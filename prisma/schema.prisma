@@ -1,0 +1,127 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Expense {
+  id        Int      @id @default(autoincrement())
+  cat       String
+  name      String
+  freq      String   // monthly | quarterly | yearly | weekly
+  amt       Float
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Debt {
+  id   Int    @id @default(autoincrement())
+  name String
+  amt  Float
+}
+
+model Asset {
+  id   Int    @id @default(autoincrement())
+  name String
+  amt  Float
+}
+
+model MortgageSettings {
+  id        Int    @id @default(1)
+  balance   Float  @default(530073)
+  rate      Float  @default(5.99)
+  payment   Float  @default(3237)
+  offsetBal Float  @default(47563)
+  endDate   String @default("2053-01-16")
+}
+
+model IncomeSettings {
+  id              Int     @id @default(1)
+  jorgeFTE        Float   @default(150000)
+  graceFTE        Float   @default(100000)
+  graceHasHELP    Boolean @default(true)
+  taxMode         Boolean @default(true)
+  jorgeMonthlyNet Float   @default(9176)
+  graceMonthlyNet Float   @default(4436)
+}
+
+model GracePhase {
+  id   Int @id @default(autoincrement())
+  year Int
+  days Int
+}
+
+model ProjectionSettings {
+  id            Int     @id @default(1)
+  jorgeGrowth   Float   @default(3.5)
+  graceGrowth   Float   @default(3.0)
+  expInflNear   Float   @default(4.0)
+  expInfl       Float   @default(2.5)
+  childcareInfl Float   @default(6.0)
+  propGrowth    Float   @default(3.5)
+  savingsRate   Float   @default(10.0)
+  investReturn  Float   @default(3.5)
+  projYears     Int     @default(20)
+  schoolFeesOn  Boolean @default(false)
+  sfC1Start     Int     @default(2028)
+  sfC1ExitIdx   Int     @default(13)
+  sfC2Start     Int     @default(2031)
+  sfC2ExitIdx   Int     @default(13)
+  sfInfl        Float   @default(5.0)
+}
+
+model LifePhase {
+  id         Int     @id @default(autoincrement())
+  name       String
+  type       String  // recurring | oneoff | phaseout
+  monthlyAmt Float
+  startYear  Int
+  endYear    Int
+  cat        String
+  enabled    Boolean @default(true)
+  sortOrder  Int     @default(0)
+}
+
+model OneOff {
+  id   Int    @id @default(autoincrement())
+  name String
+  amt  Float
+  year Int
+}
+
+model Transaction {
+  id          Int      @id @default(autoincrement())
+  dateStr     String
+  ym          String
+  desc        String
+  amt         Float
+  cat         String
+  originalCat String
+  catSource   String   // custom | system
+  lumpy       Boolean  @default(false)
+  importedAt  DateTime @default(now())
+
+  @@unique([dateStr, desc, amt])
+}
+
+model CategoriationRule {
+  id      Int    @id @default(autoincrement())
+  pattern String @unique
+  cat     String
+  source  String @default("user")
+  hits    Int    @default(0)
+}
+
+model SuggestionState {
+  id     Int    @id @default(autoincrement())
+  cat    String @unique
+  status String @default("pending")
+}
+
+model ActualsSettings {
+  id                    Int     @id @default(1)
+  useActualsProjections Boolean @default(false)
+}
