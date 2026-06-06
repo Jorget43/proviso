@@ -420,6 +420,55 @@ input[type=range] { width: 100%; accent-color: var(--t3); }
 .var-bar      { height: 100%; border-radius: 3px; transition: width .3s; }
 .proj-toggle  { display: flex; align-items: center; gap: 8px; font-size: 0.76rem; color: var(--t2); }
 
+/* ── Super ── */
+.super-table-wrap { overflow-x: auto; max-height: 480px; overflow-y: auto; }
+.super-table { width: 100%; border-collapse: collapse; font-size: 0.73rem; }
+.super-table th { position: sticky; top: 0; padding: 4px 8px; text-align: left; font-size: 0.61rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--t3); font-weight: 500; border-bottom: 1px solid var(--border); background: var(--surface2); white-space: nowrap; z-index: 1; }
+.super-table td { padding: 4px 8px; border-bottom: 1px solid var(--border); vertical-align: middle; white-space: nowrap; }
+.super-table tr:last-child td { border-bottom: none; }
+.super-table tr:hover td { background: #FAFAF5; }
+.super-table tr.super-cap-hit td { background: var(--amber-lt); }
+.super-table tr.super-depleted td { background: var(--red-lt); opacity: 0.6; }
+.super-num  { text-align: right; font-variant-numeric: tabular-nums; }
+.super-tax  { color: var(--red); }
+.super-pv   { color: var(--teal); }
+.super-draw { color: var(--amber); }
+.super-phase-sep { font-size: 0.68rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--t3); background: var(--surface2); border-top: 2px solid var(--border-md); border-bottom: 1px solid var(--border); padding: 5px 8px; margin-top: 4px; }
+.super-badge { display: inline-block; font-size: 0.58rem; font-weight: 600; padding: 1px 5px; border-radius: 4px; margin-right: 3px; vertical-align: middle; }
+.super-badge.cap { background: var(--amber-lt); color: var(--amber); }
+.super-badge.div { background: var(--purple-lt); color: var(--purple); }
+.super-legend { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 0.5rem; }
+.da-label { font-size: 0.74rem; color: var(--t2); flex-shrink: 0; min-width: 160px; }
+
+/* Super hint (mortgage aware suggestion) */
+.super-hint { margin-top: 0.6rem; padding: 0.5rem 0.75rem; background: var(--amber-lt); border: 1px solid rgba(138,82,8,0.2); border-radius: 6px; font-size: 0.72rem; color: var(--t2); display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; }
+.hint-link { background: none; border: none; padding: 0; font-family: inherit; font-size: inherit; font-weight: 600; color: var(--amber); cursor: pointer; text-decoration: underline; }
+.hint-link:hover { color: var(--t1); }
+
+/* Super context box (salary/age from Budget, read-only) */
+.super-context-box { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--r); padding: 0.6rem 0.8rem; display: flex; flex-direction: column; gap: 0.35rem; }
+.super-context-title { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.07em; color: var(--t3); font-weight: 600; margin-bottom: 0.1rem; }
+.super-context-row { display: flex; justify-content: space-between; align-items: baseline; gap: 0.5rem; font-size: 0.74rem; }
+.super-context-name { color: var(--t2); font-weight: 500; flex-shrink: 0; }
+.super-context-detail { color: var(--t3); font-size: 0.7rem; text-align: right; }
+.super-context-link { font-size: 0.7rem; color: var(--blue); text-decoration: none; margin-top: 0.2rem; align-self: flex-end; }
+.super-context-link:hover { text-decoration: underline; }
+
+/* ── Income person card (Budget) ── */
+.inc-person-card { display: flex; flex-direction: column; gap: 0.35rem; }
+.inc-card-name { font-size: 0.68rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; }
+.inc-breakdown { display: flex; flex-direction: column; gap: 2px; border-top: 1px solid var(--border); padding-top: 0.4rem; margin-top: 0.1rem; }
+.inc-br-row { display: flex; justify-content: space-between; align-items: baseline; font-size: 0.72rem; color: var(--t2); }
+.inc-br-row span { flex: 1; }
+.inc-br-row strong { text-align: right; white-space: nowrap; font-weight: 500; }
+.inc-br-negative { color: var(--red) !important; }
+.inc-br-help { color: var(--amber) !important; }
+.inc-br-super { color: var(--blue) !important; }
+.inc-br-super-row { border-top: 1px dashed var(--border); padding-top: 3px; margin-top: 2px; }
+.inc-br-net-row { border-top: 1px solid var(--border-md); padding-top: 3px; margin-top: 2px; font-size: 0.74rem; }
+.inc-br-net { color: var(--green) !important; font-weight: 600 !important; }
+.inc-rates { display: flex; gap: 0.75rem; font-size: 0.64rem; color: var(--t3); margin-top: 2px; }
+
 /* ── Misc ── */
 .proj-note { font-size: 0.68rem; color: var(--t3); line-height: 1.6; margin-top: 0.5rem; }
 .small { font-size: 0.68rem; color: var(--t3); }

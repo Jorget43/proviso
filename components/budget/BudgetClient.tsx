@@ -94,8 +94,6 @@ export default function BudgetClient({
       <IncomePanel
         income={income}
         currentDays={currentDays}
-        jorgeNet={jorgeNet}
-        graceNet={graceNet}
         onUpdate={updateIncome}
       />
 
