@@ -12,7 +12,7 @@ Jorge & Grace personal finance dashboard. Next.js 16 app, SQLite via Prisma 5, d
 | Debts & Assets | ✅ Done | `/debts`        |
 | Cashflow     | ✅ Done   | `/cashflow`     |
 | Projections  | ✅ Done   | `/projections`  |
-| Actuals      | ⏳ Next   | `/actuals`      |
+| Actuals      | ✅ Done   | `/actuals`      |
 
 ## Key architecture decisions
 
@@ -56,6 +56,5 @@ Key classes: `.page`, `.banner` + `.b-item/.b-label/.b-value`, `.metrics`, `.mc`
 
 ## Remaining (Phase 1)
 
-1. **Actuals tab** — CSV import, transaction review/categorisation, custom rules, monthly spend history chart
-2. **Docker + docker-compose** — self-hosted on Unraid
-3. **Deploy via Tailscale** — mobile access for Jorge & Grace
+1. **Docker + docker-compose** — self-hosted on Unraid
+2. **Deploy via Tailscale** — mobile access for Jorge & Grace
