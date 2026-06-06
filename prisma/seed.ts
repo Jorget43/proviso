@@ -13,7 +13,7 @@ async function main() {
   await prisma.incomeSettings.upsert({
     where:  { id: 1 },
     update: {},
-    create: { id: 1, jorgeFTE: 150000, graceFTE: 100000, graceHasHELP: true, taxMode: true, jorgeMonthlyNet: 9176, graceMonthlyNet: 4436 },
+    create: { id: 1, jorgeFTE: 150000, graceFTE: 100000, graceHasHELP: true, taxMode: true, jorgeMonthlyNet: 9176, graceMonthlyNet: 4436, jorgeAge: 34, graceAge: 32 },
   });
 
   await prisma.projectionSettings.upsert({
@@ -153,6 +153,21 @@ async function main() {
       ],
     });
   }
+
+  // ── Super settings ────────────────────────────────────────────────────────
+  await prisma.superSettings.upsert({
+    where:  { id: 1 },
+    update: {},
+    create: {
+      id: 1,
+      currentBalance: 164000, retirementAge: 67, additionalContribs: 0,
+      sgRate: 0.12, investmentReturn: 0.06, fundFeePercent: 0.005,
+      inflationRate: 0.04, desiredRetirementIncome: 80000,
+      partnerEnabled: true, partnerBalance: 80000, partnerRetirementAge: 67, partnerAdditionalContribs: 0,
+      // Orphaned (kept for DB compat)
+      currentAge: 34, salaryExcSuper: 135035, salaryGrowthRate: 0.04,
+    },
+  });
 
   console.log('✓ Seed complete');
 }

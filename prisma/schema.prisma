@@ -46,6 +46,8 @@ model IncomeSettings {
   taxMode         Boolean @default(true)
   jorgeMonthlyNet Float   @default(9176)
   graceMonthlyNet Float   @default(4436)
+  jorgeAge        Int     @default(34)
+  graceAge        Int     @default(32)
 }
 
 model GracePhase {
@@ -124,4 +126,27 @@ model SuggestionState {
 model ActualsSettings {
   id                    Int     @id @default(1)
   useActualsProjections Boolean @default(false)
+}
+
+model SuperSettings {
+  id                        Int     @id @default(1)
+  // Jorge's settings (DB column names kept for compat; mapped to jorgeBalance/etc in app code)
+  currentBalance            Float   @default(164000)
+  retirementAge             Int     @default(67)
+  additionalContribs        Float   @default(0)
+  // Shared assumptions
+  sgRate                    Float   @default(0.12)
+  investmentReturn          Float   @default(0.06)
+  fundFeePercent            Float   @default(0.005)
+  inflationRate             Float   @default(0.04)
+  desiredRetirementIncome   Float   @default(80000)
+  // Partner (Grace)
+  partnerEnabled            Boolean @default(true)
+  partnerBalance            Float   @default(80000)
+  partnerRetirementAge      Int     @default(67)
+  partnerAdditionalContribs Float   @default(0)
+  // Orphaned — kept for DB compat, no longer shown in UI
+  currentAge                Int     @default(34)
+  salaryExcSuper            Float   @default(135035)
+  salaryGrowthRate          Float   @default(0.04)
 }

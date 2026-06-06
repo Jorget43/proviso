@@ -8,6 +8,7 @@ const TABS = [
   { href: '/debts',       label: 'Debts & Assets' },
   { href: '/cashflow',    label: 'Cashflow' },
   { href: '/projections', label: 'Projections' },
+  { href: '/super',       label: 'Super' },
 ]
 
 export default function TopNav() {

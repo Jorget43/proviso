@@ -23,12 +23,142 @@ export interface IncomeSettings {
 interface IncomePanelProps {
   income: IncomeSettings
   currentDays: number
-  jorgeNet: number
-  graceNet: number
   onUpdate: (patch: Partial<IncomeSettings>) => void
 }
 
-export default function IncomePanel({ income, currentDays, jorgeNet, graceNet, onUpdate }: IncomePanelProps) {
+const BRACKETS = [
+  { lo: 0,      hi: 18200,  label: 'Nil', color: 'var(--green)' },
+  { lo: 18200,  hi: 45000,  label: '16%', color: '#C8A830' },
+  { lo: 45000,  hi: 135000, label: '30%', color: 'var(--amber)' },
+  { lo: 135000, hi: 190000, label: '37%', color: '#C05C35' },
+  { lo: 190000, hi: 250000, label: '45%', color: 'var(--red)' },
+]
+const DISPLAY_MAX = 250000
+
+function BracketBar({ gross }: { gross: number }) {
+  const capped = Math.min(gross, DISPLAY_MAX)
+  return (
+    <div style={{ marginTop: '0.5rem' }}>
+      <div style={{ fontSize: '0.6rem', color: 'var(--t3)', marginBottom: 4 }}>
+        Income bracket position
+      </div>
+      <div style={{ display: 'flex', height: 7, borderRadius: 4, overflow: 'hidden', gap: 2 }}>
+        {BRACKETS.map(b => {
+          const pct = (b.hi - b.lo) / DISPLAY_MAX * 100
+          const fill = capped >= b.hi ? 100 : capped > b.lo ? (capped - b.lo) / (b.hi - b.lo) * 100 : 0
+          return (
+            <div
+              key={b.lo}
+              title={`${b.label}: $${(b.lo / 1000).toFixed(0)}k – $${(b.hi / 1000).toFixed(0)}k`}
+              style={{
+                flex: `0 0 ${pct}%`,
+                background: 'rgba(50,42,28,0.08)',
+                borderRadius: 2,
+                overflow: 'hidden',
+                position: 'relative',
+              }}
+            >
+              <div
+                style={{
+                  width: `${fill}%`,
+                  height: '100%',
+                  background: b.color,
+                  transition: 'width 0.3s',
+                }}
+              />
+            </div>
+          )
+        })}
+      </div>
+      <div style={{ display: 'flex', marginTop: 3 }}>
+        {BRACKETS.map(b => {
+          const pct = (b.hi - b.lo) / DISPLAY_MAX * 100
+          const active = capped > b.lo
+          return (
+            <div
+              key={b.lo}
+              style={{
+                flex: `0 0 ${pct}%`,
+                fontSize: '0.58rem',
+                color: active ? b.color : 'rgba(50,42,28,0.25)',
+                textAlign: 'center',
+                fontWeight: active ? 600 : 400,
+                overflow: 'hidden',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {b.label}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function PersonCard({
+  name,
+  gross,
+  hasHELP,
+  nameColor,
+  children,
+}: {
+  name: string
+  gross: number
+  hasHELP: boolean
+  nameColor: string
+  children: React.ReactNode
+}) {
+  const tax  = calcIncomeTax(gross)
+  const med  = calcMedicare(gross)
+  const help = hasHELP ? calcHELPRepayment(gross) : 0
+  const sg   = Math.round(gross * 0.12)
+  const net  = gross - tax - med - help
+  const eff  = gross > 0 ? ((tax + med + help) / gross * 100) : 0
+  const marg = marginalRate(gross) * 100
+
+  return (
+    <div className="inc-person-card">
+      <div className="inc-card-name" style={{ color: nameColor }}>{name}</div>
+      {children}
+      {gross > 0 && (
+        <>
+          <div className="inc-breakdown">
+            <div className="inc-br-row">
+              <span>Income tax</span>
+              <strong className="inc-br-negative">−{fmt(tax)}/yr</strong>
+            </div>
+            <div className="inc-br-row">
+              <span>Medicare levy</span>
+              <strong className="inc-br-negative">−{fmt(med)}/yr</strong>
+            </div>
+            {help > 0 && (
+              <div className="inc-br-row">
+                <span>HELP repayment</span>
+                <strong className="inc-br-help">−{fmt(help)}/yr</strong>
+              </div>
+            )}
+            <div className="inc-br-row inc-br-super-row">
+              <span>Super (SG 12%)</span>
+              <strong className="inc-br-super">{fmt(sg)}/yr</strong>
+            </div>
+            <div className="inc-br-row inc-br-net-row">
+              <span>Net take-home</span>
+              <strong className="inc-br-net">{fmt(net)}/yr · {fmt(net / 12)}/mo</strong>
+            </div>
+          </div>
+          <BracketBar gross={gross} />
+          <div className="inc-rates">
+            <span>Effective rate: {eff.toFixed(1)}%</span>
+            <span>Marginal: {marg.toFixed(0)}%</span>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+export default function IncomePanel({ income, currentDays, onUpdate }: IncomePanelProps) {
   const graceWorking = income.graceFTE * (currentDays / 5)
   const gracePct = Math.round(currentDays / 5 * 100)
 
@@ -36,8 +166,11 @@ export default function IncomePanel({ income, currentDays, jorgeNet, graceNet, o
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.72rem', color: 'var(--t2)' }}>
       ATO brackets
       <label className="toggle-switch">
-        <input type="checkbox" checked={income.taxMode}
-          onChange={e => onUpdate({ taxMode: e.target.checked })} />
+        <input
+          type="checkbox"
+          checked={income.taxMode}
+          onChange={e => onUpdate({ taxMode: e.target.checked })}
+        />
         <span className="toggle-slider" />
       </label>
       <span style={{ color: income.taxMode ? 'var(--teal)' : 'var(--t3)', fontWeight: 500 }}>
@@ -50,8 +183,12 @@ export default function IncomePanel({ income, currentDays, jorgeNet, graceNet, o
     <Panel title="Income" dotColor="var(--green)" right={toggle}>
       {income.taxMode ? (
         <div className="income-grid">
-          <div className="inc-person">
-            <label>Grace <span style={{ color: 'var(--pink)', fontWeight: 500, fontSize: '0.7rem' }}>{currentDays}d/wk</span></label>
+          <PersonCard
+            name="Grace"
+            gross={graceWorking}
+            hasHELP={income.graceHasHELP}
+            nameColor="var(--pink)"
+          >
             <div className="input-prefix">
               <span>FTE/yr</span>
               <input
@@ -61,9 +198,9 @@ export default function IncomePanel({ income, currentDays, jorgeNet, graceNet, o
               />
             </div>
             <div style={{ fontSize: '0.68rem', color: 'var(--teal)', fontWeight: 500, marginTop: 3 }}>
-              {currentDays}d/wk = {fmt(graceWorking)}/yr gross ({gracePct}% FTE)
+              {currentDays}d/wk = {fmt(graceWorking)}/yr ({gracePct}% FTE)
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
               <input
                 type="checkbox"
                 id="graceHELPchk"
@@ -74,14 +211,14 @@ export default function IncomePanel({ income, currentDays, jorgeNet, graceNet, o
                 HELP debt repayments
               </label>
             </div>
-            <div style={{ fontSize: '0.68rem', color: 'var(--t3)', marginTop: 2 }}>
-              {fmt(graceWorking)}/yr gross &rarr; {fmt(graceNet * 12)}/yr net ({fmt(graceNet)}/mo)
-              {income.graceHasHELP && calcHELPRepayment(graceWorking) > 0 &&
-                ` · HELP ${fmt(calcHELPRepayment(graceWorking))}/yr`}
-            </div>
-          </div>
-          <div className="inc-person">
-            <label>Jorge</label>
+          </PersonCard>
+
+          <PersonCard
+            name="Jorge"
+            gross={income.jorgeFTE}
+            hasHELP={false}
+            nameColor="var(--blue)"
+          >
             <div className="input-prefix">
               <span>Gross/yr</span>
               <input
@@ -90,11 +227,10 @@ export default function IncomePanel({ income, currentDays, jorgeNet, graceNet, o
                 onBlur={e => onUpdate({ jorgeFTE: parseFloat(e.target.value) || 0 })}
               />
             </div>
-            <div style={{ fontSize: '0.68rem', color: 'var(--t3)', marginTop: 4 }}>No HELP debt</div>
-            <div style={{ fontSize: '0.68rem', color: 'var(--t3)', marginTop: 2 }}>
-              {fmt(income.jorgeFTE)}/yr gross &rarr; {fmt(jorgeNet * 12)}/yr net ({fmt(jorgeNet)}/mo)
+            <div style={{ fontSize: '0.68rem', color: 'var(--t3)', marginTop: 3 }}>
+              5d/wk · Full time · No HELP debt
             </div>
-          </div>
+          </PersonCard>
         </div>
       ) : (
         <div className="income-grid">
@@ -122,51 +258,6 @@ export default function IncomePanel({ income, currentDays, jorgeNet, graceNet, o
           </div>
         </div>
       )}
-
-      {income.taxMode && (
-        <TaxBreakdown income={income} currentDays={currentDays} />
-      )}
     </Panel>
-  )
-}
-
-function TaxBreakdown({ income, currentDays }: { income: IncomeSettings; currentDays: number }) {
-  const graceWorking = income.graceFTE * (currentDays / 5)
-  const rows = [
-    { name: `Grace (${currentDays}d/wk · ${Math.round(currentDays/5*100)}% FTE)`, gross: graceWorking, hasHELP: income.graceHasHELP },
-    { name: 'Jorge', gross: income.jorgeFTE, hasHELP: false },
-  ].filter(r => r.gross > 0)
-
-  return (
-    <div style={{ borderTop: '1px solid var(--border)', paddingTop: '0.5rem', marginTop: '0.75rem' }}>
-      {rows.map(r => {
-        const tax  = calcIncomeTax(r.gross)
-        const med  = calcMedicare(r.gross)
-        const help = r.hasHELP ? calcHELPRepayment(r.gross) : 0
-        const net  = calcAfterTax(r.gross, r.hasHELP)
-        const eff  = effectiveRate(r.gross, r.hasHELP) * 100
-        const marg = marginalRate(r.gross) * 100
-        return (
-          <div key={r.name} style={{
-            display: 'flex', flexWrap: 'wrap', gap: 8,
-            padding: '6px 0', borderBottom: '1px solid var(--border)', fontSize: '0.74rem',
-          }}>
-            <span style={{ minWidth: 180, fontWeight: 500, color: 'var(--t1)' }}>{r.name}</span>
-            <span style={{ color: 'var(--t3)' }}>Gross <strong style={{ color: 'var(--t1)' }}>{fmt(r.gross)}</strong></span>
-            <span style={{ color: 'var(--t3)' }}>Tax <strong style={{ color: 'var(--red)' }}>{fmt(tax)}</strong></span>
-            <span style={{ color: 'var(--t3)' }}>Medicare <strong style={{ color: 'var(--red)' }}>{fmt(med)}</strong></span>
-            {r.hasHELP && help > 0 && (
-              <span style={{ color: 'var(--t3)' }}>HELP <strong style={{ color: 'var(--amber)' }}>{fmt(help)}</strong></span>
-            )}
-            <span style={{ color: 'var(--t3)' }}>Net <strong style={{ color: 'var(--green)' }}>{fmt(net)}</strong></span>
-            <span style={{ color: 'var(--t3)' }}>Eff. rate <strong style={{ color: 'var(--t1)' }}>{eff.toFixed(1)}%</strong></span>
-            <span style={{ color: 'var(--t3)' }}>Marginal <strong style={{ color: 'var(--amber)' }}>{marg.toFixed(1)}%</strong></span>
-          </div>
-        )
-      })}
-      <p style={{ fontSize: '0.66rem', color: 'var(--t3)', marginTop: 4, lineHeight: 1.5 }}>
-        2024-25 ATO brackets · Medicare levy 2% · LITO applied · Bracket creep modelled in projections
-      </p>
-    </div>
   )
 }
