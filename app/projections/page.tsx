@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic'
 import { prisma } from '@/lib/db'
 import { toMonthly } from '@/lib/formatting'
 import type { LifePhase } from '@/lib/lifephases'
