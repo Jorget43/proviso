@@ -1,6 +1,10 @@
 @AGENTS.md
 
-# Household Dashboard
+# Proviso
+
+**Product name:** Proviso (formerly "Household Dashboard" — rename in UI/branding pending, codebase still uses `household-dashboard` directory)
+
+**Positioning:** "Most apps tell you what you spent yesterday. Proviso models what you will be worth tomorrow."
 
 Jorge & Grace personal finance dashboard. Next.js 16 app, SQLite via Prisma 5, deployed on Unraid via Tailscale.
 
@@ -131,38 +135,115 @@ npx prisma migrate resolve --applied 0003_super_partner
 ## Remaining
 
 1. **Deploy via Tailscale** — `git clone` on Unraid, then `docker compose up -d --build`
+2. **Rename UI branding** — update `TopNav` title, page `<title>` tags, and `package.json` name from "Household Dashboard" to "Proviso"
+
+---
+
+## Product strategy
+
+### Target audience
+
+Aged 30–45, Australian, carrying a mortgage and likely dependents. Professionals who use dashboards and CRMs at work and are frustrated their household finances are managed worse than their business. They have already mastered basic budgeting and are focused on wealth building, tax efficiency, and retirement planning. They are not the YNAB debt-payoff user — they are the household CFO.
+
+### Competitive positioning
+
+| Product | Price (AUD/yr) | AU Super | Self-hosted | HELP tracking |
+|---------|---------------|----------|-------------|---------------|
+| YNAB | ~$150 | No | No | No |
+| Frollo | Free (ads) | No | No | No |
+| Pocketbook | Free (ads) | No | No | No |
+| **Proviso** | **$60** | **✓ core feature** | **✓ founding differentiator** | **✓ Phase 2** |
+
+Annual-only billing — no monthly option. Aligns with the product's philosophy, eliminates churn, and guarantees cash flow to cover infrastructure costs. Annual billing is also standard for AU software (Atlassian, Xero, MYOB all default to it).
+
+### Self-hosting as moat
+
+No AU competitor can offer self-hosting without destroying their own SaaS margin. Proviso's data sovereignty promise (data never leaves the user's Unraid box) is structural, not just a feature flag. This is the founding differentiator and every architecture decision should reinforce it, not dilute it.
 
 ---
 
 ## Commercial roadmap (priority order)
 
-The app's founding differentiator is **self-hosting** — data never leaves the user's house. No AU competitor (Frollo, Pocketbook, YNAB) can offer this without destroying their own business model. Every phase below reinforces this, not dilutes it.
+### Phase 2 — AU tax & super depth (highest ROI, foundation already exists)
 
-### Phase 2 — AU tax & super tooling (highest ROI, foundation already exists)
+The Super tab and tax engine are the foundation. Phase 2 makes them commercially defensible — no competitor comes close on these features in the AU market.
 
-The HELP repayment engine in `lib/tax.ts` is a starting point. Extend with:
+#### 2A — HELP/HECS indexation alert
 
-- **HELP/HECS indexing alert** — CPI indexation hits 1 June every year. Surface a prompt in May showing the projected indexation amount and how much a voluntary repayment would save. Most AU apps ignore this entirely.
-- **Super concessional cap tracker** — show used vs. remaining cap ($30k/yr as of FY25), carry-forward unused caps (up to 5 prior years if balance < $500k), and an EOFY countdown. No mass-market AU app does this well.
-- **EOFY dashboard** — a dedicated June view: HELP voluntary payment window, super top-up deadline, income splitting opportunities. Seasonally relevant, high engagement.
+CPI indexation applies on **1 June** each year. The ATO indexes the **opening FY balance minus any voluntary payments** made directly to the ATO before June 1. Critically, PAYG withholding deducted by employers throughout the year does **not** reduce the indexable amount — it is credited to the debt after the indexation date. This distinction is what makes voluntary prepayments valuable.
 
-Explicitly out of scope: negative gearing calculators, investment property tools — these serve investors, not households.
+The alert: show in May "Your HELP balance of $X will increase by $Y on June 1 (CPI rate). A voluntary payment of $Z today saves you $W in indexed debt — equivalent to a guaranteed tax-free return."
+
+Schema addition required:
+
+```prisma
+model HelpDebtDetail {
+  id                  Int      @id @default(autoincrement())
+  member              String   // "Jorge" or "Grace"
+  // Opening balance at 1 July — this is the ATO indexation base
+  openingFyBalance    Float
+  // PAYG withheld by employer YTD — informational only, does NOT reduce indexation
+  estimatedWithheld   Float    @default(0)
+  // Direct voluntary payments to ATO before June 1 — these DO reduce indexation
+  voluntaryRepayments Float    @default(0)
+  financialYearEnding Int      // e.g., 2025 for FY24-25
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  @@unique([member, financialYearEnding])
+}
+```
+
+Note: our `Debt.id` is `Int @default(autoincrement())`, so `HelpDebtDetail` uses an `Int` PK — not a cuid string as some external schema suggestions have proposed.
+
+#### 2B — Super concessional cap carry-forward
+
+The $30,000/yr concessional cap can be carried forward for up to 5 prior financial years, **but only if total super balance was under $500,000 at the end of the prior FY**. The current super engine (lib/super.ts) indexes the cap to AWOTE for projections but does not track actual historical utilisation.
+
+Schema addition required:
+
+```prisma
+model SuperHistory {
+  id                   Int      @id @default(autoincrement())
+  member               String   // "Jorge" or "Grace"
+  financialYearEnding  Int      // e.g., 2024 for FY23-24
+  concessionalCap      Float    // Legislative cap that year (e.g., 27500, 30000)
+  concessionalUtilised Float    // Employer SG + salary sacrifice + personal deductible
+  totalSuperBalance    Float    // Balance at 30 June — triggers carry-forward if < $500k
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  @@unique([member, financialYearEnding])
+  @@index([member])
+}
+```
+
+Query pattern for carry-forward calculation: fetch last 5 `SuperHistory` records per member, sum `(concessionalCap - concessionalUtilised)` for years where `totalSuperBalance < 500000`. Surface the result as an available top-up amount before EOFY.
+
+#### 2C — EOFY dashboard
+
+A dedicated June view (surfaced as a seasonal prompt, not a permanent tab):
+
+- HELP voluntary payment window with countdown to June 1
+- Super concessional top-up opportunity with carry-forward amount
+- Marginal rate optimisation: show whether salary sacrificing to the cap reduces income below a bracket threshold
+
+#### Explicitly out of scope for Phase 2
+
+Negative gearing calculators, investment property tools — these serve investors, not households.
 
 ### Phase 3 — CDR / Open Banking bank feeds
 
-Australia's Consumer Data Right mandates banks expose transaction data via accredited APIs. This is the legitimate replacement for the current CSV import — no scraping, no US intermediaries like Plaid.
+Australia's Consumer Data Right mandates banks expose transaction data via accredited APIs. This is the legitimate path to replace CSV import — no scraping, no US intermediaries like Plaid.
 
-- Research CDR accreditation requirements (ACCC process)
-- Replace `parseCsvText()` in `lib/actuals.ts` with a CDR feed adapter behind the same interface
-- CSV import stays as fallback for non-CDR institutions
-
-Subscription detection from transaction history (flagging recurring charges, price increases) is a useful by-product of having structured transaction data — build this on top of the CDR feed, not before it.
+- Research ACCC CDR accreditation requirements before committing to any intermediary vendor
+- Replace `parseCsvText()` in `lib/actuals.ts` with a CDR adapter behind the same interface
+- CSV import stays as permanent fallback for non-CDR institutions and privacy-first users
+- Subscription detection (recurring charges, price creep) is a natural by-product — build after the feed, not before
 
 ### Phase 4 — Household RBAC (family tenant model)
 
 Build for a household as a unit, not an individual with sharing bolted on:
 
-- **Tenant model** — single household has multiple users with roles
+- **Tenant model** — single household, multiple users with roles
 - **CFO role** — full read/write across all tabs
 - **Partner role** — read + actuals import, no budget editing
 - **Child role** — restricted view, gamified pocket money tracker (stretch)
@@ -171,5 +252,7 @@ This is architecturally significant (auth, multi-tenancy, row-level scoping) —
 
 ### Explicitly deprioritised
 
-- Auto utility switching / bill negotiation — requires commercial partnerships, not buildable independently
+- Auto utility switching / bill negotiation — requires commercial partnerships
 - One-click subscription cancellation — not feasible in AU without deep integrations
+- NPV calculator for appliances (solar, EVs) — interesting but Phase 3 at earliest
+- App Store optimisation — irrelevant until a native mobile wrapper exists
