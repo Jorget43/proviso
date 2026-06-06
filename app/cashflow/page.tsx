@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic'
 import { prisma } from '@/lib/db'
 import { calcAfterTax } from '@/lib/tax'
 import { toMonthly } from '@/lib/formatting'
