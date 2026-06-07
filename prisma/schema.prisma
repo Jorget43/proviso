@@ -188,3 +188,17 @@ model SuperSettings {
   salaryExcSuper            Float   @default(135035)
   salaryGrowthRate          Float   @default(0.04)
 }
+
+model SuperHistory {
+  id                   Int      @id @default(autoincrement())
+  member               String   // "Person1" / "Person2" (matches HouseholdSettings names)
+  financialYearEnding  Int      // e.g. 2024 for FY23-24
+  concessionalCap      Float    // Legislative cap that year (e.g. 27500, 30000)
+  concessionalUtilised Float    // Employer SG + salary sacrifice + personal deductible
+  totalSuperBalance    Float    // Balance at 30 June — gates carry-forward when < $500k
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@unique([member, financialYearEnding])
+  @@index([member])
+}

@@ -107,6 +107,26 @@ body {
 }
 .nav-settings-btn:hover { color: rgba(245,242,236,0.9); }
 
+/* Seasonal EOFY prompt — only rendered in May/June */
+.nav-eofy {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-decoration: none;
+  padding: 4px 9px;
+  border-radius: 999px;
+  color: var(--amber);
+  background: color-mix(in srgb, var(--amber) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--amber) 34%, transparent);
+  transition: background .15s, color .15s;
+}
+.nav-eofy:hover,
+.nav-eofy.active { background: color-mix(in srgb, var(--amber) 24%, transparent); color: var(--amber); }
+
 /* ── Page container ── */
 .page {
   padding: 1.4rem 1.75rem 4rem;
