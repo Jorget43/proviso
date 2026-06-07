@@ -135,7 +135,6 @@ npx prisma migrate resolve --applied 0003_super_partner
 ## Remaining
 
 1. **Deploy via Tailscale** — `git clone` on Unraid, then `docker compose up -d --build`
-2. **Rename UI branding** — update `TopNav` title, page `<title>` tags, and `package.json` name from "Household Dashboard" to "Proviso"
 
 ---
 

@@ -122,7 +122,7 @@ export default function OnboardingClient() {
       <div className="ob-outer">
         <div className="ob-card">
           <div className="ob-welcome">
-            <div className="ob-logo">Household <em>Dashboard</em></div>
+            <div className="ob-logo">Proviso</div>
             <div className="ob-welcome-headline">Your household,<br />modelled.</div>
             <p className="ob-welcome-sub">
               Most apps tell you what you spent yesterday.<br />
