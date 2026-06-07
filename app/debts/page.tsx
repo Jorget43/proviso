@@ -28,6 +28,13 @@ export default async function DebtsPage() {
   const person1Name = hs?.person1Name ?? 'Person 1'
   const person2Name = hs?.person2Name ?? 'Person 2'
 
+  // Gross income per member — used to express the indexation saving as a
+  // marginal-rate equivalent in the HELP alert.
+  const helpIncome: Record<string, number> = {
+    [person1Name]: income.jorgeFTE,
+    [person2Name]: income.graceFTE,
+  }
+
   const helpPersons = hasHelp ? [
     ...(income.jorgeHasHELP || debts.some(d => d.name.toLowerCase().includes(person1Name.toLowerCase()) && /help|hecs/i.test(d.name)) ? [{
       name:       person1Name,
@@ -51,6 +58,7 @@ export default async function DebtsPage() {
       initialExpenses={expenses}
       householdSettings={hs ?? { person1Name: 'You', person2Name: 'Partner', partnerEnabled: false }}
       initialHelpDetails={helpDetails}
+      helpIncome={helpIncome}
       fyEnding={fyEnding}
       showHelp={hasHelp}
       helpPersons={helpPersons}
