@@ -26,13 +26,12 @@ ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV DATABASE_URL="file:/data/household.db"
 
-# Prisma needs these at runtime
-COPY --from=builder /app/node_modules/.prisma        ./node_modules/.prisma
-COPY --from=builder /app/node_modules/@prisma        ./node_modules/@prisma
-COPY --from=builder /app/node_modules/prisma         ./node_modules/prisma
-COPY --from=builder /app/prisma                      ./prisma
+# Full node_modules needed: prisma CLI, tsx (for seed), and all their deps
+COPY --from=builder /app/node_modules               ./node_modules
+COPY --from=builder /app/prisma                     ./prisma
+COPY --from=builder /app/package.json               ./package.json
 
-# Next.js standalone build
+# Next.js standalone build (overlays its own trimmed node_modules on top)
 COPY --from=builder /app/.next/standalone            ./
 COPY --from=builder /app/.next/static                ./.next/static
 COPY --from=builder /app/public                      ./public
