@@ -9,6 +9,7 @@ import {
 import SuperBanner from './SuperBanner'
 import SuperBalanceChart from './SuperBalanceChart'
 import SuperProjectionTable from './SuperProjectionTable'
+import ConcessionalCarryForward, { type SuperHistoryItem } from './ConcessionalCarryForward'
 import Panel from '@/components/ui/Panel'
 
 interface MortgageContext {
@@ -23,11 +24,12 @@ interface Props {
   budgetAnnualSpend: number
   person1Name:       string
   person2Name:       string
+  superHistory:      SuperHistoryItem[]
 }
 
 type Field = keyof HouseholdSuperInputs
 
-export default function SuperClient({ initial, context, mortgage, budgetAnnualSpend, person1Name, person2Name }: Props) {
+export default function SuperClient({ initial, context, mortgage, budgetAnnualSpend, person1Name, person2Name, superHistory }: Props) {
   const [inputs, setInputs] = useState<HouseholdSuperInputs>(initial)
   const [saving, setSaving]  = useState(false)
 
@@ -282,6 +284,14 @@ export default function SuperClient({ initial, context, mortgage, budgetAnnualSp
             )}
           </div>
         </Panel>
+      </div>
+
+      {/* ── Concessional cap carry-forward (Phase 2B) ── */}
+      <div style={{ marginTop: '1rem' }}>
+        <ConcessionalCarryForward
+          members={inputs.partnerEnabled ? [person1Name, person2Name] : [person1Name]}
+          initialRows={superHistory}
+        />
       </div>
 
       {/* ── Projection table ── */}
