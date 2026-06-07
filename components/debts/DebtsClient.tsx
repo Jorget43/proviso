@@ -8,6 +8,8 @@ import MortgageDetail, { type MortgageSettings } from './MortgageDetail'
 import EmergencyFund from './EmergencyFund'
 import HelpPanel, { type HelpDetail } from './HelpPanel'
 import HelpRepaymentTracker, { type HelpPerson } from './HelpRepaymentTracker'
+import HelpIndexationAlert from './HelpIndexationAlert'
+import { computeHelpAlert, isInAlertWindow, daysUntilIndexation, type HelpAlert } from '@/lib/help'
 
 interface HouseholdSettings {
   person1Name:    string
@@ -22,6 +24,7 @@ interface DebtsClientProps {
   initialExpenses:    { amt: number; freq: string }[]
   householdSettings:  HouseholdSettings
   initialHelpDetails: HelpDetail[]
+  helpIncome:         Record<string, number>
   fyEnding:           number
   showHelp:           boolean
   helpPersons:        HelpPerson[]
@@ -34,6 +37,7 @@ export default function DebtsClient({
   initialExpenses,
   householdSettings,
   initialHelpDetails,
+  helpIncome,
   fyEnding,
   showHelp,
   helpPersons,
@@ -122,15 +126,74 @@ export default function DebtsClient({
     })
   }, [])
 
-  const helpMembers = [
+  // ── HELP indexation state (lifted so the seasonal alert stays in sync with edits) ──
+  const helpMembers = useMemo(() => [
     { name: householdSettings.person1Name, detail: initialHelpDetails.find(d => d.member === householdSettings.person1Name) ?? null },
     ...(householdSettings.partnerEnabled
       ? [{ name: householdSettings.person2Name, detail: initialHelpDetails.find(d => d.member === householdSettings.person2Name) ?? null }]
       : []),
-  ]
+  ], [householdSettings, initialHelpDetails])
+
+  const [helpDetails, setHelpDetails] = useState<Record<string, HelpDetail | null>>(
+    () => Object.fromEntries(helpMembers.map(m => [m.name, m.detail])),
+  )
+  const [cpiRate, setCpiRate] = useState(initialHelpDetails.find(d => d.cpiRate != null)?.cpiRate ?? 3.5)
+
+  const saveHelp = async (member: string, patch: Partial<HelpDetail>) => {
+    const prev = helpDetails[member]
+    const body = {
+      member,
+      financialYearEnding: fyEnding,
+      openingFyBalance:    patch.openingFyBalance    ?? prev?.openingFyBalance    ?? 0,
+      estimatedWithheld:   patch.estimatedWithheld   ?? prev?.estimatedWithheld   ?? 0,
+      voluntaryRepayments: patch.voluntaryRepayments ?? prev?.voluntaryRepayments ?? 0,
+      cpiRate:             patch.cpiRate             ?? cpiRate,
+    }
+    // Optimistic — keeps the alert reactive while the request is in flight.
+    setHelpDetails(d => ({ ...d, [member]: { ...(d[member] ?? { id: 0 }), ...body } as HelpDetail }))
+    const res = await fetch('/api/help-debt-detail', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    const saved: HelpDetail = await res.json()
+    setHelpDetails(d => ({ ...d, [member]: saved }))
+  }
+
+  const commitCpiRate = (rate: number) => {
+    setCpiRate(rate)
+    for (const { name } of helpMembers) {
+      if (helpDetails[name]) saveHelp(name, { cpiRate: rate })
+    }
+  }
+
+  const helpAlerts = useMemo<HelpAlert[]>(() => {
+    if (!showHelp || !isInAlertWindow(fyEnding)) return []
+    return helpMembers
+      .map(({ name }) => {
+        const d = helpDetails[name]
+        if (!d) return null
+        return computeHelpAlert({
+          member:              name,
+          financialYearEnding: fyEnding,
+          openingFyBalance:    d.openingFyBalance,
+          voluntaryRepayments: d.voluntaryRepayments,
+          cpiRate,
+          grossIncome:         helpIncome[name] ?? 0,
+        })
+      })
+      .filter((a): a is HelpAlert => a !== null && a.indexableBase > 0)
+  }, [showHelp, fyEnding, helpMembers, helpDetails, cpiRate, helpIncome])
 
   return (
     <div className="page">
+      {helpAlerts.length > 0 && (
+        <HelpIndexationAlert
+          alerts={helpAlerts}
+          daysUntil={daysUntilIndexation(fyEnding)}
+          fyEnding={fyEnding}
+        />
+      )}
       <div className="two-col">
         <div>
           <DebtGrid
@@ -157,7 +220,12 @@ export default function DebtsClient({
           {showHelp && (
             <HelpPanel
               members={helpMembers}
+              details={helpDetails}
+              cpiRate={cpiRate}
               fyEnding={fyEnding}
+              onSave={saveHelp}
+              onCpiRateChange={setCpiRate}
+              onCpiRateCommit={commitCpiRate}
             />
           )}
           {helpPersons.length > 0 && (
