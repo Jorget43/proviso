@@ -128,6 +128,14 @@ model ActualsSettings {
   useActualsProjections Boolean @default(false)
 }
 
+model HouseholdSettings {
+  id             Int     @id @default(1)
+  person1Name    String  @default("You")
+  person2Name    String  @default("Partner")
+  partnerEnabled Boolean @default(false)
+  onboardingDone Boolean @default(false)
+}
+
 model SuperSettings {
   id                        Int     @id @default(1)
   // Jorge's settings (DB column names kept for compat; mapped to jorgeBalance/etc in app code)

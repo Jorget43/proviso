@@ -13,6 +13,7 @@ const TABS = [
 
 export default function TopNav() {
   const pathname = usePathname()
+  if (pathname === '/onboarding') return null
   return (
     <div className="topbar">
       <div className="topbar-title">Household <em>Dashboard</em></div>

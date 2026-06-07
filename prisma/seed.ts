@@ -154,6 +154,13 @@ async function main() {
     });
   }
 
+  // ── Household settings (onboarding) ──────────────────────────────────────
+  await prisma.householdSettings.upsert({
+    where:  { id: 1 },
+    update: {},
+    create: { id: 1, person1Name: 'You', person2Name: 'Partner', partnerEnabled: false, onboardingDone: false },
+  });
+
   // ── Super settings ────────────────────────────────────────────────────────
   await prisma.superSettings.upsert({
     where:  { id: 1 },
