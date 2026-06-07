@@ -1,0 +1,18 @@
+services:
+  household-dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: household-dashboard
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - household-db:/data
+    environment:
+      - DATABASE_URL=file:/data/household.db
+      - NODE_ENV=production
+
+volumes:
+  household-db:
+    driver: local
