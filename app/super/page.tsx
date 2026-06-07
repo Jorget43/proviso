@@ -5,12 +5,13 @@ import SuperClient from '@/components/super/SuperClient'
 import type { HouseholdSuperInputs, ProjectionContext } from '@/lib/super'
 
 export default async function SuperPage() {
-  const [s, inc, proj, mtg, expenses] = await Promise.all([
+  const [s, inc, proj, mtg, expenses, hs] = await Promise.all([
     prisma.superSettings.findFirst(),
     prisma.incomeSettings.findUniqueOrThrow({ where: { id: 1 } }),
     prisma.projectionSettings.findUniqueOrThrow({ where: { id: 1 } }),
     prisma.mortgageSettings.findFirst(),
     prisma.expense.findMany(),
+    prisma.householdSettings.findUnique({ where: { id: 1 } }),
   ])
 
   // Budget-derived annual spend in today's dollars (rounded to nearest $1k)
@@ -58,6 +59,8 @@ export default async function SuperPage() {
       context={context}
       mortgage={mortgageContext}
       budgetAnnualSpend={budgetAnnualSpend}
+      person1Name={hs?.person1Name ?? 'Person 1'}
+      person2Name={hs?.person2Name ?? 'Person 2'}
     />
   )
 }

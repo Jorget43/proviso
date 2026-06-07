@@ -21,11 +21,13 @@ interface Props {
   context:           ProjectionContext
   mortgage:          MortgageContext
   budgetAnnualSpend: number
+  person1Name:       string
+  person2Name:       string
 }
 
 type Field = keyof HouseholdSuperInputs
 
-export default function SuperClient({ initial, context, mortgage, budgetAnnualSpend }: Props) {
+export default function SuperClient({ initial, context, mortgage, budgetAnnualSpend, person1Name, person2Name }: Props) {
   const [inputs, setInputs] = useState<HouseholdSuperInputs>(initial)
   const [saving, setSaving]  = useState(false)
 
@@ -121,14 +123,15 @@ export default function SuperClient({ initial, context, mortgage, budgetAnnualSp
         result={result}
         jorgeCurrentAge={context.jorgeAge}
         jorgeRetirementAge={inputs.jorgeRetirementAge}
+        person1Name={person1Name}
       />
 
       <div className="two-col" style={{ marginTop: '1rem' }}>
         {/* ── Left: inputs ── */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
 
-          {/* Jorge */}
-          <Panel title="Jorge">
+          {/* Person 1 */}
+          <Panel title={person1Name}>
             <div className="da-grid">
               {numInput('jorgeBalance', 'Current balance', '$', 5000)}
               <div>
@@ -143,9 +146,9 @@ export default function SuperClient({ initial, context, mortgage, budgetAnnualSp
             </div>
           </Panel>
 
-          {/* Grace / Partner */}
+          {/* Person 2 / Partner */}
           <Panel
-            title="Grace"
+            title={person2Name}
             right={
               <label className="toggle-switch">
                 <input
@@ -172,7 +175,7 @@ export default function SuperClient({ initial, context, mortgage, budgetAnnualSp
               </div>
             ) : (
               <p style={{ fontSize: '0.75rem', color: 'var(--t3)', margin: 0 }}>
-                Toggle on to include Grace's super in the projection.
+                Toggle on to include {person2Name}&apos;s super in the projection.
               </p>
             )}
           </Panel>
@@ -219,7 +222,7 @@ export default function SuperClient({ initial, context, mortgage, budgetAnnualSp
           <div className="super-context-box">
             <div className="super-context-title">Salary & age from Budget</div>
             <div className="super-context-row">
-              <span className="super-context-name">Jorge</span>
+              <span className="super-context-name">{person1Name}</span>
               <span className="super-context-detail">
                 Age {context.jorgeAge}
                 {' · '}${context.jorgeSalary.toLocaleString('en-AU')}/yr
@@ -228,7 +231,7 @@ export default function SuperClient({ initial, context, mortgage, budgetAnnualSp
             </div>
             {inputs.partnerEnabled && (
               <div className="super-context-row">
-                <span className="super-context-name">Grace</span>
+                <span className="super-context-name">{person2Name}</span>
                 <span className="super-context-detail">
                   Age {context.graceAge}
                   {' · '}${context.graceSalary.toLocaleString('en-AU')}/yr
@@ -253,7 +256,7 @@ export default function SuperClient({ initial, context, mortgage, budgetAnnualSp
         <Panel title="Balance over time" dotColor="var(--blue)">
           <p style={{ fontSize: '0.72rem', color: 'var(--t3)', marginBottom: '0.5rem' }}>
             {inputs.partnerEnabled
-              ? 'Blue = Jorge · Purple = Grace · Green = Combined · Dashed = today\'s $'
+              ? `Blue = ${person1Name} · Purple = ${person2Name} · Green = Combined · Dashed = today's $`
               : 'Blue = accumulation · Amber = drawdown · Dashed = today\'s $'}
           </p>
           <SuperBalanceChart
@@ -262,6 +265,8 @@ export default function SuperClient({ initial, context, mortgage, budgetAnnualSp
             graceRows={result.grace?.rows ?? null}
             jorgeRetirementYear={jorgeRetirementYear}
             graceRetirementYear={inputs.partnerEnabled ? graceRetirementYear : null}
+            person1Name={person1Name}
+            person2Name={person2Name}
           />
           <div className="super-legend">
             {result.jorge.rows.some(r => r.capHit) && (

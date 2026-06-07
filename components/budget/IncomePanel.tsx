@@ -24,6 +24,8 @@ interface IncomePanelProps {
   income: IncomeSettings
   currentDays: number
   onUpdate: (patch: Partial<IncomeSettings>) => void
+  person1Name: string
+  person2Name: string
 }
 
 const BRACKETS = [
@@ -158,7 +160,7 @@ function PersonCard({
   )
 }
 
-export default function IncomePanel({ income, currentDays, onUpdate }: IncomePanelProps) {
+export default function IncomePanel({ income, currentDays, onUpdate, person1Name, person2Name }: IncomePanelProps) {
   const graceWorking = income.graceFTE * (currentDays / 5)
   const gracePct = Math.round(currentDays / 5 * 100)
 
@@ -184,7 +186,7 @@ export default function IncomePanel({ income, currentDays, onUpdate }: IncomePan
       {income.taxMode ? (
         <div className="income-grid">
           <PersonCard
-            name="Grace"
+            name={person2Name}
             gross={graceWorking}
             hasHELP={income.graceHasHELP}
             nameColor="var(--pink)"
@@ -214,7 +216,7 @@ export default function IncomePanel({ income, currentDays, onUpdate }: IncomePan
           </PersonCard>
 
           <PersonCard
-            name="Jorge"
+            name={person1Name}
             gross={income.jorgeFTE}
             hasHELP={false}
             nameColor="var(--blue)"
@@ -235,7 +237,7 @@ export default function IncomePanel({ income, currentDays, onUpdate }: IncomePan
       ) : (
         <div className="income-grid">
           <div className="inc-person">
-            <label>Grace <span style={{ color: 'var(--pink)', fontWeight: 500, fontSize: '0.7rem' }}>{currentDays}d/wk</span></label>
+            <label>{person2Name} <span style={{ color: 'var(--pink)', fontWeight: 500, fontSize: '0.7rem' }}>{currentDays}d/wk</span></label>
             <div className="input-prefix">
               <span>$/mo net</span>
               <input
@@ -246,7 +248,7 @@ export default function IncomePanel({ income, currentDays, onUpdate }: IncomePan
             </div>
           </div>
           <div className="inc-person">
-            <label>Jorge</label>
+            <label>{person1Name}</label>
             <div className="input-prefix">
               <span>$/mo net</span>
               <input

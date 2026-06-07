@@ -15,6 +15,8 @@ interface BudgetClientProps {
   initialIncome: IncomeSettings
   currentDays: number
   cashOnHand: number
+  person1Name: string
+  person2Name: string
 }
 
 export default function BudgetClient({
@@ -22,6 +24,8 @@ export default function BudgetClient({
   initialIncome,
   currentDays,
   cashOnHand,
+  person1Name,
+  person2Name,
 }: BudgetClientProps) {
   const [expenses, setExpenses] = useState<Expense[]>(initialExpenses)
   const [income, setIncome] = useState<IncomeSettings>(initialIncome)
@@ -95,6 +99,8 @@ export default function BudgetClient({
         income={income}
         currentDays={currentDays}
         onUpdate={updateIncome}
+        person1Name={person1Name}
+        person2Name={person2Name}
       />
 
       <div className="metrics">

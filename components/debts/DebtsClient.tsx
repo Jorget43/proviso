@@ -7,6 +7,7 @@ import NetPosition from './NetPosition'
 import MortgageDetail, { type MortgageSettings } from './MortgageDetail'
 import EmergencyFund from './EmergencyFund'
 import HelpPanel, { type HelpDetail } from './HelpPanel'
+import HelpRepaymentTracker, { type HelpPerson } from './HelpRepaymentTracker'
 
 interface HouseholdSettings {
   person1Name:    string
@@ -23,6 +24,7 @@ interface DebtsClientProps {
   initialHelpDetails: HelpDetail[]
   fyEnding:           number
   showHelp:           boolean
+  helpPersons:        HelpPerson[]
 }
 
 export default function DebtsClient({
@@ -34,6 +36,7 @@ export default function DebtsClient({
   initialHelpDetails,
   fyEnding,
   showHelp,
+  helpPersons,
 }: DebtsClientProps) {
   const [debts,    setDebts]    = useState<DebtItem[]>(initialDebts)
   const [assets,   setAssets]   = useState<AssetItem[]>(initialAssets)
@@ -156,6 +159,9 @@ export default function DebtsClient({
               members={helpMembers}
               fyEnding={fyEnding}
             />
+          )}
+          {helpPersons.length > 0 && (
+            <HelpRepaymentTracker persons={helpPersons} />
           )}
         </div>
       </div>

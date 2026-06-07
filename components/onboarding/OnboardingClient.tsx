@@ -19,13 +19,17 @@ interface FormState {
   person1Super:       string
   person2Super:       string
   cashBalance:        string
+  sharesValue:        string
+  cryptoValue:        string
+  otherInvestments:   string
   hasMortgage:        boolean
   mortgageBalance:    string
   mortgageRate:       string
   mortgagePayment:    string
+  hasParentalLeave:   boolean
 }
 
-const STEP_LABELS = ['About you', 'Your partner', 'Superannuation', 'Cash & mortgage']
+const STEP_LABELS = ['About you', 'Your partner', 'Superannuation', 'Investments', 'Cash & mortgage']
 
 function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return (
@@ -84,9 +88,11 @@ export default function OnboardingClient() {
     person2Name: '', person2Age: '', person2Income: '',
     person2HasHELP: false, person2HELPBalance: '', person2Days: 5,
     person1Super: '', person2Super: '',
+    sharesValue: '', cryptoValue: '', otherInvestments: '',
     cashBalance: '',
     hasMortgage: false,
     mortgageBalance: '', mortgageRate: '', mortgagePayment: '',
+    hasParentalLeave: false,
   })
 
   const set = (patch: Partial<FormState>) => setForm(f => ({ ...f, ...patch }))
@@ -96,7 +102,8 @@ export default function OnboardingClient() {
       case 1: return !!form.person1Name.trim() && parseFloat(form.person1Age) > 0 && parseFloat(form.person1Income) > 0
       case 2: return !form.hasPartner || (!!form.person2Name.trim() && parseFloat(form.person2Age) > 0 && parseFloat(form.person2Income) > 0)
       case 3: return form.person1Super !== ''
-      case 4: return form.cashBalance !== ''
+      case 4: return true
+      case 5: return form.cashBalance !== ''
       default: return true
     }
   }
@@ -127,15 +134,19 @@ export default function OnboardingClient() {
           person2Days:        form.person2Days,
           person1Super:       parseFloat(form.person1Super)       || 0,
           person2Super:       parseFloat(form.person2Super)       || 0,
+          sharesValue:        parseFloat(form.sharesValue)        || 0,
+          cryptoValue:        parseFloat(form.cryptoValue)        || 0,
+          otherInvestments:   parseFloat(form.otherInvestments)   || 0,
           cashBalance:        parseFloat(form.cashBalance)        || 0,
           hasMortgage:        form.hasMortgage,
           mortgageBalance:    parseFloat(form.mortgageBalance)    || 0,
           mortgageRate:       parseFloat(form.mortgageRate)       || 0,
           mortgagePayment:    parseFloat(form.mortgagePayment)    || 0,
+          hasParentalLeave:   form.hasParentalLeave,
         }),
       })
       if (!res.ok) throw new Error('Save failed')
-      setStep(5)
+      setStep(6)
       setTimeout(() => router.push('/budget'), 1800)
     } catch {
       setError('Something went wrong — please try again.')
@@ -166,7 +177,7 @@ export default function OnboardingClient() {
   }
 
   // ── Done (step 5) ─────────────────────────────────────────────────────────
-  if (step === 5) {
+  if (step === 6) {
     return (
       <div className="ob-outer">
         <div className="ob-card">
@@ -182,8 +193,8 @@ export default function OnboardingClient() {
     )
   }
 
-  // ── Form steps 1–4 ────────────────────────────────────────────────────────
-  const isLast = step === 4
+  // ── Form steps 1–5 ────────────────────────────────────────────────────────
+  const isLast = step === 5
   const p1 = form.person1Name || 'You'
   const p2 = form.person2Name || 'Partner'
 
@@ -349,8 +360,27 @@ export default function OnboardingClient() {
           </div>
         )}
 
-        {/* ── Step 4: Cash & mortgage ── */}
+        {/* ── Step 4: Investments ── */}
         {step === 4 && (
+          <div>
+            <div className="ob-step-title">Investments & holdings</div>
+            <p className="ob-step-sub">Approximately — you can adjust these later in the Debts & Assets tab.</p>
+            <div className="ob-fields">
+              <Field label="Shares & ETFs" hint="Total value across all brokerage accounts">
+                <MoneyInput value={form.sharesValue} onChange={v => set({ sharesValue: v })} placeholder="0" />
+              </Field>
+              <Field label="Cryptocurrency" hint="Total value in today's prices">
+                <MoneyInput value={form.cryptoValue} onChange={v => set({ cryptoValue: v })} placeholder="0" />
+              </Field>
+              <Field label="Other investments" hint="Managed funds, bonds, investment property equity, etc.">
+                <MoneyInput value={form.otherInvestments} onChange={v => set({ otherInvestments: v })} placeholder="0" />
+              </Field>
+            </div>
+          </div>
+        )}
+
+        {/* ── Step 5: Cash & mortgage ── */}
+        {step === 5 && (
           <div>
             <div className="ob-step-title">Cash & mortgage</div>
             <div className="ob-fields">
@@ -394,6 +424,21 @@ export default function OnboardingClient() {
                   </Field>
                 </>
               )}
+
+              <div className="ob-toggle-row">
+                <div>
+                  <div className="ob-field-label">Parental leave</div>
+                  <div className="ob-field-hint">Will either person take parental leave during the projection period?</div>
+                </div>
+                <label className="toggle-switch">
+                  <input
+                    type="checkbox"
+                    checked={form.hasParentalLeave}
+                    onChange={e => set({ hasParentalLeave: e.target.checked })}
+                  />
+                  <span className="toggle-slider" />
+                </label>
+              </div>
 
               {error && <div className="ob-error">{error}</div>}
             </div>

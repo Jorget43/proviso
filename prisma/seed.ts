@@ -24,6 +24,7 @@ async function main() {
       childcareInfl: 6.0, propGrowth: 3.5, savingsRate: 10.0, investReturn: 3.5,
       projYears: 30, schoolFeesOn: false,
       sfC1Start: 2028, sfC1ExitIdx: 13, sfC2Start: 2031, sfC2ExitIdx: 13, sfInfl: 5.0,
+      parentalLeaveEnabled: false,
     },
   });
 
