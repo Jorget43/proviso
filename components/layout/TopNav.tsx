@@ -1,6 +1,7 @@
 'use client'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
+import { isEofySeason } from '@/lib/eofy'
 
 const TABS = [
   { href: '/budget',      label: 'Budget' },
@@ -16,6 +17,8 @@ export default function TopNav() {
   const router   = useRouter()
   if (pathname === '/onboarding') return null
   const active = TABS.find(t => pathname.startsWith(t.href))?.href ?? TABS[0].href
+  // Seasonal-only prompt — surfaced in May/June, not a permanent tab.
+  const showEofy = isEofySeason() || pathname.startsWith('/eofy')
   return (
     <div className="topbar">
       <div className="topbar-title">Proviso</div>
@@ -40,6 +43,15 @@ export default function TopNav() {
           <option key={t.href} value={t.href}>{t.label}</option>
         ))}
       </select>
+      {showEofy && (
+        <Link
+          href="/eofy"
+          className={`nav-eofy${pathname.startsWith('/eofy') ? ' active' : ''}`}
+          aria-label="End of financial year tools"
+        >
+          ◷ EOFY
+        </Link>
+      )}
       <Link href="/settings" className="nav-settings-btn" aria-label="Setup & settings">⚙</Link>
     </div>
   )

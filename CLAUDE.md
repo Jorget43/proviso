@@ -18,6 +18,9 @@ Jorge & Grace personal finance dashboard. Next.js 16 app, SQLite via Prisma 5, d
 | Projections    | ✅ Done   | `/projections`  |
 | Actuals        | ✅ Done   | `/actuals`      |
 | Super          | ✅ Done   | `/super`        |
+| EOFY (seasonal)| ✅ Done   | `/eofy`         |
+
+EOFY is a seasonal view, not a permanent tab — surfaced via a May/June `◷ EOFY` prompt in `TopNav`, reachable year-round by URL.
 
 ## Key architecture decisions
 
@@ -29,6 +32,9 @@ Jorge & Grace personal finance dashboard. Next.js 16 app, SQLite via Prisma 5, d
 - **Tax engine** (`lib/tax.ts`): ATO 2024–25 Stage 3 brackets, LITO, Medicare, HELP repayments
 - **Projection engine** (`lib/projections.ts`): 20-year dual simulation (with/without school fees), stepped inflation, monthly mortgage loop with live offset
 - **Super engine** (`lib/super.ts`): per-person `runSuperProjection` + household `runHouseholdProjection`; accumulation (15%/30% tax) → drawdown (tax-free pension phase); concessional cap indexed to AWOTE; Div 293 at $250k
+- **HELP indexation engine** (`lib/help.ts`): indexable base, 1-June countdown/window, marginal-rate equivalence (Phase 2A)
+- **Carry-forward engine** (`lib/superHistory.ts`): legislative cap history + 5-year concessional carry-forward gated on prior-year TSB < $500k (Phase 2B)
+- **EOFY engine** (`lib/eofy.ts`): May/June season gate + salary-sacrifice / marginal-rate optimisation (Phase 2C)
 
 ## DB singleton
 
@@ -124,6 +130,8 @@ When DB already has columns from a prior `db push`, baseline with:
 npx prisma migrate resolve --applied 0003_super_partner
 ```
 
+**Later Phase 2 migrations** (`0005_help_debt_detail`, `0009_super_history`) create brand-new tables, so `prisma migrate deploy` applies them cleanly on existing deployed DBs — no `migrate resolve` baseline needed.
+
 ## Budget tab income panel — updated 2026-06-06
 
 `IncomePanel` (taxMode ON) now shows a per-person breakdown card for Grace and Jorge:
@@ -167,6 +175,8 @@ No AU competitor can offer self-hosting without destroying their own SaaS margin
 
 The Super tab and tax engine are the foundation. Phase 2 makes them commercially defensible — no competitor comes close on these features in the AU market.
 
+**Status: 2A ✅ · 2B ✅ · 2C ✅ (all shipped 2026-06-07).** Spec text below is retained as reference; each sub-section now has an "Implemented" note describing what was built.
+
 #### 2A — HELP/HECS indexation alert
 
 CPI indexation applies on **1 June** each year. The ATO indexes the **opening FY balance minus any voluntary payments** made directly to the ATO before June 1. Critically, PAYG withholding deducted by employers throughout the year does **not** reduce the indexable amount — it is credited to the debt after the indexation date. This distinction is what makes voluntary prepayments valuable.
@@ -194,6 +204,8 @@ model HelpDebtDetail {
 
 Note: our `Debt.id` is `Int @default(autoincrement())`, so `HelpDebtDetail` uses an `Int` PK — not a cuid string as some external schema suggestions have proposed.
 
+**Implemented (2026-06-07):** `HelpDebtDetail` schema includes a `cpiRate` field (migration `0005_help_debt_detail`). Data-entry tracker is `components/debts/HelpPanel.tsx`; the seasonal banner is `components/debts/HelpIndexationAlert.tsx`, gated on a ~92-day window before 1 June via `lib/help.ts`. The engine expresses the saving as a marginal-rate equivalent — a guaranteed tax-free CPI% restated as the pre-tax return it beats (`cpiRate / (1 − marginalRate)`). HELP detail + CPI state live in `DebtsClient` (lifted) so the alert stays reactive. The banner is correctly dormant outside the window.
+
 #### 2B — Super concessional cap carry-forward
 
 The $30,000/yr concessional cap can be carried forward for up to 5 prior financial years, **but only if total super balance was under $500,000 at the end of the prior FY**. The current super engine (lib/super.ts) indexes the cap to AWOTE for projections but does not track actual historical utilisation.
@@ -217,6 +229,10 @@ model SuperHistory {
 
 Query pattern for carry-forward calculation: fetch last 5 `SuperHistory` records per member, sum `(concessionalCap - concessionalUtilised)` for years where `totalSuperBalance < 500000`. Surface the result as an available top-up amount before EOFY.
 
+**Implemented (2026-06-07):** `SuperHistory` schema (migration `0009_super_history`). Engine `lib/superHistory.ts` (legislative cap history FY19 $25k → FY26 $30k; `computeCarryForward`). API `/api/super-history` (GET/PUT upsert) + `/[id]` (DELETE). UI `components/super/ConcessionalCarryForward.tsx` on the Super tab.
+
+> **Accuracy deviation from the spec's query pattern:** the literal "sum unused for years where `totalSuperBalance < 500000`" was *not* implemented as written. Per the ATO rule, unused cap **accrues every year regardless of balance**; the $500k TSB test gates only whether it can be **used** this FY, measured against the **prior 30 June** balance. The engine implements the correct rule and gates eligibility accordingly. Revert to the literal interpretation only if a simpler approximation is preferred.
+
 #### 2C — EOFY dashboard
 
 A dedicated June view (surfaced as a seasonal prompt, not a permanent tab):
@@ -224,6 +240,8 @@ A dedicated June view (surfaced as a seasonal prompt, not a permanent tab):
 - HELP voluntary payment window with countdown to June 1
 - Super concessional top-up opportunity with carry-forward amount
 - Marginal rate optimisation: show whether salary sacrificing to the cap reduces income below a bracket threshold
+
+**Implemented (2026-06-07):** Route `/eofy` (`app/eofy/page.tsx`, server-rendered, `force-dynamic`) — per-member cards for HELP indexation (reuses `lib/help.ts`), super concessional top-up (reuses `lib/superHistory.ts`), and salary sacrifice. Marginal-rate optimisation lives in `lib/eofy.ts` (`computeSalarySacrifice`): concessional headroom, tax saved `room × (marginal − contributions tax)`, Div 293 awareness, and a bracket-crossing note when sacrificing down to the next threshold. `isEofySeason()` (May/June) gates a seasonal `◷ EOFY` pill in `TopNav` — **not** a permanent tab. `/eofy` stays reachable year-round.
 
 #### Explicitly out of scope for Phase 2
 
