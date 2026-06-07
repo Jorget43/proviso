@@ -16,7 +16,7 @@ export default function TopNav() {
   if (pathname === '/onboarding') return null
   return (
     <div className="topbar">
-      <div className="topbar-title">Household <em>Dashboard</em></div>
+      <div className="topbar-title">Proviso</div>
       <nav className="nav-tabs">
         {TABS.map(t => (
           <Link

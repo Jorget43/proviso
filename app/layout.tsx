@@ -17,8 +17,8 @@ const dmSerif = DM_Serif_Display({
 })
 
 export const metadata: Metadata = {
-  title: 'Household Dashboard',
-  description: 'Person1 & Person2 financial dashboard',
+  title: 'Proviso',
+  description: 'Your household, modelled.',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
