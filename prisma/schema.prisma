@@ -41,17 +41,24 @@ model MortgageSettings {
 
 model IncomeSettings {
   id              Int     @id @default(1)
-  jorgeFTE        Float   @default(150000)
-  graceFTE        Float   @default(100000)
-  graceHasHELP    Boolean @default(true)
+  jorgeFTE        Float   @default(0)
+  graceFTE        Float   @default(0)
+  jorgeHasHELP    Boolean @default(false)
+  graceHasHELP    Boolean @default(false)
   taxMode         Boolean @default(true)
-  jorgeMonthlyNet Float   @default(9176)
-  graceMonthlyNet Float   @default(4436)
-  jorgeAge        Int     @default(34)
-  graceAge        Int     @default(32)
+  jorgeMonthlyNet Float   @default(0)
+  graceMonthlyNet Float   @default(0)
+  jorgeAge        Int     @default(30)
+  graceAge        Int     @default(30)
 }
 
 model GracePhase {
+  id   Int @id @default(autoincrement())
+  year Int
+  days Int
+}
+
+model JorgePhase {
   id   Int @id @default(autoincrement())
   year Int
   days Int
@@ -135,6 +142,13 @@ model HouseholdSettings {
   person2Name    String  @default("Partner")
   partnerEnabled Boolean @default(false)
   onboardingDone Boolean @default(false)
+}
+
+model SchoolFeeLevel {
+  id      Int    @id @default(autoincrement())
+  level   String @unique
+  tuition Float  @default(0)
+  fixed   Float  @default(0)
 }
 
 model HelpDebtDetail {

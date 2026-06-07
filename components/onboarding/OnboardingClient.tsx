@@ -3,22 +3,26 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 interface FormState {
-  person1Name:       string
-  person1Age:        string
-  person1Income:     string
-  hasPartner:        boolean
-  person2Name:       string
-  person2Age:        string
-  person2Income:     string
-  person2HasHELP:    boolean
-  person2HELPBalance:string
-  person1Super:      string
-  person2Super:      string
-  cashBalance:       string
-  hasMortgage:       boolean
-  mortgageBalance:   string
-  mortgageRate:      string
-  mortgagePayment:   string
+  person1Name:        string
+  person1Age:         string
+  person1Income:      string
+  person1HasHELP:     boolean
+  person1HELPBalance: string
+  person1Days:        number
+  hasPartner:         boolean
+  person2Name:        string
+  person2Age:         string
+  person2Income:      string
+  person2HasHELP:     boolean
+  person2HELPBalance: string
+  person2Days:        number
+  person1Super:       string
+  person2Super:       string
+  cashBalance:        string
+  hasMortgage:        boolean
+  mortgageBalance:    string
+  mortgageRate:       string
+  mortgagePayment:    string
 }
 
 const STEP_LABELS = ['About you', 'Your partner', 'Superannuation', 'Cash & mortgage']
@@ -50,6 +54,24 @@ function MoneyInput({ value, onChange, placeholder }: { value: string; onChange:
   )
 }
 
+function DaysInput({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+  return (
+    <div className="ob-binary" style={{ gap: 4 }}>
+      {[1, 2, 3, 4, 5].map(d => (
+        <button
+          key={d}
+          type="button"
+          className={`ob-binary-opt${value === d ? ' active' : ''}`}
+          onClick={() => onChange(d)}
+          style={{ minWidth: 40 }}
+        >
+          {d}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 export default function OnboardingClient() {
   const router = useRouter()
   const [step, setStep] = useState(0)
@@ -57,12 +79,13 @@ export default function OnboardingClient() {
   const [error, setError] = useState('')
   const [form, setForm] = useState<FormState>({
     person1Name: '', person1Age: '', person1Income: '',
-    hasPartner: true,
+    person1HasHELP: false, person1HELPBalance: '', person1Days: 5,
+    hasPartner: false,
     person2Name: '', person2Age: '', person2Income: '',
-    person2HasHELP: false, person2HELPBalance: '',
+    person2HasHELP: false, person2HELPBalance: '', person2Days: 5,
     person1Super: '', person2Super: '',
     cashBalance: '',
-    hasMortgage: true,
+    hasMortgage: false,
     mortgageBalance: '', mortgageRate: '', mortgagePayment: '',
   })
 
@@ -90,21 +113,25 @@ export default function OnboardingClient() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           person1Name:        form.person1Name.trim(),
-          person1Age:         parseFloat(form.person1Age)        || 0,
-          person1Income:      parseFloat(form.person1Income)     || 0,
+          person1Age:         parseFloat(form.person1Age)         || 0,
+          person1Income:      parseFloat(form.person1Income)      || 0,
+          person1HasHELP:     form.person1HasHELP,
+          person1HELPBalance: parseFloat(form.person1HELPBalance) || 0,
+          person1Days:        form.person1Days,
           hasPartner:         form.hasPartner,
           person2Name:        form.person2Name.trim() || 'Partner',
-          person2Age:         parseFloat(form.person2Age)        || 0,
-          person2Income:      parseFloat(form.person2Income)     || 0,
+          person2Age:         parseFloat(form.person2Age)         || 0,
+          person2Income:      parseFloat(form.person2Income)      || 0,
           person2HasHELP:     form.person2HasHELP,
-          person2HELPBalance: parseFloat(form.person2HELPBalance)|| 0,
-          person1Super:       parseFloat(form.person1Super)      || 0,
-          person2Super:       parseFloat(form.person2Super)      || 0,
-          cashBalance:        parseFloat(form.cashBalance)       || 0,
+          person2HELPBalance: parseFloat(form.person2HELPBalance) || 0,
+          person2Days:        form.person2Days,
+          person1Super:       parseFloat(form.person1Super)       || 0,
+          person2Super:       parseFloat(form.person2Super)       || 0,
+          cashBalance:        parseFloat(form.cashBalance)        || 0,
           hasMortgage:        form.hasMortgage,
-          mortgageBalance:    parseFloat(form.mortgageBalance)   || 0,
-          mortgageRate:       parseFloat(form.mortgageRate)      || 0,
-          mortgagePayment:    parseFloat(form.mortgagePayment)   || 0,
+          mortgageBalance:    parseFloat(form.mortgageBalance)    || 0,
+          mortgageRate:       parseFloat(form.mortgageRate)       || 0,
+          mortgagePayment:    parseFloat(form.mortgagePayment)    || 0,
         }),
       })
       if (!res.ok) throw new Error('Save failed')
@@ -183,7 +210,7 @@ export default function OnboardingClient() {
                   className="ob-input"
                   value={form.person1Name}
                   onChange={e => set({ person1Name: e.target.value })}
-                  placeholder="e.g. Jorge"
+                  placeholder="e.g. Alex"
                   autoFocus
                 />
               </Field>
@@ -195,12 +222,34 @@ export default function OnboardingClient() {
                   max="100"
                   value={form.person1Age}
                   onChange={e => set({ person1Age: e.target.value })}
-                  placeholder="34"
+                  placeholder="35"
                 />
               </Field>
               <Field label="Gross salary / year" hint="Before tax, excluding super">
-                <MoneyInput value={form.person1Income} onChange={v => set({ person1Income: v })} placeholder="150000" />
+                <MoneyInput value={form.person1Income} onChange={v => set({ person1Income: v })} placeholder="100000" />
               </Field>
+              <Field label="Days per week" hint="How many days per week are you currently working?">
+                <DaysInput value={form.person1Days} onChange={v => set({ person1Days: v })} />
+              </Field>
+              <div className="ob-toggle-row">
+                <div>
+                  <div className="ob-field-label">HELP / HECS debt</div>
+                  <div className="ob-field-hint">Do you have a student loan?</div>
+                </div>
+                <label className="toggle-switch">
+                  <input
+                    type="checkbox"
+                    checked={form.person1HasHELP}
+                    onChange={e => set({ person1HasHELP: e.target.checked })}
+                  />
+                  <span className="toggle-slider" />
+                </label>
+              </div>
+              {form.person1HasHELP && (
+                <Field label="Your HELP balance">
+                  <MoneyInput value={form.person1HELPBalance} onChange={v => set({ person1HELPBalance: v })} placeholder="40000" />
+                </Field>
+              )}
             </div>
           </div>
         )}
@@ -236,7 +285,7 @@ export default function OnboardingClient() {
                       className="ob-input"
                       value={form.person2Name}
                       onChange={e => set({ person2Name: e.target.value })}
-                      placeholder="e.g. Grace"
+                      placeholder="e.g. Jordan"
                       autoFocus
                     />
                   </Field>
@@ -248,11 +297,14 @@ export default function OnboardingClient() {
                       max="100"
                       value={form.person2Age}
                       onChange={e => set({ person2Age: e.target.value })}
-                      placeholder="32"
+                      placeholder="33"
                     />
                   </Field>
                   <Field label="Partner's gross salary / year" hint="FTE — if part-time, enter the full-time equivalent">
                     <MoneyInput value={form.person2Income} onChange={v => set({ person2Income: v })} placeholder="100000" />
+                  </Field>
+                  <Field label="Partner's days per week" hint="How many days per week is your partner currently working?">
+                    <DaysInput value={form.person2Days} onChange={v => set({ person2Days: v })} />
                   </Field>
                   <div className="ob-toggle-row">
                     <div>
@@ -269,8 +321,8 @@ export default function OnboardingClient() {
                     </label>
                   </div>
                   {form.person2HasHELP && (
-                    <Field label="HELP balance">
-                      <MoneyInput value={form.person2HELPBalance} onChange={v => set({ person2HELPBalance: v })} placeholder="60000" />
+                    <Field label="Partner's HELP balance">
+                      <MoneyInput value={form.person2HELPBalance} onChange={v => set({ person2HELPBalance: v })} placeholder="40000" />
                     </Field>
                   )}
                 </>
@@ -286,11 +338,11 @@ export default function OnboardingClient() {
             <p className="ob-step-sub">Check your latest super fund statement or app.</p>
             <div className="ob-fields">
               <Field label={`${p1}'s super balance`}>
-                <MoneyInput value={form.person1Super} onChange={v => set({ person1Super: v })} placeholder="164000" />
+                <MoneyInput value={form.person1Super} onChange={v => set({ person1Super: v })} placeholder="50000" />
               </Field>
               {form.hasPartner && (
                 <Field label={`${p2}'s super balance`}>
-                  <MoneyInput value={form.person2Super} onChange={v => set({ person2Super: v })} placeholder="80000" />
+                  <MoneyInput value={form.person2Super} onChange={v => set({ person2Super: v })} placeholder="50000" />
                 </Field>
               )}
             </div>
@@ -303,7 +355,7 @@ export default function OnboardingClient() {
             <div className="ob-step-title">Cash & mortgage</div>
             <div className="ob-fields">
               <Field label="Cash & savings" hint="Total across all bank accounts">
-                <MoneyInput value={form.cashBalance} onChange={v => set({ cashBalance: v })} placeholder="52700" />
+                <MoneyInput value={form.cashBalance} onChange={v => set({ cashBalance: v })} placeholder="20000" />
               </Field>
 
               <div className="ob-toggle-row">
@@ -324,7 +376,7 @@ export default function OnboardingClient() {
               {form.hasMortgage && (
                 <>
                   <Field label="Outstanding balance">
-                    <MoneyInput value={form.mortgageBalance} onChange={v => set({ mortgageBalance: v })} placeholder="530000" />
+                    <MoneyInput value={form.mortgageBalance} onChange={v => set({ mortgageBalance: v })} placeholder="500000" />
                   </Field>
                   <Field label="Interest rate (% p.a.)">
                     <input
@@ -338,7 +390,7 @@ export default function OnboardingClient() {
                     />
                   </Field>
                   <Field label="Monthly repayment">
-                    <MoneyInput value={form.mortgagePayment} onChange={v => set({ mortgagePayment: v })} placeholder="3237" />
+                    <MoneyInput value={form.mortgagePayment} onChange={v => set({ mortgagePayment: v })} placeholder="3000" />
                   </Field>
                 </>
               )}

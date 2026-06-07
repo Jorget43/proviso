@@ -75,20 +75,26 @@ export default function SuperClient({ initial, context, mortgage, budgetAnnualSp
 
   function pctSlider(field: Field, label: string, min: number, max: number, stepPct = 0.5) {
     const pct = (inputs[field] as number) * 100
+    const dec = () => set(field, Math.max(min, parseFloat((pct - stepPct).toFixed(4))) / 100)
+    const inc = () => set(field, Math.min(max, parseFloat((pct + stepPct).toFixed(4))) / 100)
     return (
       <div className="slider-group">
         <div className="slider-label">
           <span>{label}</span>
           <strong>{pct.toFixed(1)}%</strong>
         </div>
-        <input
-          type="range"
-          min={min}
-          max={max}
-          step={stepPct}
-          value={pct}
-          onChange={e => set(field, parseFloat(e.target.value) / 100)}
-        />
+        <div className="slider-row">
+          <button className="slider-btn" type="button" onClick={dec}>−</button>
+          <input
+            type="range"
+            min={min}
+            max={max}
+            step={stepPct}
+            value={pct}
+            onChange={e => set(field, parseFloat(e.target.value) / 100)}
+          />
+          <button className="slider-btn" type="button" onClick={inc}>+</button>
+        </div>
       </div>
     )
   }

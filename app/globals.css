@@ -34,6 +34,8 @@
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+html, body { overflow-x: hidden; }
+
 body {
   font-family: var(--font-dm-sans, 'DM Sans', sans-serif);
   background: var(--bg);
@@ -80,6 +82,7 @@ body {
   padding: 1.4rem 1.75rem 4rem;
   max-width: 1180px;
   margin: 0 auto;
+  overflow-x: hidden;
 }
 
 /* ── Metric cards ── */
@@ -357,6 +360,10 @@ td.computed { font-weight: 500; text-align: right; white-space: nowrap; }
 .slider-group:last-child { margin-bottom: 0; }
 .slider-label { display: flex; justify-content: space-between; align-items: baseline; font-size: 0.74rem; color: var(--t2); margin-bottom: 4px; }
 .slider-label span { font-weight: 500; color: var(--t1); font-size: 0.8rem; }
+.slider-row { display: flex; align-items: center; gap: 5px; }
+.slider-row input[type=range] { flex: 1; min-width: 0; }
+.slider-btn { width: 26px; height: 26px; border-radius: 6px; border: 1px solid var(--border-md); background: var(--surface2); color: var(--t2); font-size: 1.05rem; line-height: 1; cursor: pointer; flex-shrink: 0; touch-action: manipulation; display: flex; align-items: center; justify-content: center; user-select: none; }
+.slider-btn:active { background: var(--surface); color: var(--t1); }
 input[type=range] { width: 100%; accent-color: var(--t3); }
 .green-t { accent-color: var(--green) !important; }
 .blue-t  { accent-color: var(--blue)  !important; }
