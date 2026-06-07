@@ -19,6 +19,7 @@ Person1 & Person2 personal finance dashboard. Next.js 16 app, SQLite via Prisma 
 | Actuals        | ✅ Done   | `/actuals`      |
 | Super          | ✅ Done   | `/super`        |
 | EOFY (seasonal)| ✅ Done   | `/eofy`         |
+| Investments    | ✅ Done   | `/investments`  |
 
 EOFY is a seasonal view, not a permanent tab — surfaced via a May/June `◷ EOFY` prompt in `TopNav`, reachable year-round by URL.
 
@@ -35,6 +36,7 @@ EOFY is a seasonal view, not a permanent tab — surfaced via a May/June `◷ EO
 - **HELP indexation engine** (`lib/help.ts`): indexable base, 1-June countdown/window, marginal-rate equivalence (Phase 2A)
 - **Carry-forward engine** (`lib/superHistory.ts`): legislative cap history + 5-year concessional carry-forward gated on prior-year TSB < $500k (Phase 2B)
 - **EOFY engine** (`lib/eofy.ts`): May/June season gate + salary-sacrifice / marginal-rate optimisation (Phase 2C)
+- **CGT engine** (`lib/cgt.ts`): per-parcel cost base, 12-month 50% discount eligibility, estimated CGT at the owner's marginal rate (Phase 6)
 
 ## DB singleton
 
@@ -130,7 +132,7 @@ When DB already has columns from a prior `db push`, baseline with:
 npx prisma migrate resolve --applied 0003_super_partner
 ```
 
-**Later Phase 2 migrations** (`0005_help_debt_detail`, `0009_super_history`) create brand-new tables, so `prisma migrate deploy` applies them cleanly on existing deployed DBs — no `migrate resolve` baseline needed.
+**Later migrations** (`0005_help_debt_detail`, `0009_super_history`, `0010_investment_parcels`) create brand-new tables, so `prisma migrate deploy` applies them cleanly on existing deployed DBs — no `migrate resolve` baseline needed.
 
 ## Budget tab income panel — updated 2026-06-06
 
@@ -287,6 +289,10 @@ When users may need to sell investments (shares, ETFs, crypto, property), CGT ru
 - Links to the Projections tab: if a parcel is flagged "may sell in year X", the estimated CGT can feed into the one-off expense for that year
 
 **Note:** The 2024 Federal Budget proposed a CGT discount rate change that was NOT passed into law. Current 50% discount rule still applies as of Jun 2026.
+
+**Implemented (2026-06-07):** `InvestmentParcel` schema (migration `0010_investment_parcels`). Engine `lib/cgt.ts` (`computeCgt`): per-parcel cost base, market value, capital gain/loss, 12-month 50%-discount test (per parcel, via purchase date), and estimated CGT at the owner's marginal rate. API `/api/investments` (GET/POST) + `/[id]` (PUT/DELETE). UI `components/investments/InvestmentsClient.tsx` at `/investments` (permanent tab) — editable parcel cards, portfolio summary banner, and a "plan to sell year X" selector that posts the estimated CGT to `/api/one-offs` as a Projections one-off. Caveats (losses from other parcels, brokerage, non-sale CGT events) are noted in the UI and not modelled.
+
+### Phase 2 status: complete. Phase 6 status: complete.
 
 ### Explicitly deprioritised
 

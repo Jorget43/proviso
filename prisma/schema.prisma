@@ -202,3 +202,16 @@ model SuperHistory {
   @@unique([member, financialYearEnding])
   @@index([member])
 }
+
+model InvestmentParcel {
+  id            Int      @id @default(autoincrement())
+  member        String   // owner — drives marginal rate for the CGT estimate
+  name          String   // e.g. "VAS", "BTC", "ABC shares"
+  quantity      Float    @default(0)
+  purchasePrice Float    @default(0) // per-unit cost
+  purchaseDate  String                // ISO date — per-parcel, drives the 12-month discount test
+  currentPrice  Float    @default(0) // per-unit market price
+  sellYear      Int?                  // optional planned sale year → feeds Projections one-off
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
