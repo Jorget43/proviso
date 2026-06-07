@@ -29,6 +29,7 @@ interface ProjSettings {
   savingsRate:   number
   investReturn:  number
   projYears:     number
+  parentalLeaveEnabled: boolean
   schoolFeesOn:  boolean
   sfC1Start:     number
   sfC1ExitIdx:   number
@@ -123,6 +124,7 @@ export default function ProjectionsClient({
     gracePhases,
     baseMonthlyExpenses,
     oneoffs,
+    parentalLeaveEnabled: settings.parentalLeaveEnabled,
     schoolFeesOn:         settings.schoolFeesOn,
     sfC1Start:            settings.sfC1Start,
     sfC1ExitIdx:          settings.sfC1ExitIdx,
@@ -302,7 +304,7 @@ export default function ProjectionsClient({
             <Panel title="Income by person" dotColor="var(--pink)">
               <GraceIncomeChart
                 labels={output.labels}
-                person1Data={main.jorgeArr} person2Data={main.graceArr}
+                person1Data={main.person1Arr} person2Data={main.person2Arr}
                 person1Name={person1Name}   person2Name={person2Name}
                 leaveYrs={main.leaveYrs}
                 person1FTE={income.jorgeFTE} person2FTE={income.graceFTE}
@@ -371,10 +373,24 @@ export default function ProjectionsClient({
           </Panel>
 
           <div style={{ marginTop: '1rem' }}>
-            <Panel title={`${person2Name}'s working pattern`} dotColor="var(--pink)">
+            <Panel
+              title={`${person2Name}'s working pattern`}
+              dotColor="var(--pink)"
+              right={
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.7rem', color: 'var(--t3)', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={settings.parentalLeaveEnabled}
+                    onChange={e => patchSettings({ parentalLeaveEnabled: e.target.checked })}
+                  />
+                  Parental leave
+                </label>
+              }
+            >
               <GraceTimeline
                 phases={gracePhases} currentYear={currentYear}
                 fte={income.graceFTE}
+                showLeave={settings.parentalLeaveEnabled}
                 onUpdate={updateGracePhase} onDelete={deleteGracePhase} onAdd={addGracePhase}
               />
             </Panel>

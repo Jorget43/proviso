@@ -10,12 +10,13 @@ function fmtM(n: number) {
 }
 
 interface Props {
-  result:           HouseholdSuperResult
-  jorgeCurrentAge:  number
+  result:             HouseholdSuperResult
+  jorgeCurrentAge:    number
   jorgeRetirementAge: number
+  person1Name:        string
 }
 
-export default function SuperBanner({ result, jorgeCurrentAge, jorgeRetirementAge }: Props) {
+export default function SuperBanner({ result, jorgeCurrentAge, jorgeRetirementAge, person1Name }: Props) {
   const { combinedRetirementTotal, combinedRetirementTotalPV, monthlyIncomeGoal, combinedDepletionAge } = result
   const yearsToRetirement = jorgeRetirementAge - jorgeCurrentAge
 
@@ -52,7 +53,7 @@ export default function SuperBanner({ result, jorgeCurrentAge, jorgeRetirementAg
       </div>
       <div className="b-div" />
       <div className="b-item">
-        <div className="b-label">Person1's years to retirement</div>
+        <div className="b-label">{person1Name}&apos;s years to retirement</div>
         <div className="b-value">{yearsToRetirement}</div>
       </div>
     </div>

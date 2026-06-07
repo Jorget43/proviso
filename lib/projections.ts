@@ -63,6 +63,9 @@ export interface ProjectionInputs {
   // One-off home expenses
   oneoffs:            OneOff[];
 
+  // Parental leave
+  parentalLeaveEnabled: boolean;
+
   // School fees
   schoolFeesOn:       boolean;
   sfC1Start:          number;
@@ -86,8 +89,8 @@ export interface ProjectionResult {
   mortArr:        number[];
   cashArr:        number[];
   investArr:      number[];
-  jorgeArr:       number[];
-  graceArr:       number[];
+  person1Arr:       number[];
+  person2Arr:       number[];
   phaseArr:       number[];
   deficitArr:     number[];
   cashRunningArr: number[];
@@ -132,6 +135,7 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
     projYears,
     mortBalance, mortRate, mortPayment, cashOnHand, propValue, cryptoValue, helpDebt,
     jorgePhases, gracePhases, baseMonthlyExpenses, oneoffs,
+    parentalLeaveEnabled,
     schoolFeesOn, sfC1Start, sfC1ExitIdx, sfC2Start, sfC2ExitIdx, sfInfl, sfSchedule,
     lifePhases, currentYear,
   } = inputs;
@@ -176,8 +180,8 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
     const mortArr:        number[] = [];
     const cashArr:        number[] = [];
     const investArr:      number[] = [];
-    const jorgeArr:       number[] = [];
-    const graceArr:       number[] = [];
+    const person1Arr:       number[] = [];
+    const person2Arr:       number[] = [];
     const phaseArr:       number[] = [];
     const deficitArr:     number[] = [];
     const cashRunningArr: number[] = [];
@@ -212,7 +216,7 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
 
       let graceAnnual: number;
       if (isLeave) {
-        graceAnnual = isFirstLeave ? PPL_MONTHLY * PPL_MONTHS : 0;
+        graceAnnual = (parentalLeaveEnabled && isFirstLeave) ? PPL_MONTHLY * PPL_MONTHS : 0;
         leaveYrs.push(yr);
       } else {
         const graceGrossFTE  = graceGrossBase * Math.pow(1 + gG, i + 1);
@@ -231,8 +235,8 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
           if (graceHELP === 0 && !helpClearedYr) helpClearedYr = yr;
         }
       }
-      jorgeArr.push(Math.round(jorgeAnnual));
-      graceArr.push(Math.round(graceAnnual));
+      person1Arr.push(Math.round(jorgeAnnual));
+      person2Arr.push(Math.round(graceAnnual));
 
       // ── School fees ──
       const sf = includeSchoolFees
@@ -281,7 +285,7 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
       // Mortgage stress: annual repayments / gross household income (standard AU definition)
       const jorgeGrossForStress = jorgeGrossBase * Math.pow(1 + jG, i + 1) * (jorgePhase.days / 5);
       const graceGrossForStress = (() => {
-        if (isLeave) return isFirstLeave ? PPL_MONTHLY * PPL_MONTHS : 0;
+        if (isLeave) return (parentalLeaveEnabled && isFirstLeave) ? PPL_MONTHLY * PPL_MONTHS : 0;
         const fte = graceGrossBase * Math.pow(1 + gG, i + 1);
         return fte * (phase.days / 5);
       })();
@@ -299,7 +303,7 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
 
     return {
       nwArr, incArr, expArr, mortArr, cashArr, investArr,
-      jorgeArr, graceArr, phaseArr, deficitArr, cashRunningArr, mortStressArr,
+      person1Arr, person2Arr, phaseArr, deficitArr, cashRunningArr, mortStressArr,
       sfC1Arr, sfC2Arr, sfSibArr, sfTotalArr, leaveYrs, helpClearedYr,
     };
   }

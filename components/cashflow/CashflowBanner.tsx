@@ -6,9 +6,11 @@ interface CashflowBannerProps {
   burnDelta: number
   cashOnHand: number
   runway: number
+  person1Name: string
+  person2Name: string
 }
 
-export default function CashflowBanner({ delta, leaveDelta, burnDelta, cashOnHand, runway }: CashflowBannerProps) {
+export default function CashflowBanner({ delta, leaveDelta, burnDelta, cashOnHand, runway, person1Name }: CashflowBannerProps) {
   return (
     <div className="banner">
       <div className="b-item">
@@ -22,7 +24,7 @@ export default function CashflowBanner({ delta, leaveDelta, burnDelta, cashOnHan
       </div>
       <div className="b-div" />
       <div className="b-item">
-        <div className="b-label">After PPL (Person1 only)</div>
+        <div className="b-label">After PPL ({person1Name} only)</div>
         <div className="b-value red">{fmtS(burnDelta)}/mo</div>
       </div>
       <div className="b-div" />
@@ -32,7 +34,7 @@ export default function CashflowBanner({ delta, leaveDelta, burnDelta, cashOnHan
       </div>
       <div className="b-div" />
       <div className="b-item">
-        <div className="b-label">Runway (Person1 only)</div>
+        <div className="b-label">Runway ({person1Name} only)</div>
         <div className={`b-value ${runway >= 6 ? 'green' : 'red'}`}>
           {runway === Infinity ? '∞' : runway.toFixed(1)} mo
         </div>

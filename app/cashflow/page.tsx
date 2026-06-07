@@ -9,12 +9,16 @@ import CashflowLineChart from '@/components/cashflow/CashflowLineChart'
 import IncVsExpChart from '@/components/cashflow/IncVsExpChart'
 
 export default async function CashflowPage() {
-  const [income, expenses, gracePhases, assets] = await Promise.all([
+  const [income, expenses, gracePhases, assets, hs, projSettings] = await Promise.all([
     prisma.incomeSettings.findUniqueOrThrow({ where: { id: 1 } }),
     prisma.expense.findMany(),
     prisma.gracePhase.findMany(),
     prisma.asset.findMany(),
+    prisma.householdSettings.findUnique({ where: { id: 1 } }),
+    prisma.projectionSettings.findUnique({ where: { id: 1 } }),
   ])
+  const person1Name = hs?.person1Name ?? 'Person 1'
+  const person2Name = hs?.person2Name ?? 'Person 2'
 
   const currentYear = new Date().getFullYear()
   const currentPhase = gracePhases.find(p => p.year === currentYear)
@@ -81,6 +85,8 @@ export default async function CashflowPage() {
         burnDelta={burnDelta}
         cashOnHand={cashOnHand}
         runway={runway}
+        person1Name={person1Name}
+        person2Name={person2Name}
       />
       <div className="two-col">
         <Panel title="24-month cashflow (both working)" dotColor="var(--green)">
@@ -91,14 +97,16 @@ export default async function CashflowPage() {
             note="Lumpy month hits applied in relevant months."
           />
         </Panel>
-        <Panel title="Parental leave scenario" dotColor="var(--pink)">
-          <CashflowLineChart
-            labels={labels}
-            data={burnData}
-            color="#9B2560"
-            note="Person2 on leave — PPL for 18 wks, then Person1 only."
-          />
-        </Panel>
+        {projSettings?.parentalLeaveEnabled !== false && (
+          <Panel title="Parental leave scenario" dotColor="var(--pink)">
+            <CashflowLineChart
+              labels={labels}
+              data={burnData}
+              color="#9B2560"
+              note={`${person2Name} on leave — PPL for 18 wks, then ${person1Name} only.`}
+            />
+          </Panel>
+        )}
       </div>
       <div style={{ marginTop: '1rem' }}>
         <Panel title="Income vs expenses by category" dotColor="var(--blue)">

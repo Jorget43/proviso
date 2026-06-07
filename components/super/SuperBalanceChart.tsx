@@ -14,10 +14,12 @@ interface Props {
   graceRows:           SuperRow[] | null
   jorgeRetirementYear: number
   graceRetirementYear: number | null
+  person1Name:         string
+  person2Name:         string
 }
 
 export default function SuperBalanceChart({
-  combined, jorgeRows, graceRows, jorgeRetirementYear, graceRetirementYear,
+  combined, jorgeRows, graceRows, jorgeRetirementYear, graceRetirementYear, person1Name, person2Name,
 }: Props) {
   const labels    = combined.map(c => String(c.year))
   const hasPerson2  = graceRows !== null && graceRows.length > 0
@@ -31,7 +33,7 @@ export default function SuperBalanceChart({
   const datasets = hasPerson2
     ? [
         {
-          label: 'Person1',
+          label: person1Name,
           data: combined.map(c => Math.round(jorgeByYear[c.year] ?? 0)),
           borderColor: 'rgba(30,95,168,0.85)',
           borderWidth: 2,
@@ -40,7 +42,7 @@ export default function SuperBalanceChart({
           tension: 0.3,
         },
         {
-          label: 'Person2',
+          label: person2Name,
           data: combined.map(c => Math.round(graceByYear[c.year] ?? 0)),
           borderColor: 'rgba(139,92,246,0.85)',
           borderWidth: 2,

@@ -249,6 +249,27 @@ Build for a household as a unit, not an individual with sharing bolted on:
 
 This is architecturally significant (auth, multi-tenancy, row-level scoping) — do it after the data model is stable.
 
+### Phase 5 — Developer watchdog (internal tooling only)
+
+A background process / admin-only page that monitors for changes to underlying assumptions:
+- ATO: new HELP repayment thresholds, new tax brackets, new LITO/LMITO offsets
+- Super Guarantee rate changes (currently 12% final — no further increases legislated as of Jun 2026)
+- CPI indexation rates when ATO announces them
+- AWOTE index used for concessional cap indexation
+
+Not user-facing at this stage. Surfaces via an admin flag that prompts the developer to update constants in `lib/tax.ts`, `lib/super.ts`, and `lib/constants.ts`. Future: allow CFO-role users to integrate government-announced changes themselves.
+
+### Phase 6 — CGT-aware investment module
+
+When users may need to sell investments (shares, ETFs, crypto, property), CGT rules apply:
+
+- **50% discount**: assets held > 12 months qualify for 50% CGT discount (individuals/trusts)
+- **Purchase date matters**: the discount eligibility is per-parcel, not per-asset
+- What to build: an "Investment parcels" table where users record each purchase (date, quantity, price), the system calculates cost base, applicable discount, and estimated CGT on a hypothetical sale
+- Links to the Projections tab: if a parcel is flagged "may sell in year X", the estimated CGT can feed into the one-off expense for that year
+
+**Note:** The 2024 Federal Budget proposed a CGT discount rate change that was NOT passed into law. Current 50% discount rule still applies as of Jun 2026.
+
 ### Explicitly deprioritised
 
 - Auto utility switching / bill negotiation — requires commercial partnerships

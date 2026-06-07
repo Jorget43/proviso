@@ -9,8 +9,10 @@ export async function POST(req: Request) {
     person2Name, person2Age, person2Income,
     person2HasHELP, person2HELPBalance, person2Days,
     person1Super, person2Super,
+    sharesValue, cryptoValue, otherInvestments,
     cashBalance,
     hasMortgage, mortgageBalance, mortgageRate, mortgagePayment,
+    hasParentalLeave,
   } = await req.json()
 
   const currentYear = new Date().getFullYear()
@@ -20,6 +22,11 @@ export async function POST(req: Request) {
       where:  { id: 1 },
       update: { person1Name, person2Name, partnerEnabled: hasPartner, onboardingDone: true },
       create: { id: 1, person1Name, person2Name, partnerEnabled: hasPartner, onboardingDone: true },
+    })
+
+    await tx.projectionSettings.update({
+      where: { id: 1 },
+      data: { parentalLeaveEnabled: hasParentalLeave },
     })
 
     await tx.incomeSettings.update({
@@ -43,12 +50,20 @@ export async function POST(req: Request) {
       },
     })
 
-    // Cash / savings asset
-    const cashAsset = await tx.asset.findFirst({ where: { name: 'Cash / savings' } })
-    if (cashAsset) {
-      await tx.asset.update({ where: { id: cashAsset.id }, data: { amt: cashBalance } })
-    } else {
-      await tx.asset.create({ data: { name: 'Cash / savings', amt: cashBalance } })
+    // Assets from onboarding — upsert by name
+    const assetUpserts: { name: string; amt: number }[] = [
+      { name: 'Cash / savings',   amt: cashBalance       },
+      { name: 'Shares & ETFs',    amt: sharesValue       },
+      { name: 'Cryptocurrency',   amt: cryptoValue       },
+      { name: 'Other investments',amt: otherInvestments  },
+    ]
+    for (const { name, amt } of assetUpserts) {
+      const existing = await tx.asset.findFirst({ where: { name } })
+      if (existing) {
+        await tx.asset.update({ where: { id: existing.id }, data: { amt } })
+      } else if (amt > 0) {
+        await tx.asset.create({ data: { name, amt } })
+      }
     }
 
     // Person 1 HELP debt
