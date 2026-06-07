@@ -137,6 +137,20 @@ model HouseholdSettings {
   onboardingDone Boolean @default(false)
 }
 
+model HelpDebtDetail {
+  id                  Int      @id @default(autoincrement())
+  member              String
+  financialYearEnding Int
+  openingFyBalance    Float    @default(0)
+  estimatedWithheld   Float    @default(0)
+  voluntaryRepayments Float    @default(0)
+  cpiRate             Float    @default(3.5)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@unique([member, financialYearEnding])
+}
+
 model SuperSettings {
   id                        Int     @id @default(1)
   // Jorge's settings (DB column names kept for compat; mapped to jorgeBalance/etc in app code)

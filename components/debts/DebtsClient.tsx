@@ -6,12 +6,23 @@ import AssetGrid, { type AssetItem } from './AssetGrid'
 import NetPosition from './NetPosition'
 import MortgageDetail, { type MortgageSettings } from './MortgageDetail'
 import EmergencyFund from './EmergencyFund'
+import HelpPanel, { type HelpDetail } from './HelpPanel'
+
+interface HouseholdSettings {
+  person1Name:    string
+  person2Name:    string
+  partnerEnabled: boolean
+}
 
 interface DebtsClientProps {
-  initialDebts: DebtItem[]
-  initialAssets: AssetItem[]
-  initialMortgage: MortgageSettings
-  initialExpenses: { amt: number; freq: string }[]
+  initialDebts:       DebtItem[]
+  initialAssets:      AssetItem[]
+  initialMortgage:    MortgageSettings
+  initialExpenses:    { amt: number; freq: string }[]
+  householdSettings:  HouseholdSettings
+  initialHelpDetails: HelpDetail[]
+  fyEnding:           number
+  showHelp:           boolean
 }
 
 export default function DebtsClient({
@@ -19,6 +30,10 @@ export default function DebtsClient({
   initialAssets,
   initialMortgage,
   initialExpenses,
+  householdSettings,
+  initialHelpDetails,
+  fyEnding,
+  showHelp,
 }: DebtsClientProps) {
   const [debts,    setDebts]    = useState<DebtItem[]>(initialDebts)
   const [assets,   setAssets]   = useState<AssetItem[]>(initialAssets)
@@ -104,6 +119,13 @@ export default function DebtsClient({
     })
   }, [])
 
+  const helpMembers = [
+    { name: householdSettings.person1Name, detail: initialHelpDetails.find(d => d.member === householdSettings.person1Name) ?? null },
+    ...(householdSettings.partnerEnabled
+      ? [{ name: householdSettings.person2Name, detail: initialHelpDetails.find(d => d.member === householdSettings.person2Name) ?? null }]
+      : []),
+  ]
+
   return (
     <div className="page">
       <div className="two-col">
@@ -129,6 +151,12 @@ export default function DebtsClient({
             onUpdate={updateMortgage}
           />
           <EmergencyFund cashOnHand={cashOnHand} monthlyExpenses={monthlyExpenses} />
+          {showHelp && (
+            <HelpPanel
+              members={helpMembers}
+              fyEnding={fyEnding}
+            />
+          )}
         </div>
       </div>
     </div>
