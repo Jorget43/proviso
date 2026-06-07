@@ -1,7 +1,7 @@
 'use client'
-import { useState } from 'react'
 import Panel from '@/components/ui/Panel'
 import { fmt } from '@/lib/formatting'
+import { isPostIndexation } from '@/lib/help'
 
 export interface HelpDetail {
   id:                  number
@@ -19,44 +19,22 @@ interface MemberRow {
 }
 
 interface HelpPanelProps {
-  members:  MemberRow[]
-  fyEnding: number
+  members:         MemberRow[]
+  details:         Record<string, HelpDetail | null>
+  cpiRate:         number
+  fyEnding:        number
+  onSave:          (member: string, patch: Partial<HelpDetail>) => void
+  onCpiRateChange: (rate: number) => void  // live (display + alert recompute)
+  onCpiRateCommit: (rate: number) => void  // persist on blur
 }
 
-export default function HelpPanel({ members, fyEnding }: HelpPanelProps) {
+export default function HelpPanel({ members, details, cpiRate, fyEnding, onSave, onCpiRateChange, onCpiRateCommit }: HelpPanelProps) {
   const fyStart        = fyEnding - 1
-  const indexationDate = new Date(`${fyEnding}-06-01`)
-  const postIndexation = new Date() >= indexationDate
+  const postIndexation = isPostIndexation(fyEnding)
 
-  const [details, setDetails] = useState<Record<string, HelpDetail | null>>(
-    Object.fromEntries(members.map(m => [m.name, m.detail]))
-  )
-  const [cpiRate, setCpiRate] = useState(
-    members.find(m => m.detail)?.detail?.cpiRate ?? 3.5
-  )
-
-  const save = async (member: string, patch: Partial<HelpDetail>) => {
-    const prev = details[member]
-    const body = {
-      member,
-      financialYearEnding: fyEnding,
-      openingFyBalance:    patch.openingFyBalance    ?? prev?.openingFyBalance    ?? 0,
-      estimatedWithheld:   patch.estimatedWithheld   ?? prev?.estimatedWithheld   ?? 0,
-      voluntaryRepayments: patch.voluntaryRepayments ?? prev?.voluntaryRepayments ?? 0,
-      cpiRate,
-    }
-    const res    = await fetch('/api/help-debt-detail', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-    const saved: HelpDetail = await res.json()
-    setDetails(d => ({ ...d, [member]: saved }))
-  }
-
-  const saveCpiRate = async (rate: number) => {
-    setCpiRate(rate)
-    for (const { name } of members) {
-      const d = details[name]
-      if (d) await save(name, { cpiRate: rate })
-    }
-  }
+  const save        = onSave
+  const setCpiRate  = onCpiRateChange
+  const saveCpiRate = onCpiRateCommit
 
   return (
     <Panel
