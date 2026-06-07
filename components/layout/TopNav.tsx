@@ -10,6 +10,7 @@ const TABS = [
   { href: '/cashflow',    label: 'Cashflow' },
   { href: '/projections', label: 'Projections' },
   { href: '/super',       label: 'Super' },
+  { href: '/investments', label: 'Investments' },
 ]
 
 export default function TopNav() {
