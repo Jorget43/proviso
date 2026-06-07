@@ -11,29 +11,35 @@ export interface GracePhaseRow {
 interface GraceTimelineProps {
   phases:      GracePhaseRow[]
   currentYear: number
+  fte?:        number
+  showLeave?:  boolean
   onUpdate:    (id: number, field: string, value: number) => void
   onDelete:    (id: number) => void
   onAdd:       () => void
 }
 
-function phaseLabel(days: number): string {
-  if (days === 0) return 'Parental leave'
+function phaseLabel(days: number, showLeave: boolean): string {
+  if (days === 0) return showLeave ? 'Parental leave' : 'Leave'
   if (days === 5) return 'Full time'
   return `${days} days/wk`
 }
 
-function phaseIncome(days: number): string {
-  if (days === 0) return 'PPL (first year)'
-  return fmt(GRACE_FTE * (days / 5)) + '/yr'
+function phaseIncome(days: number, fte: number, showLeave: boolean): string {
+  if (days === 0) return showLeave ? 'PPL (first year)' : 'Unpaid leave'
+  return fmt(fte * (days / 5)) + '/yr'
 }
 
-export default function GraceTimeline({ phases, currentYear, onUpdate, onDelete, onAdd }: GraceTimelineProps) {
+export default function GraceTimeline({
+  phases, currentYear, fte = GRACE_FTE, showLeave = true, onUpdate, onDelete, onAdd,
+}: GraceTimelineProps) {
   const sorted = [...phases].sort((a, b) => a.year - b.year)
+  const kStr   = Math.round(fte / 1000)
 
   return (
     <>
       <div style={{ fontSize: '0.69rem', color: 'var(--t3)', marginBottom: '0.65rem', lineHeight: 1.5 }}>
-        FTE base: <strong style={{ color: 'var(--t1)' }}>${GRACE_FTE.toLocaleString()}/yr</strong> · 3d=$60k · 4d=$80k · 5d=$100k
+        FTE base: <strong style={{ color: 'var(--t1)' }}>${fte.toLocaleString()}/yr</strong>
+        {' · '}3d=${Math.round(fte * 0.6 / 1000)}k · 4d=${Math.round(fte * 0.8 / 1000)}k · 5d=${kStr}k
       </div>
       <div style={{ overflowX: 'auto' }}>
         <table className="tl-table">
@@ -60,11 +66,13 @@ export default function GraceTimeline({ phases, currentYear, onUpdate, onDelete,
                       onChange={e => onUpdate(p.id, 'days', parseInt(e.target.value))}
                       style={{ fontSize: '0.76rem', border: 'none', background: 'transparent', cursor: 'pointer' }}
                     >
-                      {[0, 1, 2, 3, 4, 5].map(d => <option key={d} value={d}>{d === 0 ? 'Leave' : d + 'd'}</option>)}
+                      {(showLeave ? [0, 1, 2, 3, 4, 5] : [1, 2, 3, 4, 5]).map(d =>
+                        <option key={d} value={d}>{d === 0 ? 'Leave' : d + 'd'}</option>
+                      )}
                     </select>
                   </td>
-                  <td style={{ color: isLeave ? 'var(--pink)' : 'var(--t2)', fontSize: '0.74rem' }}>{phaseIncome(p.days)}</td>
-                  <td style={{ color: 'var(--t2)', fontSize: '0.74rem' }}>{phaseLabel(p.days)}{isCur ? ' ←' : ''}</td>
+                  <td style={{ color: isLeave ? 'var(--pink)' : 'var(--t2)', fontSize: '0.74rem' }}>{phaseIncome(p.days, fte, showLeave)}</td>
+                  <td style={{ color: 'var(--t2)', fontSize: '0.74rem' }}>{phaseLabel(p.days, showLeave)}{isCur ? ' ←' : ''}</td>
                   <td>
                     <button
                       onClick={() => onDelete(p.id)}

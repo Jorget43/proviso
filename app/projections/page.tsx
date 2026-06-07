@@ -5,9 +5,10 @@ import type { LifePhase } from '@/lib/lifephases'
 import ProjectionsClient from '@/components/projections/ProjectionsClient'
 
 export default async function ProjectionsPage() {
-  const [income, settings, gracePhases, oneoffs, lifePhases, expenses, debts, assets, mortgage] = await Promise.all([
+  const [income, settings, jorgePhases, gracePhases, oneoffs, lifePhases, expenses, debts, assets, mortgage, hs, feeSchedule] = await Promise.all([
     prisma.incomeSettings.findUniqueOrThrow({ where: { id: 1 } }),
     prisma.projectionSettings.findUniqueOrThrow({ where: { id: 1 } }),
+    prisma.jorgePhase.findMany({ orderBy: { year: 'asc' } }),
     prisma.gracePhase.findMany({ orderBy: { year: 'asc' } }),
     prisma.oneOff.findMany({ orderBy: { year: 'asc' } }),
     prisma.lifePhase.findMany({ orderBy: { sortOrder: 'asc' } }) as unknown as Promise<LifePhase[]>,
@@ -15,6 +16,8 @@ export default async function ProjectionsPage() {
     prisma.debt.findMany(),
     prisma.asset.findMany(),
     prisma.mortgageSettings.findUniqueOrThrow({ where: { id: 1 } }),
+    prisma.householdSettings.findUnique({ where: { id: 1 } }),
+    prisma.schoolFeeLevel.findMany({ orderBy: { id: 'asc' } }),
   ])
 
   const baseMonthlyExpenses = expenses.reduce((s, e) => s + toMonthly(e.amt, e.freq), 0)
@@ -30,7 +33,9 @@ export default async function ProjectionsPage() {
   return (
     <ProjectionsClient
       initialSettings={settings}
+      initialJorgePhases={jorgePhases}
       initialGracePhases={gracePhases}
+      initialFeeSchedule={feeSchedule}
       initialOneoffs={oneoffs}
       initialLifePhases={lifePhases}
       income={income}
@@ -43,6 +48,8 @@ export default async function ProjectionsPage() {
       propValue={propValue}
       cryptoValue={cryptoValue}
       currentYear={currentYear}
+      person1Name={hs?.person1Name ?? 'Person 1'}
+      person2Name={hs?.person2Name ?? 'Person 2'}
     />
   )
 }

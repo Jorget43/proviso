@@ -4,12 +4,16 @@ import { NextResponse } from 'next/server'
 export async function POST(req: Request) {
   const {
     person1Name, person1Age, person1Income,
+    person1HasHELP, person1HELPBalance, person1Days,
     hasPartner,
-    person2Name, person2Age, person2Income, person2HasHELP, person2HELPBalance,
+    person2Name, person2Age, person2Income,
+    person2HasHELP, person2HELPBalance, person2Days,
     person1Super, person2Super,
     cashBalance,
     hasMortgage, mortgageBalance, mortgageRate, mortgagePayment,
   } = await req.json()
+
+  const currentYear = new Date().getFullYear()
 
   await prisma.$transaction(async tx => {
     await tx.householdSettings.upsert({
@@ -23,6 +27,7 @@ export async function POST(req: Request) {
       data: {
         jorgeFTE:     person1Income,
         jorgeAge:     person1Age,
+        jorgeHasHELP: person1HasHELP,
         graceFTE:     person2Income,
         graceAge:     person2Age,
         graceHasHELP: person2HasHELP,
@@ -46,16 +51,46 @@ export async function POST(req: Request) {
       await tx.asset.create({ data: { name: 'Cash / savings', amt: cashBalance } })
     }
 
-    // HELP / HECS debt
-    const helpDebt = await tx.debt.findFirst({ where: { name: { contains: 'HELP' } } })
+    // Person 1 HELP debt
+    const p1HelpDebt = await tx.debt.findFirst({ where: { name: `${person1Name} HELP debt` } })
+    if (person1HasHELP && person1HELPBalance > 0) {
+      if (p1HelpDebt) {
+        await tx.debt.update({ where: { id: p1HelpDebt.id }, data: { amt: person1HELPBalance } })
+      } else {
+        await tx.debt.create({ data: { name: `${person1Name} HELP debt`, amt: person1HELPBalance } })
+      }
+    } else if (p1HelpDebt) {
+      await tx.debt.delete({ where: { id: p1HelpDebt.id } })
+    }
+
+    // Person 2 HELP debt
+    const p2HelpDebt = await tx.debt.findFirst({ where: { name: `${person2Name} HELP debt` } })
     if (hasPartner && person2HasHELP && person2HELPBalance > 0) {
-      if (helpDebt) {
-        await tx.debt.update({ where: { id: helpDebt.id }, data: { name: `${person2Name} HELP debt`, amt: person2HELPBalance } })
+      if (p2HelpDebt) {
+        await tx.debt.update({ where: { id: p2HelpDebt.id }, data: { amt: person2HELPBalance } })
       } else {
         await tx.debt.create({ data: { name: `${person2Name} HELP debt`, amt: person2HELPBalance } })
       }
-    } else if (helpDebt) {
-      await tx.debt.delete({ where: { id: helpDebt.id } })
+    } else if (p2HelpDebt) {
+      await tx.debt.delete({ where: { id: p2HelpDebt.id } })
+    }
+
+    // Person 1 work schedule — seed initial JorgePhase
+    const existingPerson1 = await tx.jorgePhase.findFirst({ where: { year: currentYear } })
+    if (!existingPerson1) {
+      await tx.jorgePhase.create({ data: { year: currentYear, days: person1Days } })
+    } else {
+      await tx.jorgePhase.update({ where: { id: existingPerson1.id }, data: { days: person1Days } })
+    }
+
+    // Person 2 work schedule — seed initial GracePhase
+    if (hasPartner) {
+      const existingPerson2 = await tx.gracePhase.findFirst({ where: { year: currentYear } })
+      if (!existingPerson2) {
+        await tx.gracePhase.create({ data: { year: currentYear, days: person2Days } })
+      } else {
+        await tx.gracePhase.update({ where: { id: existingPerson2.id }, data: { days: person2Days } })
+      }
     }
 
     // Mortgage

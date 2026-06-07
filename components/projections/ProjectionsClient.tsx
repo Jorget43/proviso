@@ -2,7 +2,9 @@
 import { useState, useMemo, useCallback } from 'react'
 import { toMonthly, fmtK } from '@/lib/formatting'
 import { runProjections, type ProjectionInputs } from '@/lib/projections'
-import { SF_LEVELS } from '@/lib/schoolFees'
+import { type FeeSchedule } from '@/lib/schoolFees'
+
+interface FeeRow { id: number; level: string; tuition: number; fixed: number }
 import Panel from '@/components/ui/Panel'
 import NetWorthChart      from './NetWorthChart'
 import GraceIncomeChart   from './GraceIncomeChart'
@@ -45,32 +47,53 @@ interface IncSettings {
 }
 
 interface ProjectionsClientProps {
-  initialSettings:   ProjSettings
-  initialGracePhases:GracePhaseRow[]
-  initialOneoffs:    OneOffRow[]
-  initialLifePhases: LifePhase[]
-  income:            IncSettings
+  initialSettings:    ProjSettings
+  initialJorgePhases: GracePhaseRow[]
+  initialGracePhases: GracePhaseRow[]
+  initialOneoffs:     OneOffRow[]
+  initialLifePhases:  LifePhase[]
+  initialFeeSchedule: FeeRow[]
+  income:             IncSettings
   baseMonthlyExpenses: number
-  mortBalance:       number
-  mortRate:          number
-  mortPayment:       number
-  mortEndDate:       string
-  cashOnHand:        number
-  propValue:         number
-  cryptoValue:       number
-  currentYear:       number
+  mortBalance:        number
+  mortRate:           number
+  mortPayment:        number
+  mortEndDate:        string
+  cashOnHand:         number
+  propValue:          number
+  cryptoValue:        number
+  currentYear:        number
+  person1Name:        string
+  person2Name:        string
 }
 
 export default function ProjectionsClient({
-  initialSettings, initialGracePhases, initialOneoffs, initialLifePhases,
+  initialSettings, initialJorgePhases, initialGracePhases, initialOneoffs, initialLifePhases, initialFeeSchedule,
   income, baseMonthlyExpenses,
   mortBalance, mortRate, mortPayment, mortEndDate,
   cashOnHand, propValue, cryptoValue, currentYear,
+  person1Name, person2Name,
 }: ProjectionsClientProps) {
   const [settings,    setSettings]    = useState<ProjSettings>(initialSettings)
+  const [jorgePhases, setJorgePhases] = useState<GracePhaseRow[]>(initialJorgePhases)
   const [gracePhases, setGracePhases] = useState<GracePhaseRow[]>(initialGracePhases)
+  const [feeRows,     setFeeRows]     = useState<FeeRow[]>(initialFeeSchedule)
   const [oneoffs,     setOneoffs]     = useState<OneOffRow[]>(initialOneoffs)
   const [lifePhases,  setLifePhases]  = useState<LifePhase[]>(initialLifePhases)
+
+  const sfSchedule = useMemo<FeeSchedule>(
+    () => Object.fromEntries(feeRows.map(r => [r.level, { tuition: r.tuition, fixed: r.fixed }])),
+    [feeRows],
+  )
+
+  const saveFeeRow = useCallback(async (id: number, field: 'tuition' | 'fixed', value: number) => {
+    setFeeRows(prev => prev.map(r => r.id === id ? { ...r, [field]: value } : r))
+    await fetch(`/api/school-fee-levels/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tuition: feeRows.find(r => r.id === id)?.tuition ?? 0, fixed: feeRows.find(r => r.id === id)?.fixed ?? 0, [field]: value }),
+    })
+  }, [feeRows])
 
   const inputs = useMemo<ProjectionInputs>(() => ({
     jorgeFTE:             income.jorgeFTE,
@@ -96,6 +119,7 @@ export default function ProjectionsClient({
     propValue,
     cryptoValue,
     helpDebt:             income.graceHasHELP ? 50000 : 0,
+    jorgePhases,
     gracePhases,
     baseMonthlyExpenses,
     oneoffs,
@@ -105,9 +129,10 @@ export default function ProjectionsClient({
     sfC2Start:            settings.sfC2Start,
     sfC2ExitIdx:          settings.sfC2ExitIdx,
     sfInfl:               settings.sfInfl,
+    sfSchedule:           sfSchedule,
     lifePhases,
     currentYear,
-  }), [settings, gracePhases, oneoffs, lifePhases, income, baseMonthlyExpenses, mortBalance, mortRate, mortPayment, cashOnHand, propValue, cryptoValue, currentYear])
+  }), [settings, jorgePhases, gracePhases, oneoffs, lifePhases, income, sfSchedule, baseMonthlyExpenses, mortBalance, mortRate, mortPayment, cashOnHand, propValue, cryptoValue, currentYear])
 
   const output = useMemo(() => runProjections(inputs), [inputs])
   const main   = output.withFees ?? output.base
@@ -131,6 +156,32 @@ export default function ProjectionsClient({
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(patch),
     })
+  }, [])
+
+  // ── Person1 phase CRUD ──
+  const addJorgePhase = useCallback(async () => {
+    const maxY = jorgePhases.length ? Math.max(...jorgePhases.map(p => p.year)) : currentYear
+    const res = await fetch('/api/jorge-phases', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ year: maxY + 2, days: 5 }),
+    })
+    const created: GracePhaseRow = await res.json()
+    setJorgePhases(prev => [...prev, created])
+  }, [jorgePhases, currentYear])
+
+  const updateJorgePhase = useCallback(async (id: number, field: string, value: number) => {
+    setJorgePhases(prev => prev.map(p => p.id === id ? { ...p, [field]: value } : p))
+    await fetch(`/api/jorge-phases/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ [field]: value }),
+    })
+  }, [])
+
+  const deleteJorgePhase = useCallback(async (id: number) => {
+    setJorgePhases(prev => prev.filter(p => p.id !== id))
+    await fetch(`/api/jorge-phases/${id}`, { method: 'DELETE' })
   }, [])
 
   // ── Person2 phase CRUD ──
@@ -198,16 +249,22 @@ export default function ProjectionsClient({
   function Slider({ label, id, min, max, step, value, cls, fmt: fmtFn = (v: number) => v + '%' }: {
     label: string; id: string; min: number; max: number; step: number; value: number; cls: string; fmt?: (v: number) => string
   }) {
+    const dec = (v: number) => patchSettings({ [id]: Math.max(min, parseFloat((v - step).toFixed(4))) } as Partial<ProjSettings>)
+    const inc = (v: number) => patchSettings({ [id]: Math.min(max, parseFloat((v + step).toFixed(4))) } as Partial<ProjSettings>)
     return (
       <div className="slider-group">
         <div className="slider-label">
           {label} <span>{fmtFn(value)}</span>
         </div>
-        <input
-          type="range" className={cls} min={min} max={max} step={step}
-          value={value}
-          onChange={e => patchSettings({ [id]: parseFloat(e.target.value) } as Partial<ProjSettings>)}
-        />
+        <div className="slider-row">
+          <button className="slider-btn" type="button" onClick={() => dec(value)}>−</button>
+          <input
+            type="range" className={cls} min={min} max={max} step={step}
+            value={value}
+            onChange={e => patchSettings({ [id]: parseFloat(e.target.value) } as Partial<ProjSettings>)}
+          />
+          <button className="slider-btn" type="button" onClick={() => inc(value)}>+</button>
+        </div>
       </div>
     )
   }
@@ -242,12 +299,16 @@ export default function ProjectionsClient({
             />
           </Panel>
           <div style={{ marginTop: '1rem' }}>
-            <Panel title="Person2's income by year" dotColor="var(--pink)">
+            <Panel title="Income by person" dotColor="var(--pink)">
               <GraceIncomeChart
-                labels={output.labels} graceData={main.graceArr}
-                leaveYrs={main.leaveYrs} graceGrowthRate={settings.graceGrowth}
+                labels={output.labels}
+                person1Data={main.jorgeArr} person2Data={main.graceArr}
+                person1Name={person1Name}   person2Name={person2Name}
+                leaveYrs={main.leaveYrs}
+                person1FTE={income.jorgeFTE} person2FTE={income.graceFTE}
+                person1Growth={settings.jorgeGrowth} person2Growth={settings.graceGrowth}
               />
-              <p className="proj-note mt1">Pink = leave (PPL first year). Dashed = $100k FTE reference.</p>
+              <p className="proj-note mt1">Pink = {person2Name} on leave. Dashed = FTE reference per person.</p>
             </Panel>
           </div>
           <div style={{ marginTop: '1rem' }}>
@@ -301,17 +362,28 @@ export default function ProjectionsClient({
 
         {/* ── Sidebar ── */}
         <div>
-          <Panel title="Person2's working pattern" dotColor="var(--pink)">
+          <Panel title={`${person1Name}'s working pattern`} dotColor="var(--blue)">
             <GraceTimeline
-              phases={gracePhases} currentYear={currentYear}
-              onUpdate={updateGracePhase} onDelete={deleteGracePhase} onAdd={addGracePhase}
+              phases={jorgePhases} currentYear={currentYear}
+              fte={income.jorgeFTE} showLeave={false}
+              onUpdate={updateJorgePhase} onDelete={deleteJorgePhase} onAdd={addJorgePhase}
             />
           </Panel>
 
           <div style={{ marginTop: '1rem' }}>
+            <Panel title={`${person2Name}'s working pattern`} dotColor="var(--pink)">
+              <GraceTimeline
+                phases={gracePhases} currentYear={currentYear}
+                fte={income.graceFTE}
+                onUpdate={updateGracePhase} onDelete={deleteGracePhase} onAdd={addGracePhase}
+              />
+            </Panel>
+          </div>
+
+          <div style={{ marginTop: '1rem' }}>
             <Panel title="Income & wage growth" dotColor="var(--blue)">
-              <Slider label="Person2 wage growth / yr"  id="graceGrowth"  min={0} max={15} step={0.5} value={settings.graceGrowth}  cls="green-t" />
-              <Slider label="Person1 wage growth / yr"  id="jorgeGrowth"  min={0} max={15} step={0.5} value={settings.jorgeGrowth}  cls="blue-t"  />
+              <Slider label={`${person2Name} wage growth / yr`} id="graceGrowth"  min={0} max={15} step={0.5} value={settings.graceGrowth}  cls="green-t" />
+              <Slider label={`${person1Name} wage growth / yr`} id="jorgeGrowth"  min={0} max={15} step={0.5} value={settings.jorgeGrowth}  cls="blue-t"  />
             </Panel>
           </div>
 
@@ -323,7 +395,7 @@ export default function ProjectionsClient({
               <Slider label="Property growth / yr"        id="propGrowth"    min={0} max={12}  step={0.5} value={settings.propGrowth}    cls="amber-t"  />
               <Slider label="Surplus invested %"          id="savingsRate"   min={0} max={100} step={5}   value={settings.savingsRate}   cls="purple-t" fmt={v => v + '%'} />
               <Slider label="Investment return / yr"      id="investReturn"  min={0} max={15}  step={0.5} value={settings.investReturn}  cls="purple-t" />
-              <Slider label="Projection horizon"          id="projYears"     min={5} max={25}  step={1}   value={settings.projYears}     cls="amber-t"  fmt={v => v + ' yrs'} />
+              <Slider label="Projection horizon"          id="projYears"     min={5} max={40}  step={1}   value={settings.projYears}     cls="amber-t"  fmt={v => v + ' yrs'} />
             </Panel>
           </div>
 
@@ -335,7 +407,7 @@ export default function ProjectionsClient({
 
           <div style={{ marginTop: '1rem' }}>
             <Panel
-              title="School fees (Steiner)"
+              title="Private school fees"
               dotColor="var(--teal)"
               right={
                 <label className="toggle-switch">
@@ -353,7 +425,7 @@ export default function ProjectionsClient({
                   <div className="da-row">
                     <label style={{ flex: 1, color: 'var(--t2)', fontSize: '0.74rem' }}>Child 1 exits after</label>
                     <select className="freq-select" value={settings.sfC1ExitIdx} onChange={e => patchSettings({ sfC1ExitIdx: parseInt(e.target.value) })} style={{ flex: '0 0 auto', width: 110 }}>
-                      {SF_LEVELS.map((l, i) => <option key={l} value={i}>{l}</option>)}
+                      {feeRows.map((r, i) => <option key={r.id} value={i}>{r.level}</option>)}
                     </select>
                   </div>
                   <div className="da-row">
@@ -363,12 +435,62 @@ export default function ProjectionsClient({
                   <div className="da-row">
                     <label style={{ flex: 1, color: 'var(--t2)', fontSize: '0.74rem' }}>Child 2 exits after</label>
                     <select className="freq-select" value={settings.sfC2ExitIdx} onChange={e => patchSettings({ sfC2ExitIdx: parseInt(e.target.value) })} style={{ flex: '0 0 auto', width: 110 }}>
-                      {SF_LEVELS.map((l, i) => <option key={l} value={i}>{l}</option>)}
+                      {feeRows.map((r, i) => <option key={r.id} value={i}>{r.level}</option>)}
                     </select>
                   </div>
                   <div style={{ marginTop: '0.5rem' }}>
                     <Slider label="Fee inflation / yr" id="sfInfl" min={0} max={10} step={0.5} value={settings.sfInfl} cls="teal-t" />
                   </div>
+                  {/* Editable fee schedule */}
+                  <details style={{ marginTop: 8 }}>
+                    <summary style={{ fontSize: '0.73rem', color: 'var(--t2)', cursor: 'pointer', userSelect: 'none' }}>
+                      Edit current fee schedule ({new Date().getFullYear()} $)
+                    </summary>
+                    <div style={{ marginTop: 8, overflowX: 'auto' }}>
+                      <table className="tl-table">
+                        <thead>
+                          <tr>
+                            <th>Year level</th>
+                            <th style={{ textAlign: 'right' }}>Tuition</th>
+                            <th style={{ textAlign: 'right' }}>Fixed / levies</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {feeRows.map(r => (
+                            <tr key={r.id}>
+                              <td style={{ fontSize: '0.73rem', color: 'var(--t2)' }}>{r.level}</td>
+                              <td>
+                                <div className="input-prefix" style={{ width: 100 }}>
+                                  <span>$</span>
+                                  <input
+                                    type="number" min="0" step="100"
+                                    defaultValue={r.tuition}
+                                    style={{ textAlign: 'right', fontSize: '0.72rem' }}
+                                    onBlur={e => saveFeeRow(r.id, 'tuition', parseFloat(e.target.value) || 0)}
+                                  />
+                                </div>
+                              </td>
+                              <td>
+                                <div className="input-prefix" style={{ width: 100 }}>
+                                  <span>$</span>
+                                  <input
+                                    type="number" min="0" step="100"
+                                    defaultValue={r.fixed}
+                                    style={{ textAlign: 'right', fontSize: '0.72rem' }}
+                                    onBlur={e => saveFeeRow(r.id, 'fixed', parseFloat(e.target.value) || 0)}
+                                  />
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                      <p style={{ fontSize: '0.67rem', color: 'var(--t3)', marginTop: 6, lineHeight: 1.4 }}>
+                        Enter today&apos;s fees. Projections inflate these at the &ldquo;Fee inflation&rdquo; rate above.
+                        A 15% sibling discount applies to Child 2&apos;s tuition when both are enrolled.
+                      </p>
+                    </div>
+                  </details>
                 </div>
               )}
             </Panel>

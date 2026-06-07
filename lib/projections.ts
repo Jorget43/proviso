@@ -6,7 +6,7 @@
 
 import { calcAfterTax, calcHELPRepayment } from './tax';
 import { simulateMortgageYear } from './mortgage';
-import { schoolFeesForYear }    from './schoolFees';
+import { schoolFeesForYear, type FeeSchedule } from './schoolFees';
 import { lifePhaseCostForYear } from './lifephases';
 import type { LifePhase }       from './lifephases';
 import { GRACE_FTE, PPL_MONTHLY, PPL_MONTHS } from './constants';
@@ -53,7 +53,8 @@ export interface ProjectionInputs {
   cryptoValue:        number;
   helpDebt:           number;   // total HELP for net-worth debt tracking (crude $10k/yr reduction)
 
-  // Person2 phases
+  // Work schedule phases — both persons
+  jorgePhases:        GracePhase[];
   gracePhases:        GracePhase[];
 
   // Expense base (monthly total — already includes mortgage repayment as a line item)
@@ -69,6 +70,7 @@ export interface ProjectionInputs {
   sfC2Start:          number;
   sfC2ExitIdx:        number;
   sfInfl:             number;
+  sfSchedule?:        FeeSchedule;
 
   // Life phase overlays (the mutable set from DB or defaults)
   lifePhases:         LifePhase[];
@@ -84,6 +86,7 @@ export interface ProjectionResult {
   mortArr:        number[];
   cashArr:        number[];
   investArr:      number[];
+  jorgeArr:       number[];
   graceArr:       number[];
   phaseArr:       number[];
   deficitArr:     number[];
@@ -128,15 +131,16 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
     propGrowth, savingsRate, investReturn,
     projYears,
     mortBalance, mortRate, mortPayment, cashOnHand, propValue, cryptoValue, helpDebt,
-    gracePhases, baseMonthlyExpenses, oneoffs,
-    schoolFeesOn, sfC1Start, sfC1ExitIdx, sfC2Start, sfC2ExitIdx, sfInfl,
+    jorgePhases, gracePhases, baseMonthlyExpenses, oneoffs,
+    schoolFeesOn, sfC1Start, sfC1ExitIdx, sfC2Start, sfC2ExitIdx, sfInfl, sfSchedule,
     lifePhases, currentYear,
   } = inputs;
 
-  const cy        = currentYear;
-  const labels    = Array.from({ length: projYears }, (_, i) => String(cy + i + 1));
-  const sorted    = getSortedPhases(gracePhases);
-  const leaveSt   = new Set(sorted.filter(p => p.days === 0).map(p => p.year));
+  const cy          = currentYear;
+  const labels      = Array.from({ length: projYears }, (_, i) => String(cy + i + 1));
+  const sorted      = getSortedPhases(gracePhases);
+  const sortedPerson1 = getSortedPhases(jorgePhases.length > 0 ? jorgePhases : [{ year: cy, days: 5 }]);
+  const leaveSt     = new Set(sorted.filter(p => p.days === 0).map(p => p.year));
 
   const jG  = jorgeGrowthRate  / 100;
   const gG  = graceGrowthRate  / 100;
@@ -172,6 +176,7 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
     const mortArr:        number[] = [];
     const cashArr:        number[] = [];
     const investArr:      number[] = [];
+    const jorgeArr:       number[] = [];
     const graceArr:       number[] = [];
     const phaseArr:       number[] = [];
     const deficitArr:     number[] = [];
@@ -192,15 +197,17 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
 
       // ── Income ──
       const phase        = getPhaseForYear(yr, sorted);
+      const jorgePhase   = getPhaseForYear(yr, sortedPerson1);
       const isLeave      = phase.days === 0;
       const isFirstLeave = isLeave && leaveSt.has(yr);
 
-      const jorgeGrossYr = jorgeGrossBase * Math.pow(1 + jG, i + 1);
+      const jorgeGrossYr  = jorgeGrossBase * Math.pow(1 + jG, i + 1);
+      const jorgeDaysGross = jorgeGrossYr * (jorgePhase.days / 5);
       let jorgeAnnual: number;
       if (taxMode) {
-        jorgeAnnual = calcAfterTax(jorgeGrossYr);
+        jorgeAnnual = calcAfterTax(jorgeDaysGross);
       } else {
-        jorgeAnnual = jorgeMonthlyNet * 12 * Math.pow(1 + jG, i + 1);
+        jorgeAnnual = jorgeMonthlyNet * 12 * Math.pow(1 + jG, i + 1) * (jorgePhase.days / 5);
       }
 
       let graceAnnual: number;
@@ -224,11 +231,12 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
           if (graceHELP === 0 && !helpClearedYr) helpClearedYr = yr;
         }
       }
+      jorgeArr.push(Math.round(jorgeAnnual));
       graceArr.push(Math.round(graceAnnual));
 
       // ── School fees ──
       const sf = includeSchoolFees
-        ? schoolFeesForYear(yr, sfC1Start, sfC1ExitIdx, sfC2Start, sfC2ExitIdx, sfInfl)
+        ? schoolFeesForYear(yr, sfC1Start, sfC1ExitIdx, sfC2Start, sfC2ExitIdx, sfInfl, sfSchedule)
         : { total: 0, c1: 0, c2: 0, sibSaving: 0, cml: 0 };
       sfC1Arr.push(Math.round(sf.c1));
       sfC2Arr.push(Math.round(sf.c2));
@@ -271,7 +279,7 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
       cashRunningArr.push(Math.round(cash));
 
       // Mortgage stress: annual repayments / gross household income (standard AU definition)
-      const jorgeGrossForStress = jorgeGrossBase * Math.pow(1 + jG, i + 1);
+      const jorgeGrossForStress = jorgeGrossBase * Math.pow(1 + jG, i + 1) * (jorgePhase.days / 5);
       const graceGrossForStress = (() => {
         if (isLeave) return isFirstLeave ? PPL_MONTHLY * PPL_MONTHS : 0;
         const fte = graceGrossBase * Math.pow(1 + gG, i + 1);
@@ -291,7 +299,7 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
 
     return {
       nwArr, incArr, expArr, mortArr, cashArr, investArr,
-      graceArr, phaseArr, deficitArr, cashRunningArr, mortStressArr,
+      jorgeArr, graceArr, phaseArr, deficitArr, cashRunningArr, mortStressArr,
       sfC1Arr, sfC2Arr, sfSibArr, sfTotalArr, leaveYrs, helpClearedYr,
     };
   }
