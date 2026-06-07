@@ -107,8 +107,8 @@ export default function SuperBalanceChart({
       },
       tooltip: {
         callbacks: {
-          label: (ctx: { dataset: { label?: string }; parsed: { y: number } }) => {
-            const v = ctx.parsed.y
+          label: (ctx: { dataset: { label?: string }; parsed: { y: number | null } }) => {
+            const v = ctx.parsed.y ?? 0
             const label = ctx.dataset.label ?? ''
             if (v >= 1_000_000) return `${label}: $${(v / 1_000_000).toFixed(2)}M`
             return `${label}: $${v.toLocaleString('en-AU')}`
