@@ -4,7 +4,7 @@ import { requireSession } from '@/lib/auth'
 import SettingsClient from '@/components/settings/SettingsClient'
 
 export default async function SettingsPage() {
-  await requireSession()
+  const me = await requireSession()
   const [hs, income, projSettings, mortgage, superSettings] = await Promise.all([
     prisma.householdSettings.findUnique({ where: { id: 1 } }),
     prisma.incomeSettings.findUniqueOrThrow({ where: { id: 1 } }),
@@ -12,6 +12,11 @@ export default async function SettingsPage() {
     prisma.mortgageSettings.findFirst(),
     prisma.superSettings.findFirst(),
   ])
+
+  // Member list is CFO-only (matches the users:write guard on the API).
+  const users = me.role === 'CFO'
+    ? await prisma.user.findMany({ select: { id: true, name: true, username: true, role: true }, orderBy: { id: 'asc' } })
+    : []
 
   return (
     <SettingsClient
@@ -24,6 +29,9 @@ export default async function SettingsPage() {
       superBalance={superSettings?.currentBalance ?? 0}
       partnerSuperBalance={superSettings?.partnerBalance ?? 0}
       parentalLeaveEnabled={projSettings.parentalLeaveEnabled}
+      currentRole={me.role}
+      currentUserId={me.userId}
+      users={users}
     />
   )
 }

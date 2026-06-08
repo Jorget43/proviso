@@ -64,6 +64,7 @@ export default function TopNav({ user }: { user: TopNavUser | null }) {
         </Link>
       )}
       <Link href="/settings" className="nav-settings-btn" aria-label="Setup & settings">⚙</Link>
+      {user.role !== 'CFO' && <span className="nav-readonly" title="Partner access — viewing only, plus Actuals import">Read-only</span>}
       <span className="nav-user" title={`${user.name} · ${user.role}`}>{user.name}</span>
       <button className="nav-logout" onClick={logout} aria-label="Sign out">Sign out</button>
     </div>
