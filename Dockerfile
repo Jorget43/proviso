@@ -12,7 +12,7 @@ COPY . .
 
 RUN npx prisma generate
 
-ENV DATABASE_URL="file:/data/household.db"
+ENV DATABASE_URL="file:/data/proviso.db"
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
 
@@ -24,7 +24,7 @@ RUN apt-get update -y && apt-get install -y openssl && rm -rf /var/lib/apt/lists
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
-ENV DATABASE_URL="file:/data/household.db"
+ENV DATABASE_URL="file:/data/proviso.db"
 
 # Standalone Next.js server (includes a trimmed node_modules subset)
 COPY --from=builder /app/.next/standalone            ./
