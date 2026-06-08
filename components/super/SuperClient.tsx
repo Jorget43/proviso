@@ -11,6 +11,7 @@ import SuperBalanceChart from './SuperBalanceChart'
 import SuperProjectionTable from './SuperProjectionTable'
 import ConcessionalCarryForward, { type SuperHistoryItem } from './ConcessionalCarryForward'
 import Panel from '@/components/ui/Panel'
+import ReadOnlyFence from '@/components/ui/ReadOnlyFence'
 
 interface MortgageContext {
   mortgagePaymentMonthly: number
@@ -18,6 +19,7 @@ interface MortgageContext {
 }
 
 interface Props {
+  canEdit:           boolean
   initial:           HouseholdSuperInputs
   context:           ProjectionContext
   mortgage:          MortgageContext
@@ -29,7 +31,7 @@ interface Props {
 
 type Field = keyof HouseholdSuperInputs
 
-export default function SuperClient({ initial, context, mortgage, budgetAnnualSpend, person1Name, person2Name, superHistory }: Props) {
+export default function SuperClient({ canEdit, initial, context, mortgage, budgetAnnualSpend, person1Name, person2Name, superHistory }: Props) {
   const [inputs, setInputs] = useState<HouseholdSuperInputs>(initial)
   const [saving, setSaving]  = useState(false)
 
@@ -244,14 +246,16 @@ export default function SuperClient({ initial, context, mortgage, budgetAnnualSp
             <Link href="/budget" className="super-context-link">Edit in Budget →</Link>
           </div>
 
-          <button
-            className="add-btn"
-            style={{ alignSelf: 'flex-start' }}
-            onClick={save}
-            disabled={saving}
-          >
-            {saving ? 'Saving…' : 'Save settings'}
-          </button>
+          <ReadOnlyFence canEdit={canEdit} title="Read-only — only CFO members can save super settings">
+            <button
+              className="add-btn"
+              style={{ alignSelf: 'flex-start' }}
+              onClick={save}
+              disabled={saving}
+            >
+              {saving ? 'Saving…' : 'Save settings'}
+            </button>
+          </ReadOnlyFence>
         </div>
 
         {/* ── Right: chart ── */}
@@ -288,10 +292,12 @@ export default function SuperClient({ initial, context, mortgage, budgetAnnualSp
 
       {/* ── Concessional cap carry-forward (Phase 2B) ── */}
       <div style={{ marginTop: '1rem' }}>
-        <ConcessionalCarryForward
-          members={inputs.partnerEnabled ? [person1Name, person2Name] : [person1Name]}
-          initialRows={superHistory}
-        />
+        <ReadOnlyFence canEdit={canEdit}>
+          <ConcessionalCarryForward
+            members={inputs.partnerEnabled ? [person1Name, person2Name] : [person1Name]}
+            initialRows={superHistory}
+          />
+        </ReadOnlyFence>
       </div>
 
       {/* ── Projection table ── */}

@@ -4,6 +4,7 @@ import { toMonthly, fmt, fmtS } from '@/lib/formatting'
 import { calcAfterTax } from '@/lib/tax'
 import { CATS } from '@/lib/constants'
 import MetricCard from '@/components/ui/MetricCard'
+import ReadOnlyFence from '@/components/ui/ReadOnlyFence'
 import IncomePanel, { type IncomeSettings } from './IncomePanel'
 import ExpenseTable, { type Expense } from './ExpenseTable'
 import SpendDonut from './SpendDonut'
@@ -11,6 +12,7 @@ import MonthlySummary from './MonthlySummary'
 import LumpyMonths from './LumpyMonths'
 
 interface BudgetClientProps {
+  canEdit: boolean
   initialExpenses: Expense[]
   initialIncome: IncomeSettings
   currentDays: number
@@ -20,6 +22,7 @@ interface BudgetClientProps {
 }
 
 export default function BudgetClient({
+  canEdit,
   initialExpenses,
   initialIncome,
   currentDays,
@@ -95,13 +98,15 @@ export default function BudgetClient({
 
   return (
     <div className="page">
-      <IncomePanel
-        income={income}
-        currentDays={currentDays}
-        onUpdate={updateIncome}
-        person1Name={person1Name}
-        person2Name={person2Name}
-      />
+      <ReadOnlyFence canEdit={canEdit}>
+        <IncomePanel
+          income={income}
+          currentDays={currentDays}
+          onUpdate={updateIncome}
+          person1Name={person1Name}
+          person2Name={person2Name}
+        />
+      </ReadOnlyFence>
 
       <div className="metrics">
         <MetricCard
@@ -136,12 +141,14 @@ export default function BudgetClient({
         />
       </div>
 
-      <ExpenseTable
-        expenses={expenses}
-        onAdd={addExpense}
-        onUpdate={updateExpense}
-        onDelete={deleteExpense}
-      />
+      <ReadOnlyFence canEdit={canEdit}>
+        <ExpenseTable
+          expenses={expenses}
+          onAdd={addExpense}
+          onUpdate={updateExpense}
+          onDelete={deleteExpense}
+        />
+      </ReadOnlyFence>
 
       <div className="two-col">
         <SpendDonut catMonthly={catMonthly} />

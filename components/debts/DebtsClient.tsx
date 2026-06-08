@@ -9,6 +9,7 @@ import EmergencyFund from './EmergencyFund'
 import HelpPanel, { type HelpDetail } from './HelpPanel'
 import HelpRepaymentTracker, { type HelpPerson } from './HelpRepaymentTracker'
 import HelpIndexationAlert from './HelpIndexationAlert'
+import ReadOnlyFence from '@/components/ui/ReadOnlyFence'
 import { computeHelpAlert, isInAlertWindow, daysUntilIndexation, type HelpAlert } from '@/lib/help'
 
 interface HouseholdSettings {
@@ -18,6 +19,7 @@ interface HouseholdSettings {
 }
 
 interface DebtsClientProps {
+  canEdit:            boolean
   initialDebts:       DebtItem[]
   initialAssets:      AssetItem[]
   initialMortgage:    MortgageSettings
@@ -31,6 +33,7 @@ interface DebtsClientProps {
 }
 
 export default function DebtsClient({
+  canEdit,
   initialDebts,
   initialAssets,
   initialMortgage,
@@ -196,37 +199,43 @@ export default function DebtsClient({
       )}
       <div className="two-col">
         <div>
-          <DebtGrid
-            debts={debts}
-            onAdd={addDebt}
-            onUpdate={updateDebt}
-            onDelete={deleteDebt}
-          />
-          <AssetGrid
-            assets={assets}
-            onAdd={addAsset}
-            onUpdate={updateAsset}
-            onDelete={deleteAsset}
-          />
+          <ReadOnlyFence canEdit={canEdit}>
+            <DebtGrid
+              debts={debts}
+              onAdd={addDebt}
+              onUpdate={updateDebt}
+              onDelete={deleteDebt}
+            />
+            <AssetGrid
+              assets={assets}
+              onAdd={addAsset}
+              onUpdate={updateAsset}
+              onDelete={deleteAsset}
+            />
+          </ReadOnlyFence>
         </div>
         <div>
           <NetPosition totalDebts={totalDebts} totalAssets={totalAssets} />
-          <MortgageDetail
-            mortgage={mortgage}
-            mortgageDebtAmt={mortgageDebtAmt}
-            onUpdate={updateMortgage}
-          />
+          <ReadOnlyFence canEdit={canEdit}>
+            <MortgageDetail
+              mortgage={mortgage}
+              mortgageDebtAmt={mortgageDebtAmt}
+              onUpdate={updateMortgage}
+            />
+          </ReadOnlyFence>
           <EmergencyFund cashOnHand={cashOnHand} monthlyExpenses={monthlyExpenses} />
           {showHelp && (
-            <HelpPanel
-              members={helpMembers}
-              details={helpDetails}
-              cpiRate={cpiRate}
-              fyEnding={fyEnding}
-              onSave={saveHelp}
-              onCpiRateChange={setCpiRate}
-              onCpiRateCommit={commitCpiRate}
-            />
+            <ReadOnlyFence canEdit={canEdit}>
+              <HelpPanel
+                members={helpMembers}
+                details={helpDetails}
+                cpiRate={cpiRate}
+                fyEnding={fyEnding}
+                onSave={saveHelp}
+                onCpiRateChange={setCpiRate}
+                onCpiRateCommit={commitCpiRate}
+              />
+            </ReadOnlyFence>
           )}
           {helpPersons.length > 0 && (
             <HelpRepaymentTracker persons={helpPersons} />

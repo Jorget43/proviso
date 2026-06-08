@@ -6,6 +6,7 @@ import { type FeeSchedule } from '@/lib/schoolFees'
 
 interface FeeRow { id: number; level: string; tuition: number; fixed: number }
 import Panel from '@/components/ui/Panel'
+import ReadOnlyFence from '@/components/ui/ReadOnlyFence'
 import NetWorthChart      from './NetWorthChart'
 import GraceIncomeChart   from './GraceIncomeChart'
 import IncExpProjChart    from './IncExpProjChart'
@@ -48,6 +49,7 @@ interface IncSettings {
 }
 
 interface ProjectionsClientProps {
+  canEdit:            boolean
   initialSettings:    ProjSettings
   initialJorgePhases: GracePhaseRow[]
   initialGracePhases: GracePhaseRow[]
@@ -69,6 +71,7 @@ interface ProjectionsClientProps {
 }
 
 export default function ProjectionsClient({
+  canEdit,
   initialSettings, initialJorgePhases, initialGracePhases, initialOneoffs, initialLifePhases, initialFeeSchedule,
   income, baseMonthlyExpenses,
   mortBalance, mortRate, mortPayment, mortEndDate,
@@ -273,6 +276,7 @@ export default function ProjectionsClient({
 
   return (
     <div className="page">
+      <ReadOnlyFence canEdit={canEdit}>
       {/* ── Banner ── */}
       <div className="banner">
         <div className="b-item"><div className="b-label">Net worth in {settings.projYears} yrs</div><div className="b-value green">{fmtK(finalNW)}</div></div>
@@ -554,6 +558,7 @@ export default function ProjectionsClient({
           </div>
         </div>
       </div>
+      </ReadOnlyFence>
     </div>
   )
 }

@@ -4,7 +4,7 @@ import { requireSession } from '@/lib/auth'
 import BudgetClient from '@/components/budget/BudgetClient'
 
 export default async function BudgetPage() {
-  await requireSession()
+  const me = await requireSession()
   const [expenses, income, gracePhases, assets, hs] = await Promise.all([
     prisma.expense.findMany({ orderBy: { id: 'asc' } }),
     prisma.incomeSettings.findUniqueOrThrow({ where: { id: 1 } }),
@@ -22,6 +22,7 @@ export default async function BudgetPage() {
 
   return (
     <BudgetClient
+      canEdit={me.role === 'CFO'}
       initialExpenses={expenses}
       initialIncome={income}
       currentDays={currentDays}
