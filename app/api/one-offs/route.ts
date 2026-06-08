@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server'
+import { authorize } from '@/lib/rbac'
 import { prisma } from '@/lib/db'
 
 export async function GET() {
@@ -7,6 +8,8 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  const gate = await authorize('budget:write')
+  if (!gate.ok) return gate.res
   const body = await request.json()
   const oneoff = await prisma.oneOff.create({
     data: { name: body.name ?? 'New expense', amt: body.amt ?? 0, year: body.year ?? new Date().getFullYear() + 1 },

@@ -275,7 +275,9 @@ This is architecturally significant (auth, multi-tenancy, row-level scoping) —
 
 **Plan:** [`docs/phase4-rbac-plan.md`](docs/phase4-rbac-plan.md). Locked: minimal self-hosted auth, RBAC single-household-per-deployment, Child role deferred.
 
-**4.0 shipped (2026-06-08):** auth foundation. `User`/`Session` models (migration `0011_auth`); `lib/auth.ts` (scrypt hashing, DB-backed sessions, `getSession`/`requireSession`); `proxy.ts` optimistic cookie gate; `/login` + `/setup` (first-run CFO) + `/api/auth/*`; `requireSession()` on all data pages; user chip + sign-out in `TopNav`. **Not yet done (4.1):** the 32 mutating API routes are not role-guarded yet — that's the next step (`lib/rbac` + per-route guards + role-gated UI + Partner role).
+**4.0 shipped (2026-06-08):** auth foundation. `User`/`Session` models (migration `0011_auth`); `lib/auth.ts` (scrypt hashing, DB-backed sessions, `getSession`/`requireSession`); `proxy.ts` optimistic cookie gate; `/login` + `/setup` (first-run CFO) + `/api/auth/*`; `requireSession()` on all data pages; user chip + sign-out in `TopNav`.
+
+**4.1 shipped (2026-06-08):** API role enforcement. `lib/rbac.ts` — two write scopes (`actuals:write`, `budget:write`); CFO does both, PARTNER only Actuals, CHILD none. `authorize(action)` guard called at the top of **all 39 mutating route handlers** (audited: handler count == guard count). Auth routes (`/api/auth/*`) intentionally ungated. Until 4.2 creates Partner users, only the CFO exists, so guards tighten security without changing current UX. **Remaining (4.2):** user-management UI (CFO creates Partner / assigns roles / resets passwords) + role-gated UI affordances (hide/disable edit controls for non-CFO). Child role still deferred.
 
 ### Phase 5 — Developer watchdog (internal tooling only)
 

@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server'
+import { authorize } from '@/lib/rbac'
 import { prisma } from '@/lib/db'
 
 export async function GET() {
@@ -11,6 +12,8 @@ export async function GET() {
 }
 
 export async function PUT(request: NextRequest) {
+  const gate = await authorize('actuals:write')
+  if (!gate.ok) return gate.res
   const body = await request.json()
   const s = await prisma.actualsSettings.upsert({
     where:  { id: 1 },
