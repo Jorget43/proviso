@@ -1,9 +1,11 @@
 import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/db'
+import { requireSession } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic'
 
 export default async function Home() {
+  await requireSession()
   let hs = await prisma.householdSettings.findUnique({ where: { id: 1 } })
   if (!hs) {
     // Existing install predating the onboarding feature — create a skipped record
