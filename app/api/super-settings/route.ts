@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server'
+import { authorize } from '@/lib/rbac'
 import { prisma } from '@/lib/db'
 
 const DB_DEFAULTS = {
@@ -27,6 +28,8 @@ export async function GET() {
 }
 
 export async function PUT(req: NextRequest) {
+  const gate = await authorize('budget:write')
+  if (!gate.ok) return gate.res
   // Body uses HouseholdSuperInputs field names; map to DB column names
   const body = await req.json()
   const dbData = {
