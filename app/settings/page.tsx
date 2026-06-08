@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic'
 import { prisma } from '@/lib/db'
 import { requireSession } from '@/lib/auth'
+import { computeWatchdog } from '@/lib/watchdog'
 import SettingsClient from '@/components/settings/SettingsClient'
 
 export default async function SettingsPage() {
@@ -18,6 +19,12 @@ export default async function SettingsPage() {
     ? await prisma.user.findMany({ select: { id: true, name: true, username: true, role: true }, orderBy: { id: 'asc' } })
     : []
 
+  // Developer watchdog prompt — CFO + internal tooling enabled only.
+  const watchdogEnabled = process.env.WATCHDOG_ENABLED === 'true' || process.env.NODE_ENV !== 'production'
+  const watchdog = me.role === 'CFO' && watchdogEnabled
+    ? { attention: (() => { const c = computeWatchdog().counts; return c.overdue + c.review })() }
+    : null
+
   return (
     <SettingsClient
       person1Name={hs?.person1Name ?? 'Person 1'}
@@ -32,6 +39,7 @@ export default async function SettingsPage() {
       currentRole={me.role}
       currentUserId={me.userId}
       users={users}
+      watchdog={watchdog}
     />
   )
 }
