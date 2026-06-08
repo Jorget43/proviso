@@ -1,7 +1,10 @@
 import { prisma } from '@/lib/db'
+import { authorize } from '@/lib/rbac'
 import { NextResponse } from 'next/server'
 
 export async function POST(req: Request) {
+  const gate = await authorize('budget:write')
+  if (!gate.ok) return gate.res
   const {
     person1Name, person1Age, person1Income,
     person1HasHELP, person1HELPBalance, person1Days,

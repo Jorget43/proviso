@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db'
+import { authorize } from '@/lib/rbac'
 import { NextResponse } from 'next/server'
 
 export async function GET(req: Request) {
@@ -11,6 +12,8 @@ export async function GET(req: Request) {
 }
 
 export async function PUT(req: Request) {
+  const gate = await authorize('budget:write')
+  if (!gate.ok) return gate.res
   const { member, financialYearEnding, concessionalCap, concessionalUtilised, totalSuperBalance } = await req.json()
 
   const record = await prisma.superHistory.upsert({
