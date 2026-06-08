@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e
 
-DB_PATH="/data/household.db"
+DB_PATH="/data/proviso.db"
 
 # First-run: apply schema and seed
 if [ ! -f "$DB_PATH" ]; then

@@ -1,18 +1,18 @@
 services:
-  household-dashboard:
+  proviso:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: household-dashboard
+    container_name: proviso
     restart: unless-stopped
     ports:
       - "3000:3000"
     volumes:
-      - household-db:/data
+      - proviso-db:/data
     environment:
-      - DATABASE_URL=file:/data/household.db
+      - DATABASE_URL=file:/data/proviso.db
       - NODE_ENV=production
 
 volumes:
-  household-db:
+  proviso-db:
     driver: local

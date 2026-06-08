@@ -2,7 +2,7 @@
 
 # Proviso
 
-**Product name:** Proviso (formerly "Household Dashboard" — rename in UI/branding pending, codebase still uses `household-dashboard` directory)
+**Product name:** Proviso (formerly "Household Dashboard"). UI **and** infra renamed to Proviso (2026-06-08): metadata/nav/auth/onboarding, `package.json`/lockfile name, Docker service + `container_name` `proviso`, volume `proviso-db`, DB `/data/proviso.db`. The repo **directory** stays `household-dashboard` (so `household-dashboard/Dockerfile` etc. paths below are unchanged).
 
 **Positioning:** "Most apps tell you what you spent yesterday. Proviso models what you will be worth tomorrow."
 
@@ -73,8 +73,8 @@ Key classes: `.page`, `.banner` + `.b-item/.b-label/.b-value`, `.metrics`, `.mc`
 ## Docker deployment (completed 2026-06-06)
 
 - **`household-dashboard/Dockerfile`** — 3-stage build: `deps` (npm ci) → `builder` (prisma generate + next build) → `runner` (node:20-alpine, standalone output only)
-- **`household-dashboard/docker-entrypoint.sh`** — runs `prisma migrate deploy` on every start; runs `prisma db seed` only on first run (when `/data/household.db` doesn't exist)
-- **`docker-compose.yml`** (at repo root `c:\Household-Dashboard\`) — named volume `household-db` mounted at `/data`; `DATABASE_URL=file:/data/household.db`
+- **`household-dashboard/docker-entrypoint.sh`** — runs `prisma migrate deploy` on every start; runs `prisma db seed` only on first run (when `/data/proviso.db` doesn't exist)
+- **`docker-compose.yml`** (at repo root) — service/`container_name` `proviso`; named volume `proviso-db` mounted at `/data`; `DATABASE_URL=file:/data/proviso.db`
 - **`next.config.ts`** — added `output: 'standalone'` for lean runner image
 - **`.dockerignore`** — excludes `node_modules`, `.next`, `*.db`, `.env*`
 
