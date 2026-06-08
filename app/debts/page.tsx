@@ -1,5 +1,6 @@
 export const dynamic = 'force-dynamic'
 import { prisma } from '@/lib/db'
+import { requireSession } from '@/lib/auth'
 import DebtsClient from '@/components/debts/DebtsClient'
 
 function currentFyEnding(): number {
@@ -10,6 +11,7 @@ function currentFyEnding(): number {
 }
 
 export default async function DebtsPage() {
+  await requireSession()
   const fyEnding = currentFyEnding()
 
   const [debts, assets, mortgage, expenses, hs, helpDetails, income, projSettings] = await Promise.all([

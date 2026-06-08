@@ -1,10 +1,12 @@
 export const dynamic = 'force-dynamic'
 import { prisma } from '@/lib/db'
+import { requireSession } from '@/lib/auth'
 import { toMonthly } from '@/lib/formatting'
 import SuperClient from '@/components/super/SuperClient'
 import type { HouseholdSuperInputs, ProjectionContext } from '@/lib/super'
 
 export default async function SuperPage() {
+  await requireSession()
   const [s, inc, proj, mtg, expenses, hs, superHistory] = await Promise.all([
     prisma.superSettings.findFirst(),
     prisma.incomeSettings.findUniqueOrThrow({ where: { id: 1 } }),

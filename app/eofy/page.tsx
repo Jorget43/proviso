@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic'
 import Link from 'next/link'
 import { prisma } from '@/lib/db'
+import { requireSession } from '@/lib/auth'
 import Panel from '@/components/ui/Panel'
 import { fmt } from '@/lib/formatting'
 import {
@@ -19,6 +20,7 @@ interface EofyMember {
 }
 
 export default async function EofyPage() {
+  await requireSession()
   const fyEnding = currentFinancialYearEnding()
 
   const [income, hs, superSettings, helpDetails, superHistory] = await Promise.all([
