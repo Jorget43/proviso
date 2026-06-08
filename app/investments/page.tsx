@@ -1,9 +1,11 @@
 export const dynamic = 'force-dynamic'
 import { prisma } from '@/lib/db'
+import { requireSession } from '@/lib/auth'
 import { marginalRate } from '@/lib/tax'
 import InvestmentsClient from '@/components/investments/InvestmentsClient'
 
 export default async function InvestmentsPage() {
+  await requireSession()
   const [parcels, income, hs] = await Promise.all([
     prisma.investmentParcel.findMany({ orderBy: { id: 'asc' } }),
     prisma.incomeSettings.findUniqueOrThrow({ where: { id: 1 } }),

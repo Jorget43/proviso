@@ -1,10 +1,12 @@
 export const dynamic = 'force-dynamic'
 import { prisma } from '@/lib/db'
+import { requireSession } from '@/lib/auth'
 import { toMonthly } from '@/lib/formatting'
 import type { LifePhase } from '@/lib/lifephases'
 import ProjectionsClient from '@/components/projections/ProjectionsClient'
 
 export default async function ProjectionsPage() {
+  await requireSession()
   const [income, settings, jorgePhases, gracePhases, oneoffs, lifePhases, expenses, debts, assets, mortgage, hs, feeSchedule] = await Promise.all([
     prisma.incomeSettings.findUniqueOrThrow({ where: { id: 1 } }),
     prisma.projectionSettings.findUniqueOrThrow({ where: { id: 1 } }),

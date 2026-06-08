@@ -13,10 +13,20 @@ const TABS = [
   { href: '/investments', label: 'Investments' },
 ]
 
-export default function TopNav() {
+const HIDDEN_ON = ['/onboarding', '/login', '/setup']
+
+interface TopNavUser { name: string; role: string }
+
+export default function TopNav({ user }: { user: TopNavUser | null }) {
   const pathname = usePathname()
   const router   = useRouter()
-  if (pathname === '/onboarding') return null
+  if (HIDDEN_ON.includes(pathname) || !user) return null
+
+  async function logout() {
+    await fetch('/api/auth/logout', { method: 'POST' })
+    router.push('/login')
+    router.refresh()
+  }
   const active = TABS.find(t => pathname.startsWith(t.href))?.href ?? TABS[0].href
   // Seasonal-only prompt — surfaced in May/June, not a permanent tab.
   const showEofy = isEofySeason() || pathname.startsWith('/eofy')
@@ -54,6 +64,8 @@ export default function TopNav() {
         </Link>
       )}
       <Link href="/settings" className="nav-settings-btn" aria-label="Setup & settings">⚙</Link>
+      <span className="nav-user" title={`${user.name} · ${user.role}`}>{user.name}</span>
+      <button className="nav-logout" onClick={logout} aria-label="Sign out">Sign out</button>
     </div>
   )
 }
