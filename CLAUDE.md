@@ -27,6 +27,8 @@ EOFY is a seasonal view, not a permanent tab — surfaced via a May/June `◷ EO
 
 - **Prisma 5** (pinned — Prisma 7 broke `url = env(...)`, requires `prisma.config.ts`)
 - **Next.js 16 params**: dynamic route handlers use `await params` — `params` is `Promise<{ id: string }>`
+- **Next.js 16 Proxy (was Middleware)**: the middleware file convention is renamed — root `proxy.ts` exporting `proxy` + `config.matcher`. `cookies()` is async (`await cookies()`). Used for optimistic auth gating (`proxy.ts`); secure session validation is `requireSession()` in `lib/auth.ts` (Phase 4)
+- **Auth (Phase 4)**: self-hosted, zero external deps — `node:crypto` scrypt password hashing + opaque DB-backed session token in an httpOnly cookie (`lib/auth.ts`, `Session`/`User` models). `COOKIE_SECURE=true` env when behind HTTPS (Tailscale Serve); default off for plain-http tailnet access
 - **`@/*` alias** maps to `./` (project root), not `./src/`
 - **Server vs client**: server components fetch from Prisma directly; `'use client'` for anything interactive or using Chart.js
 - **Optimistic updates**: all CRUD hits state first, then API — no loading spinners
@@ -270,6 +272,10 @@ Build for a household as a unit, not an individual with sharing bolted on:
 - **Child role** — restricted view, gamified pocket money tracker (stretch)
 
 This is architecturally significant (auth, multi-tenancy, row-level scoping) — do it after the data model is stable.
+
+**Plan:** [`docs/phase4-rbac-plan.md`](docs/phase4-rbac-plan.md). Locked: minimal self-hosted auth, RBAC single-household-per-deployment, Child role deferred.
+
+**4.0 shipped (2026-06-08):** auth foundation. `User`/`Session` models (migration `0011_auth`); `lib/auth.ts` (scrypt hashing, DB-backed sessions, `getSession`/`requireSession`); `proxy.ts` optimistic cookie gate; `/login` + `/setup` (first-run CFO) + `/api/auth/*`; `requireSession()` on all data pages; user chip + sign-out in `TopNav`. **Not yet done (4.1):** the 32 mutating API routes are not role-guarded yet — that's the next step (`lib/rbac` + per-route guards + role-gated UI + Partner role).
 
 ### Phase 5 — Developer watchdog (internal tooling only)
 

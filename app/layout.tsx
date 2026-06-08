@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { DM_Sans, DM_Serif_Display } from 'next/font/google'
 import './globals.css'
 import TopNav from '@/components/layout/TopNav'
+import { getSession } from '@/lib/auth'
 
 const dmSans = DM_Sans({
   variable: '--font-dm-sans',
@@ -21,11 +22,12 @@ export const metadata: Metadata = {
   description: 'Your household, modelled.',
 }
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const session = await getSession()
   return (
     <html lang="en" className={`${dmSans.variable} ${dmSerif.variable}`}>
       <body>
-        <TopNav />
+        <TopNav user={session ? { name: session.name, role: session.role } : null} />
         {children}
       </body>
     </html>
