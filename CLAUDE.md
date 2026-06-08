@@ -258,6 +258,8 @@ Australia's Consumer Data Right mandates banks expose transaction data via accre
 - CSV import stays as permanent fallback for non-CDR institutions and privacy-first users
 - Subscription detection (recurring charges, price creep) is a natural by-product — build after the feed, not before
 
+**Research done (2026-06-07):** cost & vendor map in [`docs/phase3-cdr-research.md`](docs/phase3-cdr-research.md). Verdict: keep CSV as the permanent $0 core; live feeds only viable as an **opt-in** CDR Representative integration (via Fiskil or Basiq, ~$15k–60k/yr first year) — direct accreditation is $100k–500k+/yr. Every CDR Representative route pipes data through the Principal's accredited cloud, in tension with the self-hosting moat, so CDR can only be a convenience layer, never the default. No code written yet (seam is `parseCsvText()` in `lib/actuals.ts` behind a future `TransactionSource` interface).
+
 ### Phase 4 — Household RBAC (family tenant model)
 
 Build for a household as a unit, not an individual with sharing bolted on:
