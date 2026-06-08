@@ -150,6 +150,18 @@ body {
   transition: color .15s, border-color .15s;
 }
 .nav-logout:hover { color: rgba(245,242,236,0.9); border-color: rgba(245,242,236,0.4); }
+.nav-readonly {
+  flex-shrink: 0;
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--amber);
+  background: color-mix(in srgb, var(--amber) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--amber) 30%, transparent);
+  border-radius: 999px;
+  padding: 2px 8px;
+}
 
 /* ── Page container ── */
 .page {
