@@ -806,6 +806,7 @@ input[type=range] { width: 100%; accent-color: var(--t3); }
 .b-value.green  { color: var(--green); }
 .b-value.red    { color: var(--red); }
 .b-value.blue   { color: var(--blue); }
+.b-value.amber  { color: var(--amber); }
 .b-value.pink   { color: var(--pink); }
 .b-value.teal   { color: var(--teal); }
 .b-div { width: 1px; height: 32px; background: var(--border); flex-shrink: 0; }

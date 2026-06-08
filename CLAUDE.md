@@ -293,6 +293,8 @@ A background process / admin-only page that monitors for changes to underlying a
 
 Not user-facing at this stage. Surfaces via an admin flag that prompts the developer to update constants in `lib/tax.ts`, `lib/super.ts`, and `lib/constants.ts`. Future: allow CFO-role users to integrate government-announced changes themselves.
 
+**Implemented (2026-06-08):** date-based staleness detector (no auto-fetch — prompts the developer). Engine `lib/watchdog.ts` — a registry of 8 time-sensitive assumptions (tax brackets, LITO, HELP thresholds, Medicare low threshold, HELP CPI rate, SG rate, concessional cap, Div 293), each stamped with `calibratedFyEnding`; `computeWatchdog(now)` flags `current`/`review`/`overdue` vs the current AU FY (non-indexed items like SG/Div293 never nag). Page `app/admin/watchdog/page.tsx` — **CFO-gated** + `notFound()` unless enabled (`WATCHDOG_ENABLED=true`, or any non-production env); lists each assumption with status, the exact constant to edit, the authority, and the review trigger. A CFO-only prompt in Settings links to it with an attention count. Workflow: verify → edit the constant → bump `calibratedFyEnding`. Future: plug a live ATO/ABS fetcher behind the same registry.
+
 ### Phase 6 — CGT-aware investment module
 
 When users may need to sell investments (shares, ETFs, crypto, property), CGT rules apply:

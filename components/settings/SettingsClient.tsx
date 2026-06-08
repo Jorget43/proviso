@@ -1,6 +1,7 @@
 'use client'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { fmt } from '@/lib/formatting'
 import Panel from '@/components/ui/Panel'
 import MembersPanel, { type Member } from './MembersPanel'
@@ -18,6 +19,7 @@ interface Props {
   currentRole:          string
   currentUserId:        number
   users:                Member[]
+  watchdog:             { attention: number } | null
 }
 
 export default function SettingsClient({
@@ -25,7 +27,7 @@ export default function SettingsClient({
   jorgeFTE, graceFTE, mortgageBalance,
   superBalance, partnerSuperBalance,
   parentalLeaveEnabled,
-  currentRole, currentUserId, users,
+  currentRole, currentUserId, users, watchdog,
 }: Props) {
   const isCfo = currentRole === 'CFO'
   const router   = useRouter()
@@ -79,6 +81,25 @@ export default function SettingsClient({
           {done ? 'Redirecting…' : busy ? 'Loading…' : 'Re-run setup wizard →'}
         </button>
       </div>
+      )}
+
+      {watchdog && (
+        <div style={{ marginTop: '1.5rem', padding: '1rem 1.25rem', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r)', display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: '0.85rem', fontWeight: 500 }}>Assumptions watchdog</div>
+            <div style={{ fontSize: '0.74rem', color: 'var(--t2)' }}>
+              {watchdog.attention > 0
+                ? `${watchdog.attention} tax/super assumption${watchdog.attention === 1 ? '' : 's'} due for review.`
+                : 'All tracked assumptions current.'}
+            </div>
+          </div>
+          {watchdog.attention > 0 && (
+            <span style={{ fontSize: '0.66rem', fontWeight: 700, color: 'var(--amber)', background: 'var(--amber-lt)', borderRadius: 999, padding: '2px 9px' }}>
+              {watchdog.attention}
+            </span>
+          )}
+          <Link href="/admin/watchdog" className="hint-link" style={{ fontSize: '0.78rem' }}>Open →</Link>
+        </div>
       )}
 
       <div style={{ marginTop: '1.25rem', fontSize: '0.72rem', color: 'var(--t3)' }}>
