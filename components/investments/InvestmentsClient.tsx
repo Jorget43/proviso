@@ -1,6 +1,7 @@
 'use client'
 import { useState, useMemo, useCallback } from 'react'
 import Panel from '@/components/ui/Panel'
+import ReadOnlyFence from '@/components/ui/ReadOnlyFence'
 import { fmt, fmtS } from '@/lib/formatting'
 import { computeCgt } from '@/lib/cgt'
 
@@ -16,6 +17,7 @@ export interface Parcel {
 }
 
 interface Props {
+  canEdit:          boolean
   initialParcels:   Parcel[]
   members:          string[]
   marginalByMember: Record<string, number>
@@ -26,7 +28,7 @@ function asOfDate(sellYear: number | null): Date {
   return sellYear ? new Date(sellYear, 5, 30) : new Date()
 }
 
-export default function InvestmentsClient({ initialParcels, members, marginalByMember }: Props) {
+export default function InvestmentsClient({ canEdit, initialParcels, members, marginalByMember }: Props) {
   const [parcels, setParcels] = useState<Parcel[]>(initialParcels)
   const [sentIds, setSentIds] = useState<Record<number, boolean>>({})
 
@@ -104,6 +106,7 @@ export default function InvestmentsClient({ initialParcels, members, marginalByM
         <div className="b-item"><span className="b-label">Net after CGT</span><span className="b-value">{fmt(totals.net)}</span></div>
       </div>
 
+      <ReadOnlyFence canEdit={canEdit}>
       <Panel title="Investment parcels" dotColor="var(--teal)">
         <p style={{ fontSize: '0.72rem', color: 'var(--t3)', marginBottom: 14, lineHeight: 1.5 }}>
           Each purchase is a separate parcel — the 50% CGT discount applies per parcel once held 12+ months.
@@ -180,6 +183,7 @@ export default function InvestmentsClient({ initialParcels, members, marginalByM
 
         <button className="add-btn mt1" onClick={addParcel} style={{ marginTop: 14 }}>+ Add parcel</button>
       </Panel>
+      </ReadOnlyFence>
 
       <p style={{ fontSize: '0.68rem', color: 'var(--t3)', lineHeight: 1.5, marginTop: 12 }}>
         Estimates only. CGT uses the owner&apos;s marginal rate (incl. Medicare) on the discounted gain and ignores

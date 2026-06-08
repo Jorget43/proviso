@@ -5,7 +5,7 @@ import { marginalRate } from '@/lib/tax'
 import InvestmentsClient from '@/components/investments/InvestmentsClient'
 
 export default async function InvestmentsPage() {
-  await requireSession()
+  const me = await requireSession()
   const [parcels, income, hs] = await Promise.all([
     prisma.investmentParcel.findMany({ orderBy: { id: 'asc' } }),
     prisma.incomeSettings.findUniqueOrThrow({ where: { id: 1 } }),
@@ -25,6 +25,7 @@ export default async function InvestmentsPage() {
 
   return (
     <InvestmentsClient
+      canEdit={me.role === 'CFO'}
       initialParcels={parcels}
       members={members}
       marginalByMember={marginalByMember}

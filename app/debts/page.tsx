@@ -11,7 +11,7 @@ function currentFyEnding(): number {
 }
 
 export default async function DebtsPage() {
-  await requireSession()
+  const me = await requireSession()
   const fyEnding = currentFyEnding()
 
   const [debts, assets, mortgage, expenses, hs, helpDetails, income, projSettings] = await Promise.all([
@@ -54,6 +54,7 @@ export default async function DebtsPage() {
 
   return (
     <DebtsClient
+      canEdit={me.role === 'CFO'}
       initialDebts={debts}
       initialAssets={assets}
       initialMortgage={mortgage}
