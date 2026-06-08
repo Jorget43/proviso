@@ -8,10 +8,10 @@
 
 import { getSession, type Role, type SessionUser } from './auth'
 
-export type Action = 'actuals:write' | 'budget:write'
+export type Action = 'actuals:write' | 'budget:write' | 'users:write'
 
 const MATRIX: Record<Role, Action[]> = {
-  CFO:     ['actuals:write', 'budget:write'],
+  CFO:     ['actuals:write', 'budget:write', 'users:write'],
   PARTNER: ['actuals:write'],
   CHILD:   [],
 }

@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { fmt } from '@/lib/formatting'
 import Panel from '@/components/ui/Panel'
+import MembersPanel, { type Member } from './MembersPanel'
 
 interface Props {
   person1Name:          string
@@ -14,6 +15,9 @@ interface Props {
   superBalance:         number
   partnerSuperBalance:  number
   parentalLeaveEnabled: boolean
+  currentRole:          string
+  currentUserId:        number
+  users:                Member[]
 }
 
 export default function SettingsClient({
@@ -21,7 +25,9 @@ export default function SettingsClient({
   jorgeFTE, graceFTE, mortgageBalance,
   superBalance, partnerSuperBalance,
   parentalLeaveEnabled,
+  currentRole, currentUserId, users,
 }: Props) {
+  const isCfo = currentRole === 'CFO'
   const router   = useRouter()
   const [busy, setBusy] = useState(false)
   const [done, setDone] = useState(false)
@@ -52,6 +58,13 @@ export default function SettingsClient({
         </div>
       </Panel>
 
+      {isCfo && (
+        <div style={{ marginTop: '1.5rem' }}>
+          <MembersPanel users={users} currentUserId={currentUserId} />
+        </div>
+      )}
+
+      {isCfo && (
       <div style={{ marginTop: '1.5rem', padding: '1.25rem', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r)' }}>
         <div style={{ fontSize: '0.875rem', fontWeight: 500, marginBottom: '0.4rem' }}>Re-run setup wizard</div>
         <p style={{ fontSize: '0.78rem', color: 'var(--t2)', marginBottom: '1rem', lineHeight: 1.5 }}>
@@ -66,9 +79,12 @@ export default function SettingsClient({
           {done ? 'Redirecting…' : busy ? 'Loading…' : 'Re-run setup wizard →'}
         </button>
       </div>
+      )}
 
       <div style={{ marginTop: '1.25rem', fontSize: '0.72rem', color: 'var(--t3)' }}>
-        To edit individual figures (incomes, expenses, super balances, debts) use the relevant tab above.
+        {isCfo
+          ? 'To edit individual figures (incomes, expenses, super balances, debts) use the relevant tab above.'
+          : 'You have view + Actuals-import access. Editing is reserved for CFO members.'}
       </div>
     </div>
   )
