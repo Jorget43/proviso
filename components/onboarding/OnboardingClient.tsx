@@ -1,6 +1,8 @@
 'use client'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { computeMonthlyRepayment, monthsUntil } from '@/lib/mortgage'
+import { fmt } from '@/lib/formatting'
 
 interface FormState {
   person1Name:        string
@@ -25,7 +27,7 @@ interface FormState {
   hasMortgage:        boolean
   mortgageBalance:    string
   mortgageRate:       string
-  mortgagePayment:    string
+  mortgageEndDate:    string
   hasParentalLeave:   boolean
 }
 
@@ -91,7 +93,7 @@ export default function OnboardingClient() {
     sharesValue: '', cryptoValue: '', otherInvestments: '',
     cashBalance: '',
     hasMortgage: false,
-    mortgageBalance: '', mortgageRate: '', mortgagePayment: '',
+    mortgageBalance: '', mortgageRate: '', mortgageEndDate: '',
     hasParentalLeave: false,
   })
 
@@ -141,7 +143,7 @@ export default function OnboardingClient() {
           hasMortgage:        form.hasMortgage,
           mortgageBalance:    parseFloat(form.mortgageBalance)    || 0,
           mortgageRate:       parseFloat(form.mortgageRate)       || 0,
-          mortgagePayment:    parseFloat(form.mortgagePayment)    || 0,
+          mortgageEndDate:    form.mortgageEndDate,
           hasParentalLeave:   form.hasParentalLeave,
         }),
       })
@@ -419,9 +421,26 @@ export default function OnboardingClient() {
                       placeholder="5.99"
                     />
                   </Field>
-                  <Field label="Monthly repayment">
-                    <MoneyInput value={form.mortgagePayment} onChange={v => set({ mortgagePayment: v })} placeholder="3000" />
+                  <Field label="Loan end date" hint="When is the loan due to be paid off? We'll work out the repayment.">
+                    <input
+                      className="ob-input"
+                      type="date"
+                      value={form.mortgageEndDate}
+                      onChange={e => set({ mortgageEndDate: e.target.value })}
+                    />
                   </Field>
+                  {(() => {
+                    const repayment = computeMonthlyRepayment(
+                      parseFloat(form.mortgageBalance) || 0,
+                      parseFloat(form.mortgageRate) || 0,
+                      monthsUntil(form.mortgageEndDate),
+                    )
+                    return repayment > 0 ? (
+                      <div className="ob-field-hint" style={{ marginTop: -4 }}>
+                        Estimated repayment: <strong>{fmt(repayment)}/month</strong>
+                      </div>
+                    ) : null
+                  })()}
                 </>
               )}
 

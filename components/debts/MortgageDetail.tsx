@@ -15,9 +15,11 @@ interface MortgageDetailProps {
   mortgage: MortgageSettings
   mortgageDebtAmt: number
   onUpdate: (patch: Partial<MortgageSettings>) => void
+  offsetLinked?: boolean
+  offsetAccountCount?: number
 }
 
-export default function MortgageDetail({ mortgage, mortgageDebtAmt, onUpdate }: MortgageDetailProps) {
+export default function MortgageDetail({ mortgage, mortgageDebtAmt, onUpdate, offsetLinked = false, offsetAccountCount = 0 }: MortgageDetailProps) {
   const rate = mortgage.rate / 100
   const bal  = mortgageDebtAmt
   const eff  = Math.max(0, bal - mortgage.offsetBal)
@@ -55,12 +57,22 @@ export default function MortgageDetail({ mortgage, mortgageDebtAmt, onUpdate }: 
           </div>
         </div>
         <div className="da-row">
-          <label style={{ flex: 1, color: 'var(--t2)', fontSize: '0.74rem' }}>Offset balance</label>
+          <label style={{ flex: 1, color: 'var(--t2)', fontSize: '0.74rem' }}>
+            Offset balance
+            {offsetLinked && (
+              <span style={{ display: 'block', color: 'var(--teal)', fontSize: '0.66rem' }}>
+                linked to {offsetAccountCount} offset account{offsetAccountCount === 1 ? '' : 's'}
+              </span>
+            )}
+          </label>
           <div className="input-prefix" style={{ width: 145 }}>
             <span>$</span>
             <input
+              key={offsetLinked ? `linked-${mortgage.offsetBal}` : 'manual'}
               type="number"
               defaultValue={mortgage.offsetBal}
+              disabled={offsetLinked}
+              title={offsetLinked ? 'Driven by the cash accounts flagged as Offset in Assets' : undefined}
               onBlur={e => onUpdate({ offsetBal: parseFloat(e.target.value) || 0 })}
             />
           </div>

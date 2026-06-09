@@ -5,12 +5,13 @@ import BudgetClient from '@/components/budget/BudgetClient'
 
 export default async function BudgetPage() {
   const me = await requireSession()
-  const [expenses, income, gracePhases, assets, hs] = await Promise.all([
+  const [expenses, income, gracePhases, assets, hs, childcare] = await Promise.all([
     prisma.expense.findMany({ orderBy: { id: 'asc' } }),
     prisma.incomeSettings.findUniqueOrThrow({ where: { id: 1 } }),
     prisma.gracePhase.findMany({ orderBy: { year: 'asc' } }),
     prisma.asset.findMany(),
     prisma.householdSettings.findUnique({ where: { id: 1 } }),
+    prisma.childcareSettings.upsert({ where: { id: 1 }, update: {}, create: { id: 1 } }),
   ])
 
   const currentYear = new Date().getFullYear()
@@ -25,6 +26,7 @@ export default async function BudgetPage() {
       canEdit={me.role === 'CFO'}
       initialExpenses={expenses}
       initialIncome={income}
+      initialChildcare={childcare}
       currentDays={currentDays}
       cashOnHand={cashOnHand}
       person1Name={hs?.person1Name ?? 'Person 1'}
