@@ -832,4 +832,11 @@ input[type=range] { width: 100%; accent-color: var(--t3); }
   .metrics { grid-template-columns: repeat(2, 1fr); }
   .income-grid { grid-template-columns: 1fr; }
   .lumpy-grid { grid-template-columns: 1fr; }
+  /* Super projection table: drop secondary columns so the essentials
+     (age, balance, contribution/drawdown, present value) fit without a
+     cramped 11-column horizontal scroll. */
+  .super-table .super-col-sec { display: none; }
+  .super-table { font-size: 0.8rem; }
+  .super-table th, .super-table td { padding: 6px 8px; }
+  .super-table-wrap { -webkit-overflow-scrolling: touch; }
 }

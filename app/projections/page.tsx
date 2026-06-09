@@ -28,7 +28,12 @@ export default async function ProjectionsPage() {
   const equity     = assets.find(a => a.name.toLowerCase().includes('house') || a.name.toLowerCase().includes('equity'))?.amt ?? 0
   const propValue  = mortDebt + equity
   const cryptoValue= assets.find(a => a.name.toLowerCase().includes('crypto'))?.amt ?? 0
-  const cashOnHand = assets.find(a => a.name.toLowerCase().includes('cash'))?.amt ?? 0
+  // Cash that offsets the mortgage = accounts flagged isOffset on Debts & Assets.
+  // Falls back to the legacy 'cash'-named asset when nothing is flagged yet.
+  const offsetAssets = assets.filter(a => a.isOffset)
+  const cashOnHand = offsetAssets.length > 0
+    ? offsetAssets.reduce((s, a) => s + a.amt, 0)
+    : assets.find(a => a.name.toLowerCase().includes('cash'))?.amt ?? 0
 
   const currentYear = new Date().getFullYear()
 

@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/db'
 import { authorize } from '@/lib/rbac'
+import { computeMonthlyRepayment, monthsUntil } from '@/lib/mortgage'
 import { NextResponse } from 'next/server'
 
 export async function POST(req: Request) {
@@ -14,7 +15,7 @@ export async function POST(req: Request) {
     person1Super, person2Super,
     sharesValue, cryptoValue, otherInvestments,
     cashBalance,
-    hasMortgage, mortgageBalance, mortgageRate, mortgagePayment,
+    hasMortgage, mortgageBalance, mortgageRate, mortgageEndDate,
     hasParentalLeave,
   } = await req.json()
 
@@ -53,19 +54,21 @@ export async function POST(req: Request) {
       },
     })
 
-    // Assets from onboarding — upsert by name
-    const assetUpserts: { name: string; amt: number }[] = [
-      { name: 'Cash / savings',   amt: cashBalance       },
-      { name: 'Shares & ETFs',    amt: sharesValue       },
-      { name: 'Cryptocurrency',   amt: cryptoValue       },
-      { name: 'Other investments',amt: otherInvestments  },
+    // Assets from onboarding — upsert by name. Cash offsets the mortgage by
+    // default when there's a loan (most households treat them as one balance).
+    const cashIsOffset = hasMortgage && mortgageBalance > 0
+    const assetUpserts: { name: string; amt: number; isOffset: boolean }[] = [
+      { name: 'Cash / savings',   amt: cashBalance,      isOffset: cashIsOffset },
+      { name: 'Shares & ETFs',    amt: sharesValue,      isOffset: false        },
+      { name: 'Cryptocurrency',   amt: cryptoValue,      isOffset: false        },
+      { name: 'Other investments',amt: otherInvestments, isOffset: false        },
     ]
-    for (const { name, amt } of assetUpserts) {
+    for (const { name, amt, isOffset } of assetUpserts) {
       const existing = await tx.asset.findFirst({ where: { name } })
       if (existing) {
-        await tx.asset.update({ where: { id: existing.id }, data: { amt } })
+        await tx.asset.update({ where: { id: existing.id }, data: { amt, isOffset } })
       } else if (amt > 0) {
-        await tx.asset.create({ data: { name, amt } })
+        await tx.asset.create({ data: { name, amt, isOffset } })
       }
     }
 
@@ -113,14 +116,33 @@ export async function POST(req: Request) {
 
     // Mortgage
     if (hasMortgage && mortgageBalance > 0) {
+      // Repayment is derived from balance + rate + remaining term — no need to ask.
+      const months  = monthsUntil(mortgageEndDate)
+      const payment = computeMonthlyRepayment(mortgageBalance, mortgageRate, months)
       await tx.mortgageSettings.update({
         where: { id: 1 },
-        data: { balance: mortgageBalance, rate: mortgageRate, payment: mortgagePayment },
+        data: {
+          balance:   mortgageBalance,
+          rate:      mortgageRate,
+          payment,
+          ...(mortgageEndDate ? { endDate: mortgageEndDate } : {}),
+          // Cash offsets the loan by default (see assets upsert above).
+          ...(cashIsOffset ? { offsetBal: cashBalance } : {}),
+        },
+      })
+      // Keep the Budget 'Mortgage' line in sync so it isn't left at $0.
+      await tx.expense.updateMany({
+        where: { cat: 'Home', name: 'Mortgage' },
+        data:  { amt: payment, freq: 'monthly' },
       })
     } else if (!hasMortgage) {
       await tx.mortgageSettings.update({
         where: { id: 1 },
         data: { balance: 0, payment: 0 },
+      })
+      await tx.expense.updateMany({
+        where: { cat: 'Home', name: 'Mortgage' },
+        data:  { amt: 0 },
       })
     }
   })

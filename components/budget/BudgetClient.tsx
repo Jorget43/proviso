@@ -1,20 +1,26 @@
 'use client'
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import { toMonthly, fmt, fmtS } from '@/lib/formatting'
 import { calcAfterTax } from '@/lib/tax'
+import { computeChildcare } from '@/lib/childcare'
 import { CATS } from '@/lib/constants'
 import MetricCard from '@/components/ui/MetricCard'
 import ReadOnlyFence from '@/components/ui/ReadOnlyFence'
 import IncomePanel, { type IncomeSettings } from './IncomePanel'
 import ExpenseTable, { type Expense } from './ExpenseTable'
+import ChildcarePanel, { type ChildcareSettings } from './ChildcarePanel'
 import SpendDonut from './SpendDonut'
 import MonthlySummary from './MonthlySummary'
 import LumpyMonths from './LumpyMonths'
+
+const CHILDCARE_CAT  = 'Children'
+const CHILDCARE_NAME = 'Childcare'
 
 interface BudgetClientProps {
   canEdit: boolean
   initialExpenses: Expense[]
   initialIncome: IncomeSettings
+  initialChildcare: ChildcareSettings
   currentDays: number
   cashOnHand: number
   person1Name: string
@@ -25,6 +31,7 @@ export default function BudgetClient({
   canEdit,
   initialExpenses,
   initialIncome,
+  initialChildcare,
   currentDays,
   cashOnHand,
   person1Name,
@@ -32,6 +39,13 @@ export default function BudgetClient({
 }: BudgetClientProps) {
   const [expenses, setExpenses] = useState<Expense[]>(initialExpenses)
   const [income, setIncome] = useState<IncomeSettings>(initialIncome)
+  const [childcare, setChildcare] = useState<ChildcareSettings>(initialChildcare)
+
+  // Combined gross family income drives the CCS taper (Jorge full FTE + Grace pro-rata).
+  const familyIncome = useMemo(
+    () => income.jorgeFTE + income.graceFTE * (currentDays / 5),
+    [income.jorgeFTE, income.graceFTE, currentDays],
+  )
 
   const jorgeNet = useMemo(() => {
     if (income.taxMode) return calcAfterTax(income.jorgeFTE, false) / 12
@@ -62,11 +76,11 @@ export default function BudgetClient({
   const delta = monthlyIncome - monthlyExpenses
   const savingsRate = monthlyIncome > 0 ? delta / monthlyIncome * 100 : 0
 
-  const addExpense = useCallback(async () => {
+  const addExpense = useCallback(async (cat: string = 'Fun') => {
     const res = await fetch('/api/expenses', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ cat: 'Fun', name: 'New item', freq: 'monthly', amt: 0 }),
+      body: JSON.stringify({ cat, name: 'New item', freq: 'monthly', amt: 0 }),
     })
     const created: Expense = await res.json()
     setExpenses(prev => [...prev, created])
@@ -95,6 +109,52 @@ export default function BudgetClient({
       body: JSON.stringify(patch),
     })
   }, [])
+
+  const updateChildcare = useCallback(async (patch: Partial<ChildcareSettings>) => {
+    setChildcare(prev => ({ ...prev, ...patch }))
+    await fetch('/api/childcare-settings', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    })
+  }, [])
+
+  // Keep a managed "Childcare" budget line in sync with the CCS calculation.
+  // When enabled, its amount is the net out-of-pocket monthly cost; when
+  // disabled, the managed line is removed.
+  const childcareSyncing = useRef(false)
+  useEffect(() => {
+    const managed = expenses.find(e => e.cat === CHILDCARE_CAT && e.name === CHILDCARE_NAME)
+    if (childcare.enabled) {
+      const net = Math.round(computeChildcare({
+        costPerDay:   childcare.costPerDay,
+        daysPerWeek:  childcare.daysPerWeek,
+        numChildren:  childcare.numChildren,
+        familyIncome,
+      }).netMonthly)
+      if (managed) {
+        if (Math.round(managed.amt) !== net) {
+          setExpenses(prev => prev.map(e => e.id === managed.id ? { ...e, amt: net } : e))
+          fetch(`/api/expenses/${managed.id}`, {
+            method: 'PUT', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ amt: net }),
+          })
+        }
+      } else if (!childcareSyncing.current) {
+        childcareSyncing.current = true
+        fetch('/api/expenses', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cat: CHILDCARE_CAT, name: CHILDCARE_NAME, freq: 'monthly', amt: net }),
+        })
+          .then(r => r.json())
+          .then((created: Expense) => setExpenses(prev => [...prev, created]))
+          .finally(() => { childcareSyncing.current = false })
+      }
+    } else if (managed) {
+      setExpenses(prev => prev.filter(e => e.id !== managed.id))
+      fetch(`/api/expenses/${managed.id}`, { method: 'DELETE' })
+    }
+  }, [childcare, familyIncome, expenses])
 
   return (
     <div className="page">
@@ -147,6 +207,14 @@ export default function BudgetClient({
           onAdd={addExpense}
           onUpdate={updateExpense}
           onDelete={deleteExpense}
+        />
+      </ReadOnlyFence>
+
+      <ReadOnlyFence canEdit={canEdit}>
+        <ChildcarePanel
+          settings={childcare}
+          familyIncome={familyIncome}
+          onUpdate={updateChildcare}
         />
       </ReadOnlyFence>
 

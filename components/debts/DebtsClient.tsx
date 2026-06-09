@@ -1,5 +1,5 @@
 'use client'
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useEffect } from 'react'
 import { toMonthly } from '@/lib/formatting'
 import DebtGrid, { type DebtItem } from './DebtGrid'
 import AssetGrid, { type AssetItem } from './AssetGrid'
@@ -57,6 +57,13 @@ export default function DebtsClient({
     [assets],
   )
 
+  // Offset is the sum of cash accounts flagged isOffset — a single source of
+  // truth shared with the mortgage. When at least one account is flagged, that
+  // sum drives mortgage.offsetBal (the manual field becomes a linked display).
+  const offsetAssets = useMemo(() => assets.filter(a => a.isOffset), [assets])
+  const offsetLinked = offsetAssets.length > 0
+  const offsetTotal  = useMemo(() => offsetAssets.reduce((s, a) => s + a.amt, 0), [offsetAssets])
+
   const monthlyExpenses = useMemo(
     () => initialExpenses.reduce((s, e) => s + toMonthly(e.amt, e.freq), 0),
     [initialExpenses],
@@ -104,7 +111,7 @@ export default function DebtsClient({
     setAssets(prev => [...prev, created])
   }, [])
 
-  const updateAsset = useCallback(async (id: number, field: string, value: string | number) => {
+  const updateAsset = useCallback(async (id: number, field: string, value: string | number | boolean) => {
     const parsed = field === 'amt' ? (parseFloat(String(value)) || 0) : value
     setAssets(prev => prev.map(a => a.id === id ? { ...a, [field]: parsed } : a))
     await fetch(`/api/assets/${id}`, {
@@ -128,6 +135,13 @@ export default function DebtsClient({
       body: JSON.stringify(patch),
     })
   }, [])
+
+  // Keep the mortgage offset balance in lock-step with the flagged cash accounts.
+  useEffect(() => {
+    if (offsetLinked && mortgage.offsetBal !== offsetTotal) {
+      updateMortgage({ offsetBal: offsetTotal })
+    }
+  }, [offsetLinked, offsetTotal, mortgage.offsetBal, updateMortgage])
 
   // ── HELP indexation state (lifted so the seasonal alert stays in sync with edits) ──
   const helpMembers = useMemo(() => [
@@ -221,6 +235,8 @@ export default function DebtsClient({
               mortgage={mortgage}
               mortgageDebtAmt={mortgageDebtAmt}
               onUpdate={updateMortgage}
+              offsetLinked={offsetLinked}
+              offsetAccountCount={offsetAssets.length}
             />
           </ReadOnlyFence>
           <EmergencyFund cashOnHand={cashOnHand} monthlyExpenses={monthlyExpenses} />

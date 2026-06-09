@@ -19,14 +19,14 @@ function PersonTable({ rows, name }: { rows: SuperRow[]; name: string }) {
         <thead>
           <tr>
             <th>Age</th>
-            <th>Year</th>
+            <th className="super-col-sec">Year</th>
             <th>Balance</th>
-            <th>Earnings</th>
-            <th>Earn. Tax</th>
+            <th className="super-col-sec">Earnings</th>
+            <th className="super-col-sec">Earn. Tax</th>
             <th>Contribution</th>
-            <th>Contrib. Tax</th>
-            <th>Fees</th>
-            <th>Salary</th>
+            <th className="super-col-sec">Contrib. Tax</th>
+            <th className="super-col-sec">Fees</th>
+            <th className="super-col-sec">Salary</th>
             <th>PV (today's $)</th>
             <th>Notes</th>
           </tr>
@@ -35,14 +35,14 @@ function PersonTable({ rows, name }: { rows: SuperRow[]; name: string }) {
           {accRows.map(r => (
             <tr key={r.count} className={r.capHit ? 'super-cap-hit' : ''}>
               <td>{r.age}</td>
-              <td>{r.year}</td>
+              <td className="super-col-sec">{r.year}</td>
               <td className="super-num">{c(r.balance)}</td>
-              <td className="super-num">{c(r.earnings)}</td>
-              <td className="super-num super-tax">{c(r.earningsTax)}</td>
+              <td className="super-num super-col-sec">{c(r.earnings)}</td>
+              <td className="super-num super-tax super-col-sec">{c(r.earningsTax)}</td>
               <td className="super-num">{c(r.contribution)}</td>
-              <td className="super-num super-tax">{c(r.contributionTax)}</td>
-              <td className="super-num super-tax">{c(r.fees)}</td>
-              <td className="super-num">{c(r.salary)}</td>
+              <td className="super-num super-tax super-col-sec">{c(r.contributionTax)}</td>
+              <td className="super-num super-tax super-col-sec">{c(r.fees)}</td>
+              <td className="super-num super-col-sec">{c(r.salary)}</td>
               <td className="super-num super-pv">{c(r.presentValue)}</td>
               <td>
                 {r.capHit && <span className="super-badge cap">Cap</span>}
@@ -60,13 +60,13 @@ function PersonTable({ rows, name }: { rows: SuperRow[]; name: string }) {
             <thead>
               <tr>
                 <th>Age</th>
-                <th>Year</th>
+                <th className="super-col-sec">Year</th>
                 <th>Balance</th>
-                <th>Earnings</th>
-                <th>Earn. Tax</th>
+                <th className="super-col-sec">Earnings</th>
+                <th className="super-col-sec">Earn. Tax</th>
                 <th>Drawdown</th>
-                <th colSpan={2}>Fees</th>
-                <th></th>
+                <th className="super-col-sec" colSpan={2}>Fees</th>
+                <th className="super-col-sec"></th>
                 <th>PV (today's $)</th>
                 <th></th>
               </tr>
@@ -75,13 +75,13 @@ function PersonTable({ rows, name }: { rows: SuperRow[]; name: string }) {
               {ddRows.map(r => (
                 <tr key={r.count} className={r.balance === 0 ? 'super-depleted' : ''}>
                   <td>{r.age}</td>
-                  <td>{r.year}</td>
+                  <td className="super-col-sec">{r.year}</td>
                   <td className="super-num">{c(r.balance)}</td>
-                  <td className="super-num">{c(r.earnings)}</td>
-                  <td className="super-num super-tax">—</td>
+                  <td className="super-num super-col-sec">{c(r.earnings)}</td>
+                  <td className="super-num super-tax super-col-sec">—</td>
                   <td className="super-num super-draw">{c(r.drawdown)}</td>
-                  <td className="super-num super-tax" colSpan={2}>{c(r.fees)}</td>
-                  <td></td>
+                  <td className="super-num super-tax super-col-sec" colSpan={2}>{c(r.fees)}</td>
+                  <td className="super-col-sec"></td>
                   <td className="super-num super-pv">{c(r.presentValue)}</td>
                   <td></td>
                 </tr>
