@@ -25,9 +25,12 @@ model Debt {
 }
 
 model Asset {
-  id   Int    @id @default(autoincrement())
-  name String
-  amt  Float
+  id       Int     @id @default(autoincrement())
+  name     String
+  amt      Float
+  // When true, this cash account offsets the mortgage. The sum of all
+  // isOffset assets is the canonical mortgage offset balance.
+  isOffset Boolean @default(false)
 }
 
 model MortgageSettings {
@@ -37,6 +40,14 @@ model MortgageSettings {
   payment   Float  @default(3237)
   offsetBal Float  @default(47563)
   endDate   String @default("2053-01-16")
+}
+
+model ChildcareSettings {
+  id          Int     @id @default(1)
+  enabled     Boolean @default(false)
+  costPerDay  Float   @default(130)  // gross fee per child per day, before CCS
+  daysPerWeek Int     @default(3)
+  numChildren Int     @default(1)
 }
 
 model IncomeSettings {

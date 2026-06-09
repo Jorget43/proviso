@@ -34,6 +34,12 @@ async function main() {
     create: { id: 1, useActualsProjections: false },
   });
 
+  await prisma.childcareSettings.upsert({
+    where:  { id: 1 },
+    update: {},
+    create: { id: 1, enabled: false, costPerDay: 130, daysPerWeek: 3, numChildren: 1 },
+  });
+
   // ── Expenses ──────────────────────────────────────────────────────────────
   // Only seed if table is empty
   const expCount = await prisma.expense.count();
