@@ -1,4 +1,5 @@
 'use client'
+import { useState } from 'react'
 import { CATS } from '@/lib/constants'
 import { toMonthly, fmt } from '@/lib/formatting'
 import Panel from '@/components/ui/Panel'
@@ -13,7 +14,7 @@ export interface Expense {
 
 interface ExpenseTableProps {
   expenses: Expense[]
-  onAdd: () => void
+  onAdd: (cat?: string) => void
   onUpdate: (id: number, field: string, value: string | number) => void
   onDelete: (id: number) => void
 }
@@ -21,11 +22,11 @@ interface ExpenseTableProps {
 const FREQS = ['weekly', 'monthly', 'quarterly', 'yearly']
 
 export default function ExpenseTable({ expenses, onAdd, onUpdate, onDelete }: ExpenseTableProps) {
+  const [addCat, setAddCat] = useState<string>(CATS[0])
   return (
     <Panel
       title="Expenses"
       dotColor="var(--red)"
-      right={<span className="small">Click any field to edit</span>}
       rawBody
     >
       <div style={{ overflowX: 'auto' }}>
@@ -48,7 +49,17 @@ export default function ExpenseTable({ expenses, onAdd, onUpdate, onDelete }: Ex
               return [
                 <tr key={`cat-${cat}`} className="cat-row">
                   <td colSpan={6}>
-                    {cat} <span>&mdash; {fmt(catTotal)}/mo</span>
+                    <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span>{cat} <span>&mdash; {fmt(catTotal)}/mo</span></span>
+                      <button
+                        className="add-btn"
+                        style={{ fontSize: '0.68rem', padding: '1px 8px' }}
+                        onClick={() => onAdd(cat)}
+                        title={`Add a new ${cat} item`}
+                      >
+                        + add
+                      </button>
+                    </span>
                   </td>
                 </tr>,
                 ...items.map(e => {
@@ -78,7 +89,10 @@ export default function ExpenseTable({ expenses, onAdd, onUpdate, onDelete }: Ex
                         <input
                           className="amt-input"
                           type="number"
-                          defaultValue={e.amt.toFixed(2)}
+                          inputMode="decimal"
+                          step="any"
+                          key={`amt-${e.id}-${e.amt}`}
+                          defaultValue={String(e.amt)}
                           onBlur={ev => onUpdate(e.id, 'amt', parseFloat(ev.target.value) || 0)}
                         />
                       </td>
@@ -92,8 +106,12 @@ export default function ExpenseTable({ expenses, onAdd, onUpdate, onDelete }: Ex
           </tbody>
         </table>
       </div>
-      <div style={{ padding: '0.6rem 1.2rem', borderTop: '1px solid var(--border)', background: 'var(--surface2)' }}>
-        <button className="add-btn" onClick={onAdd}>+ Add expense</button>
+      <div style={{ padding: '0.6rem 1.2rem', borderTop: '1px solid var(--border)', background: 'var(--surface2)', display: 'flex', gap: 8, alignItems: 'center' }}>
+        <span className="small">Add item to</span>
+        <select className="freq-select" value={addCat} onChange={e => setAddCat(e.target.value)}>
+          {CATS.map(c => <option key={c}>{c}</option>)}
+        </select>
+        <button className="add-btn" onClick={() => onAdd(addCat)}>+ Add expense</button>
       </div>
     </Panel>
   )

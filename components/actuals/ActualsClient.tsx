@@ -1,5 +1,5 @@
 'use client'
-import { useState, useMemo, useCallback, useRef } from 'react'
+import { useState, useMemo, useCallback, useRef, type CSSProperties } from 'react'
 import { CATS } from '@/lib/constants'
 import { toMonthly, fmt, fmtS } from '@/lib/formatting'
 import {
@@ -7,6 +7,8 @@ import {
   buildSuggestions, extractMerchantPattern,
   type ParsedTransaction, type CustomRule, type Suggestion,
 } from '@/lib/actuals'
+import { parseStatementText, type StatementSource } from '@/lib/pdfStatement'
+import { extractPdfText } from '@/lib/pdfExtract'
 import Panel from '@/components/ui/Panel'
 import SpendHistoryChart from './SpendHistoryChart'
 
@@ -49,6 +51,22 @@ const SAMPLE_CSV = `01/05/2026,WOOLWORTHS WARRANWOOD,-142.50
 29/05/2026,VET CROYDON ANIMAL,-220.00
 30/05/2026,MISC SHOPS,-145.00`
 
+function dropStyle(busy: boolean): CSSProperties {
+  return {
+    border: '1px dashed var(--border-md)',
+    borderRadius: 'var(--r)',
+    padding: '0.85rem',
+    textAlign: 'center',
+    cursor: busy ? 'wait' : 'pointer',
+    background: 'var(--surface2)',
+    opacity: busy ? 0.6 : 1,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 3,
+    transition: 'background 0.15s',
+  }
+}
+
 export default function ActualsClient({
   initialTxns, initialRules, initialSuggStatus, initialExpenses, initialUseActuals,
 }: ActualsClientProps) {
@@ -61,6 +79,10 @@ export default function ActualsClient({
   const [useActuals,   setUseActuals]   = useState(initialUseActuals)
   const [overriddenRows, setOverriddenRows] = useState<Record<number, string>>({})
   const [commitInfo,   setCommitInfo]   = useState<{ committed: number; skipped: number } | null>(null)
+  const [pdfBusy,      setPdfBusy]      = useState(false)
+  const [pdfStatus,    setPdfStatus]    = useState<string | null>(null)
+  const bankInputRef = useRef<HTMLInputElement>(null)
+  const cardInputRef = useRef<HTMLInputElement>(null)
 
   // ── Derived ──────────────────────────────────────────────────────────────
   const monthsCovered = useMemo(
@@ -111,6 +133,37 @@ export default function ActualsClient({
     setOverriddenRows({})
     setCommitInfo(null)
   }, [csvText, customRules])
+
+  // ── Parse uploaded PDF statements ─────────────────────────────────────────
+  const handlePdfs = useCallback(async (files: FileList | null, source: StatementSource) => {
+    if (!files || !files.length) return
+    setPdfBusy(true)
+    setCommitInfo(null)
+    const label = source === 'bank' ? 'bank statement' : 'credit card'
+    setPdfStatus(`Reading ${files.length} ${label} PDF${files.length > 1 ? 's' : ''}…`)
+
+    const collected: ParsedTransaction[] = []
+    const errors: string[] = []
+    for (const file of Array.from(files)) {
+      try {
+        const text = await extractPdfText(file)
+        const parsed = parseStatementText(text, customRules, source)
+        if (!parsed.length) errors.push(`${file.name}: no transactions detected`)
+        collected.push(...parsed)
+      } catch {
+        errors.push(`${file.name}: couldn't read PDF`)
+      }
+    }
+    if (collected.length) {
+      setPendingTxns(prev => [...prev, ...collected])
+      setOverriddenRows({})
+    }
+    setPdfBusy(false)
+    const ok = `Added ${collected.length} transaction${collected.length === 1 ? '' : 's'} from ${files.length} file${files.length > 1 ? 's' : ''} — review below before committing.`
+    setPdfStatus(errors.length ? `${ok} Issues: ${errors.join('; ')}.` : ok)
+    if (source === 'bank' && bankInputRef.current) bankInputRef.current.value = ''
+    if (source === 'card' && cardInputRef.current) cardInputRef.current.value = ''
+  }, [customRules])
 
   // ── Commit to history ─────────────────────────────────────────────────────
   const commitTransactions = useCallback(async () => {
@@ -280,8 +333,53 @@ export default function ActualsClient({
               </div>
             }
           >
+            {/* ── PDF upload: two boxes ── */}
             <p style={{ fontSize: '0.75rem', color: 'var(--t2)', marginBottom: '0.65rem' }}>
-              Paste CSV from any Australian bank. New imports are <strong>merged cumulatively</strong> — duplicates skipped. Format: date, description, amount.
+              Upload statement <strong>PDFs</strong> — the way banks actually send them. Drop in one or more files; transactions are parsed in your browser (nothing is uploaded) and added to the review list.
+            </p>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: '0.8rem' }}>
+              <div
+                className="pdf-drop"
+                onClick={() => !pdfBusy && bankInputRef.current?.click()}
+                style={dropStyle(pdfBusy)}
+              >
+                <div style={{ fontWeight: 600, fontSize: '0.78rem' }}>🏦 Bank statements</div>
+                <div className="small" style={{ color: 'var(--t3)' }}>Everyday / savings accounts. Multiple PDFs OK.</div>
+                <input
+                  ref={bankInputRef}
+                  type="file"
+                  accept="application/pdf"
+                  multiple
+                  hidden
+                  onChange={e => handlePdfs(e.target.files, 'bank')}
+                />
+              </div>
+              <div
+                className="pdf-drop"
+                onClick={() => !pdfBusy && cardInputRef.current?.click()}
+                style={dropStyle(pdfBusy)}
+              >
+                <div style={{ fontWeight: 600, fontSize: '0.78rem' }}>💳 Credit cards</div>
+                <div className="small" style={{ color: 'var(--t3)' }}>Where most spending sits. Multiple cards OK.</div>
+                <input
+                  ref={cardInputRef}
+                  type="file"
+                  accept="application/pdf"
+                  multiple
+                  hidden
+                  onChange={e => handlePdfs(e.target.files, 'card')}
+                />
+              </div>
+            </div>
+            {pdfStatus && (
+              <p className="small" style={{ marginBottom: '0.8rem', color: pdfBusy ? 'var(--t2)' : 'var(--green)' }}>
+                {pdfBusy ? '⏳ ' : '✓ '}{pdfStatus}
+              </p>
+            )}
+
+            <div style={{ borderTop: '1px solid var(--border)', margin: '0.2rem 0 0.8rem' }} />
+            <p style={{ fontSize: '0.75rem', color: 'var(--t2)', marginBottom: '0.65rem' }}>
+              Or paste CSV from any Australian bank. New imports are <strong>merged cumulatively</strong> — duplicates skipped. Format: date, description, amount.
             </p>
             <textarea
               className="csv-textarea"

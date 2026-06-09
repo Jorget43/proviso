@@ -13,8 +13,9 @@ function currentFyEnding(): number {
 export default async function DebtsPage() {
   const me = await requireSession()
   const fyEnding = currentFyEnding()
+  const currentYear = new Date().getFullYear()
 
-  const [debts, assets, mortgage, expenses, hs, helpDetails, income, projSettings] = await Promise.all([
+  const [debts, assets, mortgage, expenses, hs, helpDetails, income, projSettings, jorgePhases, gracePhases] = await Promise.all([
     prisma.debt.findMany({ orderBy: { id: 'asc' } }),
     prisma.asset.findMany({ orderBy: { id: 'asc' } }),
     prisma.mortgageSettings.findUniqueOrThrow({ where: { id: 1 } }),
@@ -23,6 +24,8 @@ export default async function DebtsPage() {
     prisma.helpDebtDetail.findMany({ where: { financialYearEnding: fyEnding } }),
     prisma.incomeSettings.findUniqueOrThrow({ where: { id: 1 } }),
     prisma.projectionSettings.findUniqueOrThrow({ where: { id: 1 } }),
+    prisma.jorgePhase.findMany({ orderBy: { year: 'asc' } }),
+    prisma.gracePhase.findMany({ orderBy: { year: 'asc' } }),
   ])
 
   const hasHelp = debts.some(d => /help|hecs/i.test(d.name)) || helpDetails.length > 0
@@ -30,23 +33,32 @@ export default async function DebtsPage() {
   const person1Name = hs?.person1Name ?? 'Person 1'
   const person2Name = hs?.person2Name ?? 'Person 2'
 
-  // Gross income per member — used to express the indexation saving as a
+  // Pro-rata current income by working days, matching the Budget panel and the
+  // projection engine — HELP repayments are assessed on actual taxable income,
+  // not the full-time-equivalent salary. Jorge defaults to full-time (5 days);
+  // Grace defaults to 3 (mirrors app/budget/page.tsx).
+  const jorgeDays = jorgePhases.find(p => p.year === currentYear)?.days ?? 5
+  const graceDays = gracePhases.find(p => p.year === currentYear)?.days ?? 3
+  const jorgeIncome = income.jorgeFTE * (jorgeDays / 5)
+  const graceIncome = income.graceFTE * (graceDays / 5)
+
+  // Pro-rata income per member — used to express the indexation saving as a
   // marginal-rate equivalent in the HELP alert.
   const helpIncome: Record<string, number> = {
-    [person1Name]: income.jorgeFTE,
-    [person2Name]: income.graceFTE,
+    [person1Name]: jorgeIncome,
+    [person2Name]: graceIncome,
   }
 
   const helpPersons = hasHelp ? [
     ...(income.jorgeHasHELP || debts.some(d => d.name.toLowerCase().includes(person1Name.toLowerCase()) && /help|hecs/i.test(d.name)) ? [{
       name:       person1Name,
-      income:     income.jorgeFTE,
+      income:     jorgeIncome,
       growthRate: projSettings.jorgeGrowth,
       helpBalance: debts.find(d => d.name.toLowerCase().includes(person1Name.toLowerCase()) && /help|hecs/i.test(d.name))?.amt ?? 0,
     }] : []),
     ...(hs?.partnerEnabled && (income.graceHasHELP || debts.some(d => d.name.toLowerCase().includes(person2Name.toLowerCase()) && /help|hecs/i.test(d.name))) ? [{
       name:       person2Name,
-      income:     income.graceFTE,
+      income:     graceIncome,
       growthRate: projSettings.graceGrowth,
       helpBalance: debts.find(d => d.name.toLowerCase().includes(person2Name.toLowerCase()) && /help|hecs/i.test(d.name))?.amt ?? 0,
     }] : []),

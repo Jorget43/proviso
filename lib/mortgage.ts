@@ -2,6 +2,30 @@
 // Offset updates EVERY MONTH — cash balance changes monthly from net flow.
 // Do not simplify to annual offset; the monthly calculation is intentional.
 
+/**
+ * Standard amortised monthly repayment for a principal-and-interest loan.
+ *
+ * @param balance   Outstanding principal
+ * @param ratePct   Annual interest rate as a percentage (e.g. 5.99)
+ * @param months    Number of monthly payments remaining
+ * @returns         Monthly repayment, rounded to whole dollars; 0 if inputs invalid
+ */
+export function computeMonthlyRepayment(balance: number, ratePct: number, months: number): number {
+  if (balance <= 0 || months <= 0) return 0;
+  const r = ratePct / 100 / 12;
+  if (r === 0) return Math.round(balance / months);
+  const payment = balance * r / (1 - Math.pow(1 + r, -months));
+  return Math.round(payment);
+}
+
+/** Whole months between now and an ISO end date (floored at 0). */
+export function monthsUntil(endDate: string, from: Date = new Date()): number {
+  const end = new Date(endDate);
+  if (isNaN(end.getTime())) return 0;
+  const months = (end.getFullYear() - from.getFullYear()) * 12 + (end.getMonth() - from.getMonth());
+  return Math.max(0, months);
+}
+
 export interface MortgageYearResult {
   endBalance:      number;
   endCash:         number;
