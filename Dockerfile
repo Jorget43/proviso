@@ -26,6 +26,10 @@ ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV DATABASE_URL="file:/data/proviso.db"
 
+# Bake the release tag in at build time: docker build --build-arg PROVISO_VERSION=v1.2.3
+ARG PROVISO_VERSION=dev
+ENV PROVISO_VERSION=$PROVISO_VERSION
+
 # Standalone Next.js server (includes a trimmed node_modules subset)
 COPY --from=builder /app/.next/standalone            ./
 COPY --from=builder /app/.next/static                ./.next/static

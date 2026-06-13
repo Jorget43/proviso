@@ -18,6 +18,7 @@ export interface Assumption {
   label:              string
   category:           'Income tax' | 'HELP' | 'Medicare' | 'Super'
   authority:          'ATO' | 'ABS' | 'Legislation'
+  authorityUrl?:      string   // canonical URL to verify the current value
   location:           string   // file → symbol the developer edits
   currentValue:       string   // human-readable summary of what's in the code now
   calibratedFyEnding: number   // FY-ending year this value was last set/verified for
@@ -56,6 +57,7 @@ export const ASSUMPTIONS: Assumption[] = [
     label: 'Income tax brackets & rates (Stage 3)',
     category: 'Income tax',
     authority: 'ATO',
+    authorityUrl: 'https://www.ato.gov.au/tax-rates-and-codes/tax-rates-australian-residents',
     location: 'lib/tax.ts → TAX_THRESHOLDS_2425 / TAX_RATES_2425',
     currentValue: '0/16/30/37/45% at $0 / 18,200 / 45,000 / 135,000 / 190,000',
     calibratedFyEnding: 2025,
@@ -67,6 +69,7 @@ export const ASSUMPTIONS: Assumption[] = [
     label: 'Low Income Tax Offset (LITO)',
     category: 'Income tax',
     authority: 'ATO',
+    authorityUrl: 'https://www.ato.gov.au/individuals-and-families/income-deductions-offsets-and-records/tax-offsets/low-income-tax-offset-and-low-and-middle-income-tax-offset',
     location: 'lib/tax.ts → calcLITO',
     currentValue: 'Max $700; phase-outs $37,500–45,000 (5%) then $45,000–66,667 (1.5%)',
     calibratedFyEnding: 2025,
@@ -78,6 +81,7 @@ export const ASSUMPTIONS: Assumption[] = [
     label: 'HELP/HECS repayment thresholds',
     category: 'HELP',
     authority: 'ATO',
+    authorityUrl: 'https://www.ato.gov.au/individuals-and-families/study-and-training-loans/study-and-training-loan-repayment-thresholds-and-rates',
     location: 'lib/tax.ts → HELP_THRESHOLDS',
     currentValue: 'First threshold $54,435 @ 1.0% → top $167,206 @ 10.0%',
     calibratedFyEnding: 2025,
@@ -89,6 +93,7 @@ export const ASSUMPTIONS: Assumption[] = [
     label: 'Medicare levy low-income threshold',
     category: 'Medicare',
     authority: 'ATO',
+    authorityUrl: 'https://www.ato.gov.au/individuals-and-families/medicare-and-private-health-insurance/medicare-levy/medicare-levy-reduction-for-low-income-earners',
     location: 'lib/tax.ts → MEDICARE_LOW_THRESH',
     currentValue: '$26,000 (single, simplified)',
     calibratedFyEnding: 2025,
@@ -100,6 +105,7 @@ export const ASSUMPTIONS: Assumption[] = [
     label: 'HELP CPI indexation rate',
     category: 'HELP',
     authority: 'ATO',
+    authorityUrl: 'https://www.ato.gov.au/individuals-and-families/study-and-training-loans/when-your-loan-is-indexed',
     location: 'lib/help.ts / DebtsClient — default cpiRate (3.5%)',
     currentValue: 'Default fallback 3.5%',
     calibratedFyEnding: 2025,
@@ -112,6 +118,7 @@ export const ASSUMPTIONS: Assumption[] = [
     label: 'Superannuation Guarantee rate',
     category: 'Super',
     authority: 'Legislation',
+    authorityUrl: 'https://www.ato.gov.au/businesses-and-organisations/super-for-employers/working-out-if-you-have-to-pay-super/how-much-super-to-pay',
     location: 'Super inputs — sgRate default (12%)',
     currentValue: '12.0% (final under current legislation)',
     calibratedFyEnding: 2026,
@@ -124,6 +131,7 @@ export const ASSUMPTIONS: Assumption[] = [
     label: 'Concessional contributions cap',
     category: 'Super',
     authority: 'ABS',
+    authorityUrl: 'https://www.ato.gov.au/individuals-and-families/super/growing-and-keeping-track-of-your-super/caps-on-super-contributions/concessional-contributions-cap',
     location: 'lib/super.ts → CONCESSIONAL_CAP_BASE; lib/superHistory.ts → LEGISLATIVE_CONCESSIONAL_CAP',
     currentValue: '$30,000 (FY24-25 & FY25-26)',
     calibratedFyEnding: 2026,
@@ -136,6 +144,7 @@ export const ASSUMPTIONS: Assumption[] = [
     label: 'Division 293 income threshold',
     category: 'Super',
     authority: 'Legislation',
+    authorityUrl: 'https://www.ato.gov.au/individuals-and-families/super/growing-and-keeping-track-of-your-super/caps-on-super-contributions/division-293-tax-information-for-individuals',
     location: 'lib/super.ts → DIV293_THRESHOLD',
     currentValue: '$250,000',
     calibratedFyEnding: 2026,

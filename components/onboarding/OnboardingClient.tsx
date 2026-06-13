@@ -31,6 +31,20 @@ interface FormState {
   hasParentalLeave:   boolean
 }
 
+// Suggested median values — sourced from ABS / ATO Australian data.
+// Displayed as explicit chips the user must click to accept; never silently pre-filled.
+const SUGGEST = {
+  age1:          { display: '35 years',   value: '35',     note: 'Median Australian worker' },
+  age2:          { display: '33 years',   value: '33',     note: 'Median Australian partner' },
+  income:        { display: '$100,000',   value: '100000', note: 'Median FTE salary (ABS)' },
+  helpBalance:   { display: '$26,000',    value: '26000',  note: 'Median HELP debt (ATO)' },
+  super1:        { display: '$75,000',    value: '75000',  note: 'Median super balance 35–44 (ABS)' },
+  super2:        { display: '$60,000',    value: '60000',  note: 'Median super balance 35–44 (ABS)' },
+  cash:          { display: '$25,000',    value: '25000',  note: 'Median household savings (ABS)' },
+  mortgageBal:   { display: '$620,000',   value: '620000', note: 'Median Australian mortgage (ABS)' },
+  mortgageRate:  { display: '6.2%',       value: '6.20',   note: 'Average variable rate (RBA)' },
+}
+
 const STEP_LABELS = ['About you', 'Your partner', 'Superannuation', 'Investments', 'Cash & mortgage']
 
 function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
@@ -43,19 +57,65 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
   )
 }
 
-function MoneyInput({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder?: string }) {
+// Chip shown only when field is empty — user must click to accept the suggested value.
+function SuggestChip({ suggest, onAccept }: {
+  suggest: { display: string; note: string }
+  onAccept: () => void
+}) {
   return (
-    <div className="ob-prefix-row">
-      <span className="ob-prefix-sym">$</span>
+    <button type="button" className="ob-suggest" onClick={onAccept}>
+      <span className="ob-suggest-label">Suggested</span>
+      <span className="ob-suggest-value">{suggest.display}</span>
+      <span className="ob-suggest-note">{suggest.note}</span>
+    </button>
+  )
+}
+
+function MoneyInput({ value, onChange, placeholder, suggest, onAcceptSuggest }: {
+  value: string
+  onChange: (v: string) => void
+  placeholder?: string
+  suggest?: { display: string; note: string }
+  onAcceptSuggest?: () => void
+}) {
+  return (
+    <div>
+      <div className="ob-prefix-row">
+        <span className="ob-prefix-sym">$</span>
+        <input
+          className="ob-prefix-input"
+          type="number"
+          min="0"
+          step="any"
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          placeholder={placeholder}
+        />
+      </div>
+      {suggest && onAcceptSuggest && !value && (
+        <SuggestChip suggest={suggest} onAccept={onAcceptSuggest} />
+      )}
+    </div>
+  )
+}
+
+function AgeInput({ value, onChange, suggest, onAcceptSuggest }: {
+  value: string
+  onChange: (v: string) => void
+  suggest: { display: string; note: string }
+  onAcceptSuggest: () => void
+}) {
+  return (
+    <div>
       <input
-        className="ob-prefix-input"
+        className="ob-input"
         type="number"
-        min="0"
-        step="any"
+        min="18"
+        max="100"
         value={value}
         onChange={e => onChange(e.target.value)}
-        placeholder={placeholder}
       />
+      {!value && <SuggestChip suggest={suggest} onAccept={onAcceptSuggest} />}
     </div>
   )
 }
@@ -178,7 +238,7 @@ export default function OnboardingClient() {
     )
   }
 
-  // ── Done (step 5) ─────────────────────────────────────────────────────────
+  // ── Done (step 6) ─────────────────────────────────────────────────────────
   if (step === 6) {
     return (
       <div className="ob-outer">
@@ -228,18 +288,20 @@ export default function OnboardingClient() {
                 />
               </Field>
               <Field label="Your age">
-                <input
-                  className="ob-input"
-                  type="number"
-                  min="18"
-                  max="100"
+                <AgeInput
                   value={form.person1Age}
-                  onChange={e => set({ person1Age: e.target.value })}
-                  placeholder="35"
+                  onChange={v => set({ person1Age: v })}
+                  suggest={SUGGEST.age1}
+                  onAcceptSuggest={() => set({ person1Age: SUGGEST.age1.value })}
                 />
               </Field>
               <Field label="Gross salary / year" hint="Before tax, excluding super">
-                <MoneyInput value={form.person1Income} onChange={v => set({ person1Income: v })} placeholder="100000" />
+                <MoneyInput
+                  value={form.person1Income}
+                  onChange={v => set({ person1Income: v })}
+                  suggest={SUGGEST.income}
+                  onAcceptSuggest={() => set({ person1Income: SUGGEST.income.value })}
+                />
               </Field>
               <Field label="Days per week" hint="How many days per week are you currently working?">
                 <DaysInput value={form.person1Days} onChange={v => set({ person1Days: v })} />
@@ -260,7 +322,12 @@ export default function OnboardingClient() {
               </div>
               {form.person1HasHELP && (
                 <Field label="Your HELP balance">
-                  <MoneyInput value={form.person1HELPBalance} onChange={v => set({ person1HELPBalance: v })} placeholder="40000" />
+                  <MoneyInput
+                    value={form.person1HELPBalance}
+                    onChange={v => set({ person1HELPBalance: v })}
+                    suggest={SUGGEST.helpBalance}
+                    onAcceptSuggest={() => set({ person1HELPBalance: SUGGEST.helpBalance.value })}
+                  />
                 </Field>
               )}
             </div>
@@ -303,18 +370,20 @@ export default function OnboardingClient() {
                     />
                   </Field>
                   <Field label="Partner's age">
-                    <input
-                      className="ob-input"
-                      type="number"
-                      min="18"
-                      max="100"
+                    <AgeInput
                       value={form.person2Age}
-                      onChange={e => set({ person2Age: e.target.value })}
-                      placeholder="33"
+                      onChange={v => set({ person2Age: v })}
+                      suggest={SUGGEST.age2}
+                      onAcceptSuggest={() => set({ person2Age: SUGGEST.age2.value })}
                     />
                   </Field>
                   <Field label="Partner's gross salary / year" hint="FTE — if part-time, enter the full-time equivalent">
-                    <MoneyInput value={form.person2Income} onChange={v => set({ person2Income: v })} placeholder="100000" />
+                    <MoneyInput
+                      value={form.person2Income}
+                      onChange={v => set({ person2Income: v })}
+                      suggest={SUGGEST.income}
+                      onAcceptSuggest={() => set({ person2Income: SUGGEST.income.value })}
+                    />
                   </Field>
                   <Field label="Partner's days per week" hint="How many days per week is your partner currently working?">
                     <DaysInput value={form.person2Days} onChange={v => set({ person2Days: v })} />
@@ -335,7 +404,12 @@ export default function OnboardingClient() {
                   </div>
                   {form.person2HasHELP && (
                     <Field label="Partner's HELP balance">
-                      <MoneyInput value={form.person2HELPBalance} onChange={v => set({ person2HELPBalance: v })} placeholder="40000" />
+                      <MoneyInput
+                        value={form.person2HELPBalance}
+                        onChange={v => set({ person2HELPBalance: v })}
+                        suggest={SUGGEST.helpBalance}
+                        onAcceptSuggest={() => set({ person2HELPBalance: SUGGEST.helpBalance.value })}
+                      />
                     </Field>
                   )}
                 </>
@@ -351,11 +425,21 @@ export default function OnboardingClient() {
             <p className="ob-step-sub">Check your latest super fund statement or app.</p>
             <div className="ob-fields">
               <Field label={`${p1}'s super balance`}>
-                <MoneyInput value={form.person1Super} onChange={v => set({ person1Super: v })} placeholder="50000" />
+                <MoneyInput
+                  value={form.person1Super}
+                  onChange={v => set({ person1Super: v })}
+                  suggest={SUGGEST.super1}
+                  onAcceptSuggest={() => set({ person1Super: SUGGEST.super1.value })}
+                />
               </Field>
               {form.hasPartner && (
                 <Field label={`${p2}'s super balance`}>
-                  <MoneyInput value={form.person2Super} onChange={v => set({ person2Super: v })} placeholder="50000" />
+                  <MoneyInput
+                    value={form.person2Super}
+                    onChange={v => set({ person2Super: v })}
+                    suggest={SUGGEST.super2}
+                    onAcceptSuggest={() => set({ person2Super: SUGGEST.super2.value })}
+                  />
                 </Field>
               )}
             </div>
@@ -387,7 +471,12 @@ export default function OnboardingClient() {
             <div className="ob-step-title">Cash & mortgage</div>
             <div className="ob-fields">
               <Field label="Cash & savings" hint="Total across all bank accounts">
-                <MoneyInput value={form.cashBalance} onChange={v => set({ cashBalance: v })} placeholder="20000" />
+                <MoneyInput
+                  value={form.cashBalance}
+                  onChange={v => set({ cashBalance: v })}
+                  suggest={SUGGEST.cash}
+                  onAcceptSuggest={() => set({ cashBalance: SUGGEST.cash.value })}
+                />
               </Field>
 
               <div className="ob-toggle-row">
@@ -408,18 +497,30 @@ export default function OnboardingClient() {
               {form.hasMortgage && (
                 <>
                   <Field label="Outstanding balance">
-                    <MoneyInput value={form.mortgageBalance} onChange={v => set({ mortgageBalance: v })} placeholder="500000" />
+                    <MoneyInput
+                      value={form.mortgageBalance}
+                      onChange={v => set({ mortgageBalance: v })}
+                      suggest={SUGGEST.mortgageBal}
+                      onAcceptSuggest={() => set({ mortgageBalance: SUGGEST.mortgageBal.value })}
+                    />
                   </Field>
                   <Field label="Interest rate (% p.a.)">
-                    <input
-                      className="ob-input"
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={form.mortgageRate}
-                      onChange={e => set({ mortgageRate: e.target.value })}
-                      placeholder="5.99"
-                    />
+                    <div>
+                      <input
+                        className="ob-input"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={form.mortgageRate}
+                        onChange={e => set({ mortgageRate: e.target.value })}
+                      />
+                      {!form.mortgageRate && (
+                        <SuggestChip
+                          suggest={SUGGEST.mortgageRate}
+                          onAccept={() => set({ mortgageRate: SUGGEST.mortgageRate.value })}
+                        />
+                      )}
+                    </div>
                   </Field>
                   <Field label="Loan end date" hint="When is the loan due to be paid off? We'll work out the repayment.">
                     <input

@@ -19,8 +19,9 @@ export default async function SettingsPage() {
     ? await prisma.user.findMany({ select: { id: true, name: true, username: true, role: true }, orderBy: { id: 'asc' } })
     : []
 
-  // Developer watchdog prompt — CFO + internal tooling enabled only.
-  const watchdogEnabled = process.env.WATCHDOG_ENABLED === 'true' || process.env.NODE_ENV !== 'production'
+  // Developer watchdog prompt — only on Jorge's instance (WATCHDOG_ENABLED=true).
+  // Never shown to end-user deployments regardless of role.
+  const watchdogEnabled = process.env.WATCHDOG_ENABLED === 'true'
   const watchdog = me.role === 'CFO' && watchdogEnabled
     ? { attention: (() => { const c = computeWatchdog().counts; return c.overdue + c.review })() }
     : null

@@ -248,3 +248,16 @@ model Session {
 
   @@index([userId])
 }
+
+model WatchdogSnapshot {
+  id          Int       @id @default(autoincrement())
+  takenAt     DateTime  @default(now())
+  reportJson  String
+  emailSentAt DateTime?
+}
+
+model VersionCheck {
+  id        Int      @id @default(autoincrement())
+  checkedAt DateTime @default(now())
+  latestTag String
+}
