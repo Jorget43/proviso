@@ -73,7 +73,7 @@ Key classes: `.page`, `.banner` + `.b-item/.b-label/.b-value`, `.metrics`, `.mc`
 ## Docker deployment (completed 2026-06-06)
 
 - **`household-dashboard/Dockerfile`** — 3-stage build: `deps` (npm ci) → `builder` (prisma generate + next build) → `runner` (node:20-alpine, standalone output only)
-- **`household-dashboard/docker-entrypoint.sh`** — runs `prisma migrate deploy` on every start; runs `prisma db seed` only on first run (when `/data/proviso.db` doesn't exist)
+- **`household-dashboard/docker-entrypoint.sh`** — runs `prisma migrate deploy` on every start; runs `prisma db seed` only on first run (when `/data/proviso.db` doesn't exist). **Does NOT `set -e`**: a failed `migrate deploy` logs a loud warning (with `migrate status` / `migrate resolve` remediation hints) and the app starts anyway, rather than crash-looping into `ERR_CONNECTION_REFUSED`. The app's error boundaries surface any resulting DB problems in the UI. (Hardened 2026-06-13 after a P3009 failed-migration record wedged every boot.)
 - **`docker-compose.yml`** (at repo root) — service/`container_name` `proviso`; named volume `proviso-db` mounted at `/data`; `DATABASE_URL=file:/data/proviso.db`
 - **`next.config.ts`** — added `output: 'standalone'` for lean runner image
 - **`.dockerignore`** — excludes `node_modules`, `.next`, `*.db`, `.env*`

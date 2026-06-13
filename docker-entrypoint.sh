@@ -1,18 +1,48 @@
 #!/bin/sh
-set -e
+# Intentionally NOT using `set -e`.
+#
+# A failed `prisma migrate deploy` must never crash-loop the container. A
+# reachable app — even one with a stale or inconsistent schema — is far easier
+# to diagnose and recover than ERR_CONNECTION_REFUSED with no way in. (See the
+# 2026-06-13 incident: a single failed migration record, P3009, wedged every
+# boot.) So we attempt migrations, warn loudly on failure, and start anyway.
+# The app's error boundaries surface DB problems in the UI.
 
 DB_PATH="/data/proviso.db"
 
-# First-run: apply schema and seed
+run_migrations() {
+  echo "[entrypoint] Running migrations (prisma migrate deploy)..."
+  if npx prisma migrate deploy; then
+    echo "[entrypoint] Migrations applied."
+    return 0
+  fi
+  echo "[entrypoint] =============================================================="
+  echo "[entrypoint] ⚠  WARNING: prisma migrate deploy FAILED."
+  echo "[entrypoint]    Starting the app anyway so it stays reachable."
+  echo "[entrypoint]    Pages that need a missing table may error until resolved."
+  echo "[entrypoint]"
+  echo "[entrypoint]    Common cause: a failed/inconsistent migration history (P3009)."
+  echo "[entrypoint]    Inspect:  docker exec <container> npx prisma migrate status"
+  echo "[entrypoint]    Resolve:  docker exec <container> npx prisma migrate resolve --applied <name>"
+  echo "[entrypoint] =============================================================="
+  return 1
+}
+
 if [ ! -f "$DB_PATH" ]; then
-  echo "[entrypoint] Creating database at $DB_PATH..."
-  npx prisma migrate deploy
-  npx prisma db seed
-  echo "[entrypoint] Database seeded."
+  echo "[entrypoint] No database at $DB_PATH — first run."
+  if run_migrations; then
+    echo "[entrypoint] Seeding initial data..."
+    if npx prisma db seed; then
+      echo "[entrypoint] Database seeded."
+    else
+      echo "[entrypoint] ⚠  WARNING: seed failed — continuing without seed data."
+    fi
+  else
+    echo "[entrypoint] ⚠  Skipping seed because migrations did not complete."
+  fi
 else
-  # On subsequent starts, still run migrate deploy in case schema changed
-  echo "[entrypoint] Database exists — running migrations..."
-  npx prisma migrate deploy
+  echo "[entrypoint] Database exists at $DB_PATH."
+  run_migrations || true
 fi
 
 echo "[entrypoint] Starting Next.js..."
