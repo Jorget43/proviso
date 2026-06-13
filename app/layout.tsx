@@ -25,15 +25,21 @@ export const metadata: Metadata = {
 }
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const session = await getSession()
+  // Guard against database unavailable (corrupted file, disk full, etc.).
+  // Degrading to null here lets the layout render; page-level calls may still
+  // throw and will be caught by app/error.tsx or app/global-error.tsx.
+  let session: Awaited<ReturnType<typeof getSession>> = null
+  try { session = await getSession() } catch { /* DB unavailable — fall through */ }
 
   const currentVersion = process.env.PROVISO_VERSION ?? 'dev'
   let updateLatestTag = ''
   if (session?.role === 'CFO' && currentVersion !== 'dev') {
-    const versionInfo = await getLatestVersion()
-    if (versionInfo && isUpdateAvailable(currentVersion, versionInfo.latestTag)) {
-      updateLatestTag = versionInfo.latestTag
-    }
+    try {
+      const versionInfo = await getLatestVersion()
+      if (versionInfo && isUpdateAvailable(currentVersion, versionInfo.latestTag)) {
+        updateLatestTag = versionInfo.latestTag
+      }
+    } catch { /* version check is non-critical */ }
   }
 
   return (
