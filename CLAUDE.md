@@ -395,7 +395,7 @@ A version check runs on startup and periodically (daily) to compare `PROVISO_VER
 - `PROVISO_VERSION` injected at Docker build time from the git tag: `ARG PROVISO_VERSION` → `ENV PROVISO_VERSION` in `Dockerfile`
 - `GET /api/version` returns `{ version: string }` — publicly readable, no auth required
 - Daily check via the watchdog scheduler or a separate `instrumentation.ts` cron; stores last-check result in a `VersionCheck` table (similar pattern to `WatchdogSnapshot`)
-- Release manifest: `https://api.github.com/repos/Jorget43/household-dashboard/releases/latest` — no API key required
+- Release manifest: `https://api.github.com/repos/Jorget43/proviso/releases/latest` — no API key required
 
 #### Tier 1: Docker on any machine
 
@@ -475,7 +475,7 @@ git push origin v1.2.3
 
 **Update cadence:** deployed instances poll GitHub Releases daily at 09:00 AEST. After tagging and pushing the image, the CFO banner appears on all running instances within 24 hours.
 
-**GitHub Actions file to create** (`household-dashboard/.github/workflows/docker.yml`):
+**GitHub Actions file to create** (`.github/workflows/docker.yml` at repo root):
 ```yaml
 on:
   push:
@@ -492,12 +492,12 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - uses: docker/build-push-action@v5
         with:
-          context: ./household-dashboard
+          context: .
           push: true
           build-args: PROVISO_VERSION=${{ github.ref_name }}
           tags: |
-            ghcr.io/jorget43/household-dashboard:${{ github.ref_name }}
-            ghcr.io/jorget43/household-dashboard:latest
+            ghcr.io/jorget43/proviso:${{ github.ref_name }}
+            ghcr.io/jorget43/proviso:latest
 ```
 
 ---

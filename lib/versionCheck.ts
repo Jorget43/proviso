@@ -1,7 +1,7 @@
 import cron from 'node-cron'
 import { prisma } from './db'
 
-const RELEASES_URL = 'https://api.github.com/repos/Jorget43/household-dashboard/releases/latest'
+const RELEASES_URL = 'https://api.github.com/repos/Jorget43/proviso/releases/latest'
 
 export async function checkAndStoreLatestVersion(): Promise<void> {
   try {
