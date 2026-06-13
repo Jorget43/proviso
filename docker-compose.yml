@@ -25,7 +25,7 @@ services:
       #   (requires your NOTIFICATION_EMAIL to be verified in the Resend dashboard)
       #   or set to noreply@yourdomain.com after verifying a domain in Resend
       # - WATCHDOG_ENABLED=true
-      # - NOTIFICATION_EMAIL=tsiposjorge@gmail.com
+      # - NOTIFICATION_EMAIL=you@example.com
       # - RESEND_API_KEY=re_...
       # - RESEND_FROM_EMAIL=onboarding@resend.dev
 
