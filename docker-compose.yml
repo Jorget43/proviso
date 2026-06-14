@@ -1,0 +1,50 @@
+services:
+  proviso:
+    image: ghcr.io/jorget43/proviso:${PROVISO_VERSION:-latest}
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # Pass the git tag at build time so the in-app update banner can detect newer releases.
+        # In CI: --build-arg PROVISO_VERSION=$(git describe --tags --abbrev=0)
+        # Locally:  docker compose build (omit = "dev", banner never shown)
+        PROVISO_VERSION: ${PROVISO_VERSION:-dev}
+    container_name: proviso
+    restart: unless-stopped
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+    ports:
+      - "3000:3000"
+    volumes:
+      - proviso-db:/data
+    environment:
+      - DATABASE_URL=file:/data/proviso.db
+      - NODE_ENV=production
+      # Watchdog notification — set these to enable weekly email alerts
+      # WATCHDOG_ENABLED=true activates the scheduler and the /admin/watchdog page
+      # NOTIFICATION_EMAIL=you@gmail.com — where alerts are sent
+      # RESEND_API_KEY=re_... — get a free key at resend.com (3k emails/month free)
+      # RESEND_FROM_EMAIL=onboarding@resend.dev — use Resend's default sender for personal use
+      #   (requires your NOTIFICATION_EMAIL to be verified in the Resend dashboard)
+      #   or set to noreply@yourdomain.com after verifying a domain in Resend
+      # - WATCHDOG_ENABLED=true
+      # - NOTIFICATION_EMAIL=you@example.com
+      # - RESEND_API_KEY=re_...
+      # - RESEND_FROM_EMAIL=onboarding@resend.dev
+
+  # ── Watchtower — automatic image updates ─────────────────────────────────
+  # Checks GHCR daily at 3 am (TZ). When a new proviso image lands, pulls and
+  # restarts the container automatically. No user action required.
+  watchtower:
+    image: containrrr/watchtower
+    container_name: watchtower
+    restart: unless-stopped
+    environment:
+      - TZ=Australia/Sydney   # change to your local timezone if needed
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: --schedule "0 0 3 * * *" proviso
+
+volumes:
+  proviso-db:
+    driver: local

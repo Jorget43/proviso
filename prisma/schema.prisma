@@ -1,0 +1,351 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Expense {
+  id        Int      @id @default(autoincrement())
+  cat       String
+  name      String
+  freq      String   // monthly | quarterly | yearly | weekly
+  amt       Float
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model AnnualExpense {
+  id        Int      @id @default(autoincrement())
+  name      String
+  cat       String
+  amt       Float
+  month     Int      // 1–12: calendar month this expense typically hits
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Debt {
+  id   Int    @id @default(autoincrement())
+  name String
+  amt  Float
+}
+
+model Asset {
+  id       Int     @id @default(autoincrement())
+  name     String
+  amt      Float
+  // When true, this cash account offsets the mortgage. The sum of all
+  // isOffset assets is the canonical mortgage offset balance.
+  isOffset Boolean @default(false)
+}
+
+model MortgageSettings {
+  id        Int    @id @default(1)
+  balance   Float  @default(530073)
+  rate      Float  @default(5.99)
+  payment   Float  @default(3237)
+  offsetBal Float  @default(47563)
+  endDate   String @default("2053-01-16")
+}
+
+model ChildcareSettings {
+  id          Int     @id @default(1)
+  enabled     Boolean @default(false)
+  costPerDay  Float   @default(130)  // gross fee per child per day, before CCS
+  daysPerWeek Int     @default(3)
+  numChildren Int     @default(1)
+}
+
+model IncomeSettings {
+  id              Int     @id @default(1)
+  jorgeFTE        Float   @default(0)
+  graceFTE        Float   @default(0)
+  jorgeHasHELP    Boolean @default(false)
+  graceHasHELP    Boolean @default(false)
+  taxMode         Boolean @default(true)
+  jorgeMonthlyNet Float   @default(0)
+  graceMonthlyNet Float   @default(0)
+  jorgeAge        Int     @default(30)
+  graceAge        Int     @default(30)
+}
+
+model GracePhase {
+  id   Int @id @default(autoincrement())
+  year Int
+  days Int
+}
+
+model JorgePhase {
+  id   Int @id @default(autoincrement())
+  year Int
+  days Int
+}
+
+model ProjectionSettings {
+  id                   Int     @id @default(1)
+  jorgeGrowth          Float   @default(3.5)
+  graceGrowth          Float   @default(3.0)
+  expInflNear          Float   @default(4.0)
+  expInfl              Float   @default(2.5)
+  childcareInfl        Float   @default(6.0)
+  propGrowth           Float   @default(3.5)
+  savingsRate          Float   @default(10.0)
+  investReturn         Float   @default(3.5)
+  projYears            Int     @default(20)
+  schoolFeesOn         Boolean @default(false)
+  sfC1Start            Int     @default(2028)
+  sfC1ExitIdx          Int     @default(13)
+  sfC2Start            Int     @default(2031)
+  sfC2ExitIdx          Int     @default(13)
+  sfInfl               Float   @default(5.0)
+  sfPresetKey          String? // e.g. "vic|independent"; null = custom schedule
+  parentalLeaveEnabled Boolean @default(true)
+}
+
+model LifePhase {
+  id         Int     @id @default(autoincrement())
+  name       String
+  type       String  // recurring | oneoff | phaseout
+  monthlyAmt Float
+  startYear  Int
+  endYear    Int
+  cat        String
+  enabled    Boolean @default(true)
+  sortOrder  Int     @default(0)
+}
+
+model OneOff {
+  id   Int    @id @default(autoincrement())
+  name String
+  amt  Float
+  year Int
+}
+
+model Transaction {
+  id          Int      @id @default(autoincrement())
+  dateStr     String
+  ym          String
+  desc        String
+  amt         Float
+  cat         String
+  originalCat String
+  catSource   String   // custom | system
+  lumpy       Boolean  @default(false)
+  importedAt  DateTime @default(now())
+
+  @@unique([dateStr, desc, amt])
+}
+
+model CategoriationRule {
+  id      Int    @id @default(autoincrement())
+  pattern String @unique
+  cat     String
+  source  String @default("user")
+  hits    Int    @default(0)
+}
+
+model SuggestionState {
+  id     Int    @id @default(autoincrement())
+  cat    String @unique
+  status String @default("pending")
+}
+
+model ActualsSettings {
+  id                    Int     @id @default(1)
+  useActualsProjections Boolean @default(false)
+}
+
+model HouseholdSettings {
+  id             Int     @id @default(1)
+  person1Name    String  @default("You")
+  person2Name    String  @default("Partner")
+  partnerEnabled Boolean @default(false)
+  onboardingDone Boolean @default(false)
+}
+
+model SchoolFeeLevel {
+  id      Int    @id @default(autoincrement())
+  level   String @unique
+  tuition Float  @default(0)
+  fixed   Float  @default(0)
+}
+
+model HelpDebtDetail {
+  id                  Int      @id @default(autoincrement())
+  member              String
+  financialYearEnding Int
+  openingFyBalance    Float    @default(0)
+  estimatedWithheld   Float    @default(0)
+  voluntaryRepayments Float    @default(0)
+  cpiRate             Float    @default(3.5)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@unique([member, financialYearEnding])
+}
+
+model SuperSettings {
+  id                        Int     @id @default(1)
+  // Person 1 settings (DB column names kept for compat; mapped to jorgeBalance/etc in app code)
+  currentBalance            Float   @default(164000)
+  retirementAge             Int     @default(67)
+  additionalContribs        Float   @default(0)
+  // Shared assumptions
+  sgRate                    Float   @default(0.12)
+  investmentReturn          Float   @default(0.06)
+  fundFeePercent            Float   @default(0.005)
+  inflationRate             Float   @default(0.04)
+  desiredRetirementIncome   Float   @default(80000)
+  // Partner (person 2)
+  partnerEnabled            Boolean @default(true)
+  partnerBalance            Float   @default(80000)
+  partnerRetirementAge      Int     @default(67)
+  partnerAdditionalContribs Float   @default(0)
+  // Orphaned — kept for DB compat, no longer shown in UI
+  currentAge                Int     @default(34)
+  salaryExcSuper            Float   @default(135035)
+  salaryGrowthRate          Float   @default(0.04)
+}
+
+model SuperHistory {
+  id                   Int      @id @default(autoincrement())
+  member               String   // person1Name / person2Name value at time of entry
+  financialYearEnding  Int      // e.g. 2024 for FY23-24
+  concessionalCap      Float    // Legislative cap that year (e.g. 27500, 30000)
+  concessionalUtilised Float    // Employer SG + salary sacrifice + personal deductible
+  totalSuperBalance    Float    // Balance at 30 June — gates carry-forward when < $500k
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@unique([member, financialYearEnding])
+  @@index([member])
+}
+
+model InvestmentParcel {
+  id            Int      @id @default(autoincrement())
+  member        String   // owner — drives marginal rate for the CGT estimate
+  name          String   // e.g. "VAS", "BTC", "ABC shares"
+  quantity      Float    @default(0)
+  purchasePrice Float    @default(0) // per-unit cost
+  purchaseDate  String                // ISO date — per-parcel, drives the 12-month discount test
+  currentPrice  Float    @default(0) // per-unit market price
+  sellYear      Int?                  // optional planned sale year → feeds Projections one-off
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model User {
+  id               Int                @id @default(autoincrement())
+  name             String
+  username         String             @unique
+  passwordHash     String
+  role             String             // CFO | PARTNER | CHILD
+  email            String?
+  failedAttempts   Int                @default(0)
+  lockedUntil      DateTime?
+  totpSecret       String?
+  totpRecoveryCodes String?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  sessions         Session[]
+  passwordResets   PasswordReset[]
+  allowance        AllowanceSchedule?
+  pocketMoney      PocketMoneyTx[]
+  passkeys         Passkey[]
+}
+
+model AllowanceSchedule {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @unique
+  amount    Float
+  dayOfWeek Int      @default(5) // 0=Sun…6=Sat; default Friday
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model PocketMoneyTx {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  amount      Float    // positive = credit, negative = debit
+  description String
+  date        String   // YYYY-MM-DD
+  category    String   @default("general")
+  createdAt   DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Session {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model PasswordReset {
+  id        Int       @id @default(autoincrement())
+  userId    Int
+  token     String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model WatchdogSnapshot {
+  id          Int       @id @default(autoincrement())
+  takenAt     DateTime  @default(now())
+  reportJson  String
+  emailSentAt DateTime?
+}
+
+model VersionCheck {
+  id        Int      @id @default(autoincrement())
+  checkedAt DateTime @default(now())
+  latestTag String
+}
+
+model Passkey {
+  id           Int      @id @default(autoincrement())
+  userId       Int
+  credentialId String   @unique
+  publicKey    Bytes
+  counter      BigInt   @default(0)
+  deviceType   String   @default("platform")
+  backedUp     Boolean  @default(false)
+  transports   String   @default("")
+  name         String   @default("Passkey")
+  createdAt    DateTime @default(now())
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model WebAuthnChallenge {
+  id        Int      @id @default(autoincrement())
+  challenge String   @unique
+  userId    Int?
+  expiresAt DateTime
+}
+
+model RentSettings {
+  id                    Int     @id @default(1)
+  enabled               Boolean @default(false)
+  monthlyRent           Float   @default(0)
+  annualIncreaseRate    Float   @default(5.0)   // typical AU rental increase %
+  // Purchase plan — model transition from renting to owning
+  purchasePlanEnabled   Boolean @default(false)
+  targetPurchaseYear    Int     @default(2031)
+  targetPropertyValue   Float   @default(800000)
+  depositPct            Float   @default(20.0)   // deposit as % of property value
+  depositFromCash       Float   @default(0)       // drawn from savings
+  depositFromInvestments Float  @default(0)       // sold from investment portfolio (triggers CGT)
+  newMortgageRate       Float   @default(6.0)
+  newMortgageTermYrs    Int     @default(30)
+}

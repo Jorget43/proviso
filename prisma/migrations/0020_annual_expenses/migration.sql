@@ -1,0 +1,9 @@
+CREATE TABLE "AnnualExpense" (
+  "id"        INTEGER  NOT NULL PRIMARY KEY AUTOINCREMENT,
+  "name"      TEXT     NOT NULL,
+  "cat"       TEXT     NOT NULL,
+  "amt"       REAL     NOT NULL,
+  "month"     INTEGER  NOT NULL,
+  "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
