@@ -8,6 +8,23 @@
 
 Personal finance dashboard. Next.js 16 app, SQLite via Prisma 5, deployed on Unraid via Tailscale.
 
+## ⚠️ Privacy rule — read before writing any code
+
+**All code must be written for a generic end user, not for the developer's household.**
+
+This repo is public. Never let any of the following into the codebase, comments, commit messages, or documentation:
+
+- **Names** — real names of the developer or their household members. Use "Person 1 / Person 2", "the user", "the partner", "the operator", or "the developer" instead.
+- **Financial figures** — specific salaries, balances, debt amounts, or any real numbers from the developer's own finances. Defaults in the schema are illustrative placeholders only; they must be realistic but not real.
+- **Location** — suburb, city, street, or any address detail.
+- **Any other PII** — email addresses (except `tsiposjorge@gmail.com` in CI/auth config where unavoidable), phone numbers, tax file numbers, account numbers.
+
+**Practical rules:**
+- Comments must describe behaviour, not the developer's situation ("Person 1 defaults to 5 days" not "Jorge defaults to 5 days").
+- Seed data and default values must look like realistic placeholders, not copies of real household data.
+- If you find a personal reference while working on something else, fix it in the same PR.
+- The remaining DB column/table names that still contain personal names (`JorgePhase`, `GracePhase`, `jorgeFTE`, etc.) are a known legacy issue tracked in `CLEANUP_PLAN.md` (local only, not in repo). Do not add more; fix existing ones when the migration work is done.
+
 ## Status: all tabs live
 
 | Tab            | Route           |
