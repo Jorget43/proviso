@@ -33,18 +33,18 @@ export async function PUT(req: NextRequest) {
   // Body uses HouseholdSuperInputs field names; map to DB column names
   const body = await req.json()
   const dbData = {
-    currentBalance:            body.jorgeBalance,
-    retirementAge:             body.jorgeRetirementAge,
-    additionalContribs:        body.jorgeAdditionalContribs,
+    currentBalance:            body.person1Balance,
+    retirementAge:             body.person1RetirementAge,
+    additionalContribs:        body.person1AdditionalContribs,
     sgRate:                    body.sgRate,
     investmentReturn:          body.investmentReturn,
     fundFeePercent:            body.fundFeePercent,
     inflationRate:             body.inflationRate,
     desiredRetirementIncome:   body.desiredRetirementIncome,
     partnerEnabled:            body.partnerEnabled,
-    partnerBalance:            body.graceBalance,
-    partnerRetirementAge:      body.graceRetirementAge,
-    partnerAdditionalContribs: body.graceAdditionalContribs,
+    partnerBalance:            body.person2Balance,
+    partnerRetirementAge:      body.person2RetirementAge,
+    partnerAdditionalContribs: body.person2AdditionalContribs,
   }
   const s = await prisma.superSettings.upsert({
     where:  { id: 1 },

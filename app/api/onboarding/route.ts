@@ -36,12 +36,12 @@ export async function POST(req: Request) {
     await tx.incomeSettings.update({
       where: { id: 1 },
       data: {
-        jorgeFTE:     person1Income,
-        jorgeAge:     person1Age,
-        jorgeHasHELP: person1HasHELP,
-        graceFTE:     person2Income,
-        graceAge:     person2Age,
-        graceHasHELP: person2HasHELP,
+        person1FTE:     person1Income,
+        person1Age:     person1Age,
+        person1HasHELP: person1HasHELP,
+        person2FTE:     person2Income,
+        person2Age:     person2Age,
+        person2HasHELP: person2HasHELP,
       },
     })
 
@@ -97,20 +97,20 @@ export async function POST(req: Request) {
     }
 
     // Person 1 work schedule
-    const existingP1 = await tx.jorgePhase.findFirst({ where: { year: currentYear } })
+    const existingP1 = await tx.person1Phase.findFirst({ where: { year: currentYear } })
     if (!existingP1) {
-      await tx.jorgePhase.create({ data: { year: currentYear, days: person1Days } })
+      await tx.person1Phase.create({ data: { year: currentYear, days: person1Days } })
     } else {
-      await tx.jorgePhase.update({ where: { id: existingP1.id }, data: { days: person1Days } })
+      await tx.person1Phase.update({ where: { id: existingP1.id }, data: { days: person1Days } })
     }
 
     // Person 2 work schedule
     if (hasPartner) {
-      const existingP2 = await tx.gracePhase.findFirst({ where: { year: currentYear } })
+      const existingP2 = await tx.person2Phase.findFirst({ where: { year: currentYear } })
       if (!existingP2) {
-        await tx.gracePhase.create({ data: { year: currentYear, days: person2Days } })
+        await tx.person2Phase.create({ data: { year: currentYear, days: person2Days } })
       } else {
-        await tx.gracePhase.update({ where: { id: existingP2.id }, data: { days: person2Days } })
+        await tx.person2Phase.update({ where: { id: existingP2.id }, data: { days: person2Days } })
       }
     }
 

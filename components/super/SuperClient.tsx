@@ -52,11 +52,11 @@ export default function SuperClient({ canEdit, initial, context, mortgage, budge
   }
 
   // Mortgage hint calculations
-  const currentYear          = new Date().getFullYear()
-  const jorgeRetirementYear  = currentYear + (inputs.jorgeRetirementAge - context.jorgeAge)
-  const graceRetirementYear  = currentYear + (inputs.graceRetirementAge - context.graceAge)
-  const mortgagePaidOff      = mortgage.mortgageEndYear < jorgeRetirementYear
-  const mortgageYearsBefore  = jorgeRetirementYear - mortgage.mortgageEndYear
+  const currentYear           = new Date().getFullYear()
+  const person1RetirementYear = currentYear + (inputs.person1RetirementAge - context.person1Age)
+  const person2RetirementYear = currentYear + (inputs.person2RetirementAge - context.person2Age)
+  const mortgagePaidOff      = mortgage.mortgageEndYear < person1RetirementYear
+  const mortgageYearsBefore  = person1RetirementYear - mortgage.mortgageEndYear
   const mortgageAnnual       = mortgage.mortgagePaymentMonthly * 12
   const suggestedIncome      = mortgagePaidOff && mortgageAnnual > 0
     ? Math.max(0, Math.round((inputs.desiredRetirementIncome - mortgageAnnual) / 1000) * 1000)
@@ -125,8 +125,8 @@ export default function SuperClient({ canEdit, initial, context, mortgage, budge
     <div className="page">
       <SuperBanner
         result={result}
-        jorgeCurrentAge={context.jorgeAge}
-        jorgeRetirementAge={inputs.jorgeRetirementAge}
+        person1CurrentAge={context.person1Age}
+        person1RetirementAge={inputs.person1RetirementAge}
         person1Name={person1Name}
       />
 
@@ -137,16 +137,16 @@ export default function SuperClient({ canEdit, initial, context, mortgage, budge
           {/* Person 1 */}
           <Panel title={person1Name}>
             <div className="da-grid">
-              {numInput('jorgeBalance', 'Current balance', '$', 5000)}
+              {numInput('person1Balance', 'Current balance', '$', 5000)}
               <div>
-                {ageInput('jorgeRetirementAge', 'Planned retirement age')}
+                {ageInput('person1RetirementAge', 'Planned retirement age')}
                 <p className="small" style={{ marginTop: 3 }}>
-                  {Math.max(0, inputs.jorgeRetirementAge - context.jorgeAge)}yr from now
-                  {inputs.jorgeRetirementAge < 60 && ' · Before preservation age (60)'}
-                  {inputs.jorgeRetirementAge !== 67 && inputs.jorgeRetirementAge >= 60 && ' · Standard pension age: 67'}
+                  {Math.max(0, inputs.person1RetirementAge - context.person1Age)}yr from now
+                  {inputs.person1RetirementAge < 60 && ' · Before preservation age (60)'}
+                  {inputs.person1RetirementAge !== 67 && inputs.person1RetirementAge >= 60 && ' · Standard pension age: 67'}
                 </p>
               </div>
-              {numInput('jorgeAdditionalContribs', 'Extra contributions / yr', '$', 500)}
+              {numInput('person1AdditionalContribs', 'Extra contributions / yr', '$', 500)}
             </div>
           </Panel>
 
@@ -166,16 +166,16 @@ export default function SuperClient({ canEdit, initial, context, mortgage, budge
           >
             {inputs.partnerEnabled ? (
               <div className="da-grid">
-                {numInput('graceBalance', 'Current balance', '$', 5000)}
+                {numInput('person2Balance', 'Current balance', '$', 5000)}
                 <div>
-                  {ageInput('graceRetirementAge', 'Planned retirement age')}
+                  {ageInput('person2RetirementAge', 'Planned retirement age')}
                   <p className="small" style={{ marginTop: 3 }}>
-                    {Math.max(0, inputs.graceRetirementAge - context.graceAge)}yr from now
-                    {inputs.graceRetirementAge < 60 && ' · Before preservation age (60)'}
-                    {inputs.graceRetirementAge !== 67 && inputs.graceRetirementAge >= 60 && ' · Standard pension age: 67'}
+                    {Math.max(0, inputs.person2RetirementAge - context.person2Age)}yr from now
+                    {inputs.person2RetirementAge < 60 && ' · Before preservation age (60)'}
+                    {inputs.person2RetirementAge !== 67 && inputs.person2RetirementAge >= 60 && ' · Standard pension age: 67'}
                   </p>
                 </div>
-                {numInput('graceAdditionalContribs', 'Extra contributions / yr', '$', 500)}
+                {numInput('person2AdditionalContribs', 'Extra contributions / yr', '$', 500)}
               </div>
             ) : (
               <p style={{ fontSize: '0.75rem', color: 'var(--t3)', margin: 0 }}>
@@ -228,18 +228,18 @@ export default function SuperClient({ canEdit, initial, context, mortgage, budge
             <div className="super-context-row">
               <span className="super-context-name">{person1Name}</span>
               <span className="super-context-detail">
-                Age {context.jorgeAge}
-                {' · '}${context.jorgeSalary.toLocaleString('en-AU')}/yr
-                {' · '}Growth {(context.jorgeSalaryGrowth * 100).toFixed(1)}%
+                Age {context.person1Age}
+                {' · '}${context.person1Salary.toLocaleString('en-AU')}/yr
+                {' · '}Growth {(context.person1SalaryGrowth * 100).toFixed(1)}%
               </span>
             </div>
             {inputs.partnerEnabled && (
               <div className="super-context-row">
                 <span className="super-context-name">{person2Name}</span>
                 <span className="super-context-detail">
-                  Age {context.graceAge}
-                  {' · '}${context.graceSalary.toLocaleString('en-AU')}/yr
-                  {' · '}Growth {(context.graceSalaryGrowth * 100).toFixed(1)}%
+                  Age {context.person2Age}
+                  {' · '}${context.person2Salary.toLocaleString('en-AU')}/yr
+                  {' · '}Growth {(context.person2SalaryGrowth * 100).toFixed(1)}%
                 </span>
               </div>
             )}
@@ -267,21 +267,21 @@ export default function SuperClient({ canEdit, initial, context, mortgage, budge
           </p>
           <SuperBalanceChart
             combined={result.combined}
-            jorgeRows={result.jorge.rows}
-            graceRows={result.grace?.rows ?? null}
-            jorgeRetirementYear={jorgeRetirementYear}
-            graceRetirementYear={inputs.partnerEnabled ? graceRetirementYear : null}
+            person1Rows={result.person1.rows}
+            person2Rows={result.person2?.rows ?? null}
+            person1RetirementYear={person1RetirementYear}
+            person2RetirementYear={inputs.partnerEnabled ? person2RetirementYear : null}
             person1Name={person1Name}
             person2Name={person2Name}
           />
           <div className="super-legend">
-            {result.jorge.rows.some(r => r.capHit) && (
+            {result.person1.rows.some(r => r.capHit) && (
               <span className="super-badge cap">Cap</span>
             )}
-            {result.jorge.rows.some(r => r.div293) && (
+            {result.person1.rows.some(r => r.div293) && (
               <span className="super-badge div">Div293</span>
             )}
-            {(result.jorge.rows.some(r => r.capHit) || result.jorge.rows.some(r => r.div293)) && (
+            {(result.person1.rows.some(r => r.capHit) || result.person1.rows.some(r => r.div293)) && (
               <span style={{ fontSize: '0.7rem', color: 'var(--t3)' }}>
                 Cap = concessional cap exceeded · Div293 = Division 293 tax applies (income &gt; $250k)
               </span>

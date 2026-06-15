@@ -42,8 +42,8 @@ export default async function SettingsPage() {
       person1Name={hs?.person1Name ?? 'Person 1'}
       person2Name={hs?.person2Name ?? 'Person 2'}
       partnerEnabled={hs?.partnerEnabled ?? false}
-      jorgeFTE={income.jorgeFTE}
-      graceFTE={income.graceFTE}
+      person1FTE={income.person1FTE}
+      person2FTE={income.person2FTE}
       mortgageBalance={mortgage?.balance ?? 0}
       superBalance={superSettings?.currentBalance ?? 0}
       partnerSuperBalance={superSettings?.partnerBalance ?? 0}

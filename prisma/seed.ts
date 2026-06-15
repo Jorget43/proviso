@@ -13,14 +13,14 @@ async function main() {
   await prisma.incomeSettings.upsert({
     where:  { id: 1 },
     update: {},
-    create: { id: 1, jorgeFTE: 0, graceFTE: 0, graceHasHELP: false, taxMode: true, jorgeMonthlyNet: 0, graceMonthlyNet: 0, jorgeAge: 30, graceAge: 30 },
+    create: { id: 1, person1FTE: 0, person2FTE: 0, person2HasHELP: false, taxMode: true, person1MonthlyNet: 0, person2MonthlyNet: 0, person1Age: 30, person2Age: 30 },
   });
 
   await prisma.projectionSettings.upsert({
     where:  { id: 1 },
     update: {},
     create: {
-      id: 1, jorgeGrowth: 3.5, graceGrowth: 3.0, expInflNear: 4.0, expInfl: 2.5,
+      id: 1, person1Growth: 3.5, person2Growth: 3.0, expInflNear: 4.0, expInfl: 2.5,
       childcareInfl: 6.0, propGrowth: 3.5, savingsRate: 10.0, investReturn: 3.5,
       projYears: 30, schoolFeesOn: false,
       sfC1Start: 2028, sfC1ExitIdx: 13, sfC2Start: 2031, sfC2ExitIdx: 13, sfInfl: 5.0,
@@ -110,10 +110,10 @@ async function main() {
   // Not pre-seeded — users add assets through onboarding and the Debts tab
 
   // ── Person 2 work phases ──────────────────────────────────────────────────
-  const gpCount = await prisma.gracePhase.count();
+  const gpCount = await prisma.person2Phase.count();
   if (gpCount === 0) {
     const currentYear = new Date().getFullYear();
-    await prisma.gracePhase.createMany({
+    await prisma.person2Phase.createMany({
       data: [
         { year: currentYear, days: 5 },
       ],

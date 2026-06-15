@@ -9,21 +9,21 @@ interface FeeRow { id: number; level: string; tuition: number; fixed: number }
 import Panel from '@/components/ui/Panel'
 import ReadOnlyFence from '@/components/ui/ReadOnlyFence'
 import NetWorthChart      from './NetWorthChart'
-import GraceIncomeChart   from './GraceIncomeChart'
+import PartnerIncomeChart from './GraceIncomeChart'
 import IncExpProjChart    from './IncExpProjChart'
 import DeficitChart       from './DeficitChart'
 import MortStressChart    from './MortStressChart'
 import MortPaydownChart   from './MortPaydownChart'
 import SchoolFeeChart     from './SchoolFeeChart'
-import GraceTimeline,     { type GracePhaseRow } from './GraceTimeline'
+import WorkPhaseTimeline, { type WorkPhaseRow } from './GraceTimeline'
 import OneOffPanel,       { type OneOffRow }      from './OneOffPanel'
 import LifePhasesPanel                            from './LifePhasesPanel'
 import type { LifePhase } from '@/lib/lifephases'
 
 interface ProjSettings {
   id:            number
-  jorgeGrowth:   number
-  graceGrowth:   number
+  person1Growth: number
+  person2Growth: number
   expInflNear:   number
   expInfl:       number
   childcareInfl: number
@@ -42,12 +42,12 @@ interface ProjSettings {
 }
 
 interface IncSettings {
-  jorgeFTE:        number
-  graceFTE:        number
-  graceHasHELP:    boolean
-  taxMode:         boolean
-  jorgeMonthlyNet: number
-  graceMonthlyNet: number
+  person1FTE:        number
+  person2FTE:        number
+  person2HasHELP:    boolean
+  taxMode:           boolean
+  person1MonthlyNet: number
+  person2MonthlyNet: number
 }
 
 interface RentSettingsType {
@@ -68,8 +68,8 @@ interface RentSettingsType {
 interface ProjectionsClientProps {
   canEdit:              boolean
   initialSettings:      ProjSettings
-  initialJorgePhases:   GracePhaseRow[]
-  initialGracePhases:   GracePhaseRow[]
+  initialPerson1Phases: WorkPhaseRow[]
+  initialPerson2Phases: WorkPhaseRow[]
   initialOneoffs:       OneOffRow[]
   initialLifePhases:    LifePhase[]
   initialFeeSchedule:   FeeRow[]
@@ -98,15 +98,15 @@ const DEFAULT_RENT: RentSettingsType = {
 
 export default function ProjectionsClient({
   canEdit,
-  initialSettings, initialJorgePhases, initialGracePhases, initialOneoffs, initialLifePhases, initialFeeSchedule,
+  initialSettings, initialPerson1Phases, initialPerson2Phases, initialOneoffs, initialLifePhases, initialFeeSchedule,
   income, baseMonthlyExpenses,
   mortBalance, mortRate, mortPayment, mortEndDate,
   cashOnHand, propValue, cryptoValue, currentYear,
   person1Name, person2Name, initialRentSettings,
 }: ProjectionsClientProps) {
-  const [settings,    setSettings]    = useState<ProjSettings>(initialSettings)
-  const [jorgePhases, setJorgePhases] = useState<GracePhaseRow[]>(initialJorgePhases)
-  const [gracePhases, setGracePhases] = useState<GracePhaseRow[]>(initialGracePhases)
+  const [settings,       setSettings]       = useState<ProjSettings>(initialSettings)
+  const [person1Phases,  setPerson1Phases]  = useState<WorkPhaseRow[]>(initialPerson1Phases)
+  const [person2Phases,  setPerson2Phases]  = useState<WorkPhaseRow[]>(initialPerson2Phases)
   const [feeRows,     setFeeRows]     = useState<FeeRow[]>(initialFeeSchedule)
   const [oneoffs,     setOneoffs]     = useState<OneOffRow[]>(initialOneoffs)
   const [lifePhases,  setLifePhases]  = useState<LifePhase[]>(initialLifePhases)
@@ -129,15 +129,15 @@ export default function ProjectionsClient({
   }, [feeRows])
 
   const inputs = useMemo<ProjectionInputs>(() => ({
-    jorgeFTE:             income.jorgeFTE,
-    graceFTE:             income.graceFTE,
+    person1FTE:           income.person1FTE,
+    person2FTE:           income.person2FTE,
     taxMode:              income.taxMode,
-    graceHasHELP:         income.graceHasHELP,
-    graceHELPBalance:     income.graceHasHELP ? 50000 : 0,
-    jorgeMonthlyNet:      income.jorgeMonthlyNet,
-    graceMonthlyNet:      income.graceMonthlyNet,
-    jorgeGrowthRate:      settings.jorgeGrowth,
-    graceGrowthRate:      settings.graceGrowth,
+    person2HasHELP:       income.person2HasHELP,
+    person2HELPBalance:   income.person2HasHELP ? 50000 : 0,
+    person1MonthlyNet:    income.person1MonthlyNet,
+    person2MonthlyNet:    income.person2MonthlyNet,
+    person1GrowthRate:    settings.person1Growth,
+    person2GrowthRate:    settings.person2Growth,
     expInflNear:          settings.expInflNear,
     expInfl:              settings.expInfl,
     childcareInfl:        settings.childcareInfl,
@@ -151,9 +151,9 @@ export default function ProjectionsClient({
     cashOnHand,
     propValue,
     cryptoValue,
-    helpDebt:             income.graceHasHELP ? 50000 : 0,
-    jorgePhases,
-    gracePhases,
+    helpDebt:             income.person2HasHELP ? 50000 : 0,
+    person1Phases,
+    person2Phases,
     baseMonthlyExpenses,
     oneoffs,
     parentalLeaveEnabled: settings.parentalLeaveEnabled,
@@ -177,7 +177,7 @@ export default function ProjectionsClient({
     depositFromInvestments: rentSt.depositFromInvestments,
     newMortgageRate:       rentSt.newMortgageRate,
     newMortgageTermYrs:    rentSt.newMortgageTermYrs,
-  }), [settings, jorgePhases, gracePhases, oneoffs, lifePhases, income, sfSchedule, baseMonthlyExpenses, mortBalance, mortRate, mortPayment, cashOnHand, propValue, cryptoValue, currentYear, rentSt])
+  }), [settings, person1Phases, person2Phases, oneoffs, lifePhases, income, sfSchedule, baseMonthlyExpenses, mortBalance, mortRate, mortPayment, cashOnHand, propValue, cryptoValue, currentYear, rentSt])
 
   const output = useMemo(() => runProjections(inputs), [inputs])
   const main   = output.withFees ?? output.base
@@ -217,55 +217,55 @@ export default function ProjectionsClient({
   }, [])
 
   // ── Person1 phase CRUD ──
-  const addJorgePhase = useCallback(async () => {
-    const maxY = jorgePhases.length ? Math.max(...jorgePhases.map(p => p.year)) : currentYear
-    const res = await fetch('/api/jorge-phases', {
+  const addPerson1Phase = useCallback(async () => {
+    const maxY = person1Phases.length ? Math.max(...person1Phases.map(p => p.year)) : currentYear
+    const res = await fetch('/api/person1-phases', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ year: maxY + 2, days: 5 }),
     })
-    const created: GracePhaseRow = await res.json()
-    setJorgePhases(prev => [...prev, created])
-  }, [jorgePhases, currentYear])
+    const created: WorkPhaseRow = await res.json()
+    setPerson1Phases(prev => [...prev, created])
+  }, [person1Phases, currentYear])
 
-  const updateJorgePhase = useCallback(async (id: number, field: string, value: number) => {
-    setJorgePhases(prev => prev.map(p => p.id === id ? { ...p, [field]: value } : p))
-    await fetch(`/api/jorge-phases/${id}`, {
+  const updatePerson1Phase = useCallback(async (id: number, field: string, value: number) => {
+    setPerson1Phases(prev => prev.map(p => p.id === id ? { ...p, [field]: value } : p))
+    await fetch(`/api/person1-phases/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ [field]: value }),
     })
   }, [])
 
-  const deleteJorgePhase = useCallback(async (id: number) => {
-    setJorgePhases(prev => prev.filter(p => p.id !== id))
-    await fetch(`/api/jorge-phases/${id}`, { method: 'DELETE' })
+  const deletePerson1Phase = useCallback(async (id: number) => {
+    setPerson1Phases(prev => prev.filter(p => p.id !== id))
+    await fetch(`/api/person1-phases/${id}`, { method: 'DELETE' })
   }, [])
 
   // ── Person2 phase CRUD ──
-  const addGracePhase = useCallback(async () => {
-    const maxY = gracePhases.length ? Math.max(...gracePhases.map(p => p.year)) : currentYear
-    const res = await fetch('/api/grace-phases', {
+  const addPerson2Phase = useCallback(async () => {
+    const maxY = person2Phases.length ? Math.max(...person2Phases.map(p => p.year)) : currentYear
+    const res = await fetch('/api/person2-phases', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ year: maxY + 2, days: 3 }),
     })
-    const created: GracePhaseRow = await res.json()
-    setGracePhases(prev => [...prev, created])
-  }, [gracePhases, currentYear])
+    const created: WorkPhaseRow = await res.json()
+    setPerson2Phases(prev => [...prev, created])
+  }, [person2Phases, currentYear])
 
-  const updateGracePhase = useCallback(async (id: number, field: string, value: number) => {
-    setGracePhases(prev => prev.map(p => p.id === id ? { ...p, [field]: value } : p))
-    await fetch(`/api/grace-phases/${id}`, {
+  const updatePerson2Phase = useCallback(async (id: number, field: string, value: number) => {
+    setPerson2Phases(prev => prev.map(p => p.id === id ? { ...p, [field]: value } : p))
+    await fetch(`/api/person2-phases/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ [field]: value }),
     })
   }, [])
 
-  const deleteGracePhase = useCallback(async (id: number) => {
-    setGracePhases(prev => prev.filter(p => p.id !== id))
-    await fetch(`/api/grace-phases/${id}`, { method: 'DELETE' })
+  const deletePerson2Phase = useCallback(async (id: number) => {
+    setPerson2Phases(prev => prev.filter(p => p.id !== id))
+    await fetch(`/api/person2-phases/${id}`, { method: 'DELETE' })
   }, [])
 
   // ── One-off CRUD ──
@@ -366,13 +366,13 @@ export default function ProjectionsClient({
           </Panel>
           <div style={{ marginTop: '1rem' }}>
             <Panel title="Income by person" dotColor="var(--pink)">
-              <GraceIncomeChart
+              <PartnerIncomeChart
                 labels={output.labels}
                 person1Data={main.person1Arr} person2Data={main.person2Arr}
                 person1Name={person1Name}   person2Name={person2Name}
                 leaveYrs={main.leaveYrs}
-                person1FTE={income.jorgeFTE} person2FTE={income.graceFTE}
-                person1Growth={settings.jorgeGrowth} person2Growth={settings.graceGrowth}
+                person1FTE={income.person1FTE} person2FTE={income.person2FTE}
+                person1Growth={settings.person1Growth} person2Growth={settings.person2Growth}
               />
               <p className="proj-note mt1">Pink = {person2Name} on leave. Dashed = FTE reference per person.</p>
             </Panel>
@@ -429,10 +429,10 @@ export default function ProjectionsClient({
         {/* ── Sidebar ── */}
         <div>
           <Panel title={`${person1Name}'s working pattern`} dotColor="var(--blue)">
-            <GraceTimeline
-              phases={jorgePhases} currentYear={currentYear}
-              fte={income.jorgeFTE} showLeave={false}
-              onUpdate={updateJorgePhase} onDelete={deleteJorgePhase} onAdd={addJorgePhase}
+            <WorkPhaseTimeline
+              phases={person1Phases} currentYear={currentYear}
+              fte={income.person1FTE} showLeave={false}
+              onUpdate={updatePerson1Phase} onDelete={deletePerson1Phase} onAdd={addPerson1Phase}
             />
           </Panel>
 
@@ -451,19 +451,19 @@ export default function ProjectionsClient({
                 </label>
               }
             >
-              <GraceTimeline
-                phases={gracePhases} currentYear={currentYear}
-                fte={income.graceFTE}
+              <WorkPhaseTimeline
+                phases={person2Phases} currentYear={currentYear}
+                fte={income.person2FTE}
                 showLeave={settings.parentalLeaveEnabled}
-                onUpdate={updateGracePhase} onDelete={deleteGracePhase} onAdd={addGracePhase}
+                onUpdate={updatePerson2Phase} onDelete={deletePerson2Phase} onAdd={addPerson2Phase}
               />
             </Panel>
           </div>
 
           <div style={{ marginTop: '1rem' }}>
             <Panel title="Income & wage growth" dotColor="var(--blue)">
-              <Slider label={`${person2Name} wage growth / yr`} id="graceGrowth"  min={0} max={15} step={0.5} value={settings.graceGrowth}  cls="green-t" />
-              <Slider label={`${person1Name} wage growth / yr`} id="jorgeGrowth"  min={0} max={15} step={0.5} value={settings.jorgeGrowth}  cls="blue-t"  />
+              <Slider label={`${person2Name} wage growth / yr`} id="person2Growth" min={0} max={15} step={0.5} value={settings.person2Growth} cls="green-t" />
+              <Slider label={`${person1Name} wage growth / yr`} id="person1Growth" min={0} max={15} step={0.5} value={settings.person1Growth} cls="blue-t"  />
             </Panel>
           </div>
 
@@ -814,7 +814,7 @@ export default function ProjectionsClient({
                   { label: 'Final mortgage',  val: fmtK(main.mortArr[main.mortArr.length - 1]),     color: 'var(--red)' },
                   { label: 'Expense base',    val: '$' + Math.round(baseMonthlyExpenses).toLocaleString('en-AU') + '/mo', color: '' },
                   { label: 'Leave years',     val: main.leaveYrs.join(', ') || 'None',             color: main.leaveYrs.length ? 'var(--pink)' : '' },
-                  ...(income.graceHasHELP ? [{ label: 'Person2 HELP cleared', val: main.helpClearedYr ? String(main.helpClearedYr) : `Beyond ${settings.projYears}yr horizon`, color: main.helpClearedYr ? 'var(--teal)' : '' }] : []),
+                  ...(income.person2HasHELP ? [{ label: 'Person2 HELP cleared', val: main.helpClearedYr ? String(main.helpClearedYr) : `Beyond ${settings.projYears}yr horizon`, color: main.helpClearedYr ? 'var(--teal)' : '' }] : []),
                 ].map(({ label, val, color }) => (
                   <div key={label} style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ color: 'var(--t2)' }}>{label}</span>

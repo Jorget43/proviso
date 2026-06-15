@@ -9,32 +9,32 @@ import type { CombinedRow, SuperRow } from '@/lib/super'
 ChartJS.register(LineElement, PointElement, LinearScale, CategoryScale, Tooltip, Legend, Filler)
 
 interface Props {
-  combined:            CombinedRow[]
-  jorgeRows:           SuperRow[]
-  graceRows:           SuperRow[] | null
-  jorgeRetirementYear: number
-  graceRetirementYear: number | null
-  person1Name:         string
-  person2Name:         string
+  combined:              CombinedRow[]
+  person1Rows:           SuperRow[]
+  person2Rows:           SuperRow[] | null
+  person1RetirementYear: number
+  person2RetirementYear: number | null
+  person1Name:           string
+  person2Name:           string
 }
 
 export default function SuperBalanceChart({
-  combined, jorgeRows, graceRows, jorgeRetirementYear, graceRetirementYear, person1Name, person2Name,
+  combined, person1Rows, person2Rows, person1RetirementYear, person2RetirementYear, person1Name, person2Name,
 }: Props) {
   const labels    = combined.map(c => String(c.year))
-  const hasPerson2  = graceRows !== null && graceRows.length > 0
+  const hasPerson2  = person2Rows !== null && person2Rows.length > 0
 
   // Build year-indexed lookups for person 1 and person 2
-  const jorgeByYear: Record<number, number> = {}
-  for (const r of jorgeRows) jorgeByYear[r.year] = r.balance
-  const graceByYear: Record<number, number> = {}
-  if (graceRows) for (const r of graceRows) graceByYear[r.year] = r.balance
+  const person1ByYear: Record<number, number> = {}
+  for (const r of person1Rows) person1ByYear[r.year] = r.balance
+  const person2ByYear: Record<number, number> = {}
+  if (person2Rows) for (const r of person2Rows) person2ByYear[r.year] = r.balance
 
   const datasets = hasPerson2
     ? [
         {
           label: person1Name,
-          data: combined.map(c => Math.round(jorgeByYear[c.year] ?? 0)),
+          data: combined.map(c => Math.round(person1ByYear[c.year] ?? 0)),
           borderColor: 'rgba(30,95,168,0.85)',
           borderWidth: 2,
           pointRadius: 0,
@@ -43,7 +43,7 @@ export default function SuperBalanceChart({
         },
         {
           label: person2Name,
-          data: combined.map(c => Math.round(graceByYear[c.year] ?? 0)),
+          data: combined.map(c => Math.round(person2ByYear[c.year] ?? 0)),
           borderColor: 'rgba(139,92,246,0.85)',
           borderWidth: 2,
           pointRadius: 0,
@@ -73,7 +73,7 @@ export default function SuperBalanceChart({
     : [
         {
           label: 'Balance',
-          data: combined.map(c => Math.round(c.jorgeBalance)),
+          data: combined.map(c => Math.round(c.person1Balance)),
           borderWidth: 2,
           pointRadius: 0,
           fill: false,
@@ -81,7 +81,7 @@ export default function SuperBalanceChart({
           segment: {
             borderColor: (ctx: { p1DataIndex: number }) => {
               const year = combined[ctx.p1DataIndex]?.year ?? 0
-              return year >= jorgeRetirementYear
+              return year >= person1RetirementYear
                 ? 'rgba(138,82,8,0.85)'
                 : 'rgba(30,95,168,0.85)'
             },
@@ -127,8 +127,8 @@ export default function SuperBalanceChart({
           callback: (_: unknown, i: number) => {
             const c = combined[i]
             if (!c) return ''
-            if (c.year === jorgeRetirementYear) return `↓${c.year}`
-            if (graceRetirementYear && c.year === graceRetirementYear) return `↓${c.year}`
+            if (c.year === person1RetirementYear) return `↓${c.year}`
+            if (person2RetirementYear && c.year === person2RetirementYear) return `↓${c.year}`
             return i % 5 === 0 ? String(c.year) : ''
           },
         },

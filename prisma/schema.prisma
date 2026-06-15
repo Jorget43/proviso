@@ -62,24 +62,55 @@ model ChildcareSettings {
 
 model IncomeSettings {
   id              Int     @id @default(1)
+  // @deprecated — use person1FTE
   jorgeFTE        Float   @default(0)
+  // @deprecated — use person2FTE
   graceFTE        Float   @default(0)
+  // @deprecated — use person1HasHELP
   jorgeHasHELP    Boolean @default(false)
+  // @deprecated — use person2HasHELP
   graceHasHELP    Boolean @default(false)
   taxMode         Boolean @default(true)
+  // @deprecated — use person1MonthlyNet
   jorgeMonthlyNet Float   @default(0)
+  // @deprecated — use person2MonthlyNet
   graceMonthlyNet Float   @default(0)
+  // @deprecated — use person1Age
   jorgeAge        Int     @default(30)
+  // @deprecated — use person2Age
   graceAge        Int     @default(30)
+
+  person1FTE        Float   @default(0)
+  person2FTE        Float   @default(0)
+  person1HasHELP    Boolean @default(false)
+  person2HasHELP    Boolean @default(false)
+  person1MonthlyNet Float   @default(0)
+  person2MonthlyNet Float   @default(0)
+  person1Age        Int     @default(30)
+  person2Age        Int     @default(30)
 }
 
+// @deprecated — use Person2Phase
 model GracePhase {
   id   Int @id @default(autoincrement())
   year Int
   days Int
 }
 
+// @deprecated — use Person1Phase
 model JorgePhase {
+  id   Int @id @default(autoincrement())
+  year Int
+  days Int
+}
+
+model Person1Phase {
+  id   Int @id @default(autoincrement())
+  year Int
+  days Int
+}
+
+model Person2Phase {
   id   Int @id @default(autoincrement())
   year Int
   days Int
@@ -87,8 +118,12 @@ model JorgePhase {
 
 model ProjectionSettings {
   id                   Int     @id @default(1)
+  // @deprecated — use person1Growth
   jorgeGrowth          Float   @default(3.5)
+  // @deprecated — use person2Growth
   graceGrowth          Float   @default(3.0)
+  person1Growth        Float   @default(3.5)
+  person2Growth        Float   @default(3.0)
   expInflNear          Float   @default(4.0)
   expInfl              Float   @default(2.5)
   childcareInfl        Float   @default(6.0)

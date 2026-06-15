@@ -11,10 +11,10 @@ import IncVsExpChart from '@/components/cashflow/IncVsExpChart'
 
 export default async function CashflowPage() {
   await requireSession()
-  const [income, expenses, gracePhases, assets, hs, projSettings, annualExpenses] = await Promise.all([
+  const [income, expenses, person2Phases, assets, hs, projSettings, annualExpenses] = await Promise.all([
     prisma.incomeSettings.findUniqueOrThrow({ where: { id: 1 } }),
     prisma.expense.findMany(),
-    prisma.gracePhase.findMany(),
+    prisma.person2Phase.findMany(),
     prisma.asset.findMany(),
     prisma.householdSettings.findUnique({ where: { id: 1 } }),
     prisma.projectionSettings.findUnique({ where: { id: 1 } }),
@@ -24,26 +24,26 @@ export default async function CashflowPage() {
   const person2Name = hs?.person2Name ?? 'Person 2'
 
   const currentYear = new Date().getFullYear()
-  const currentPhase = gracePhases.find(p => p.year === currentYear)
+  const currentPhase = person2Phases.find(p => p.year === currentYear)
   const currentDays = currentPhase?.days ?? 3
 
   const cashOnHand = assets.find(a => a.name.toLowerCase().includes('cash'))?.amt ?? 0
 
   // Monthly net income
-  const jorgeNet = income.taxMode
-    ? calcAfterTax(income.jorgeFTE, false) / 12
-    : income.jorgeMonthlyNet
+  const person1Net = income.taxMode
+    ? calcAfterTax(income.person1FTE, false) / 12
+    : income.person1MonthlyNet
 
-  const graceNet = income.taxMode
-    ? calcAfterTax(income.graceFTE * (currentDays / 5), income.graceHasHELP) / 12
-    : income.graceMonthlyNet
+  const person2Net = income.taxMode
+    ? calcAfterTax(income.person2FTE * (currentDays / 5), income.person2HasHELP) / 12
+    : income.person2MonthlyNet
 
-  const totalInc = jorgeNet + graceNet
+  const totalInc = person1Net + person2Net
   const totalExp = expenses.reduce((s, e) => s + toMonthly(e.amt, e.freq), 0)
   const delta = totalInc - totalExp
 
-  const leaveDelta = jorgeNet + PPL_MONTHLY - totalExp
-  const burnDelta  = jorgeNet - totalExp
+  const leaveDelta = person1Net + PPL_MONTHLY - totalExp
+  const burnDelta  = person1Net - totalExp
   const runway     = burnDelta < 0 ? cashOnHand / Math.abs(burnDelta) : Infinity
 
   // Annual expense hits by calendar month (1-12)
@@ -71,7 +71,7 @@ export default async function CashflowPage() {
     const pm   = Math.min(i + 1, PPL_MONTHS)
     const post = Math.max(0, i + 1 - PPL_MONTHS)
     return Math.max(0, Math.round(
-      cashOnHand + pm * leaveDelta + post * (jorgeNet - totalExp) - (lumpyByMonth[d.getMonth() + 1] ?? 0)
+      cashOnHand + pm * leaveDelta + post * (person1Net - totalExp) - (lumpyByMonth[d.getMonth() + 1] ?? 0)
     ))
   })
 

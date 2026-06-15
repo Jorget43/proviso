@@ -103,9 +103,9 @@ interface Props {
 export default function SuperProjectionTable({ result, person1Name, person2Name }: Props) {
   return (
     <div className="super-table-wrap">
-      <PersonTable rows={result.jorge.rows} name={person1Name} />
-      {result.grace && (
-        <PersonTable rows={result.grace.rows} name={person2Name} />
+      <PersonTable rows={result.person1.rows} name={person1Name} />
+      {result.person2 && (
+        <PersonTable rows={result.person2.rows} name={person2Name} />
       )}
     </div>
   )

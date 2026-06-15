@@ -33,22 +33,22 @@ export default async function SuperPage() {
     fundFeePercent:           s?.fundFeePercent            ?? 0.005,
     inflationRate:            s?.inflationRate             ?? 0.04,
     desiredRetirementIncome:  retirementIncome,
-    jorgeBalance:             s?.currentBalance            ?? 164000,
-    jorgeRetirementAge:       s?.retirementAge             ?? 67,
-    jorgeAdditionalContribs:  s?.additionalContribs        ?? 0,
+    person1Balance:           s?.currentBalance            ?? 164000,
+    person1RetirementAge:     s?.retirementAge             ?? 67,
+    person1AdditionalContribs:s?.additionalContribs        ?? 0,
     partnerEnabled:           s?.partnerEnabled            ?? true,
-    graceBalance:             s?.partnerBalance            ?? 80000,
-    graceRetirementAge:       s?.partnerRetirementAge      ?? 67,
-    graceAdditionalContribs:  s?.partnerAdditionalContribs ?? 0,
+    person2Balance:           s?.partnerBalance            ?? 80000,
+    person2RetirementAge:     s?.partnerRetirementAge      ?? 67,
+    person2AdditionalContribs:s?.partnerAdditionalContribs ?? 0,
   }
 
   const context: ProjectionContext = {
-    jorgeAge:          inc.jorgeAge,
-    jorgeSalary:       inc.jorgeFTE,
-    jorgeSalaryGrowth: proj.jorgeGrowth / 100,
-    graceAge:          inc.graceAge,
-    graceSalary:       inc.graceFTE,
-    graceSalaryGrowth: proj.graceGrowth / 100,
+    person1Age:          inc.person1Age,
+    person1Salary:       inc.person1FTE,
+    person1SalaryGrowth: proj.person1Growth / 100,
+    person2Age:          inc.person2Age,
+    person2Salary:       inc.person2FTE,
+    person2SalaryGrowth: proj.person2Growth / 100,
   }
 
   const mortgageContext = {

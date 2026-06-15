@@ -10,15 +10,15 @@ function fmtM(n: number) {
 }
 
 interface Props {
-  result:             HouseholdSuperResult
-  jorgeCurrentAge:    number
-  jorgeRetirementAge: number
-  person1Name:        string
+  result:               HouseholdSuperResult
+  person1CurrentAge:    number
+  person1RetirementAge: number
+  person1Name:          string
 }
 
-export default function SuperBanner({ result, jorgeCurrentAge, jorgeRetirementAge, person1Name }: Props) {
+export default function SuperBanner({ result, person1CurrentAge, person1RetirementAge, person1Name }: Props) {
   const { combinedRetirementTotal, combinedRetirementTotalPV, monthlyIncomeGoal, combinedDepletionAge } = result
-  const yearsToRetirement = jorgeRetirementAge - jorgeCurrentAge
+  const yearsToRetirement = person1RetirementAge - person1CurrentAge
 
   const depletionLabel = combinedDepletionAge
     ? `Age ${combinedDepletionAge}`
@@ -26,7 +26,7 @@ export default function SuperBanner({ result, jorgeCurrentAge, jorgeRetirementAg
 
   const depletionColor = !combinedDepletionAge
     ? 'var(--green)'
-    : combinedDepletionAge - jorgeRetirementAge < 20
+    : combinedDepletionAge - person1RetirementAge < 20
     ? 'var(--red)'
     : 'var(--amber)'
 

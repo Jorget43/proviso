@@ -17,8 +17,8 @@ export default async function InvestmentsPage() {
 
   // Each owner's marginal rate (incl. Medicare) drives the CGT estimate.
   const marginalByMember: Record<string, number> = {
-    [person1Name]: marginalRate(income.jorgeFTE),
-    [person2Name]: marginalRate(income.graceFTE),
+    [person1Name]: marginalRate(income.person1FTE),
+    [person2Name]: marginalRate(income.person2FTE),
   }
 
   const members = hs?.partnerEnabled ? [person1Name, person2Name] : [person1Name]

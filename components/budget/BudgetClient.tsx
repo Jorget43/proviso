@@ -45,23 +45,23 @@ export default function BudgetClient({
 
   // Combined gross family income drives the CCS taper (person 1 full FTE + person 2 pro-rata).
   const familyIncome = useMemo(
-    () => income.jorgeFTE + income.graceFTE * (currentDays / 5),
-    [income.jorgeFTE, income.graceFTE, currentDays],
+    () => income.person1FTE + income.person2FTE * (currentDays / 5),
+    [income.person1FTE, income.person2FTE, currentDays],
   )
 
-  const jorgeNet = useMemo(() => {
-    if (income.taxMode) return calcAfterTax(income.jorgeFTE, false) / 12
-    return income.jorgeMonthlyNet
+  const person1Net = useMemo(() => {
+    if (income.taxMode) return calcAfterTax(income.person1FTE, false) / 12
+    return income.person1MonthlyNet
   }, [income])
 
-  const graceNet = useMemo(() => {
+  const person2Net = useMemo(() => {
     if (income.taxMode) {
-      return calcAfterTax(income.graceFTE * (currentDays / 5), income.graceHasHELP) / 12
+      return calcAfterTax(income.person2FTE * (currentDays / 5), income.person2HasHELP) / 12
     }
-    return income.graceMonthlyNet
+    return income.person2MonthlyNet
   }, [income, currentDays])
 
-  const monthlyIncome = jorgeNet + graceNet
+  const monthlyIncome = person1Net + person2Net
 
   const monthlyExpenses = useMemo(
     () => expenses.reduce((s, e) => s + toMonthly(e.amt, e.freq), 0),

@@ -7,11 +7,11 @@ import ProjectionsClient from '@/components/projections/ProjectionsClient'
 
 export default async function ProjectionsPage() {
   const me = await requireSession()
-  const [income, settings, jorgePhases, gracePhases, oneoffs, lifePhases, expenses, debts, assets, mortgage, hs, feeSchedule, rentSettings] = await Promise.all([
+  const [income, settings, person1Phases, person2Phases, oneoffs, lifePhases, expenses, debts, assets, mortgage, hs, feeSchedule, rentSettings] = await Promise.all([
     prisma.incomeSettings.findUniqueOrThrow({ where: { id: 1 } }),
     prisma.projectionSettings.findUniqueOrThrow({ where: { id: 1 } }),
-    prisma.jorgePhase.findMany({ orderBy: { year: 'asc' } }),
-    prisma.gracePhase.findMany({ orderBy: { year: 'asc' } }),
+    prisma.person1Phase.findMany({ orderBy: { year: 'asc' } }),
+    prisma.person2Phase.findMany({ orderBy: { year: 'asc' } }),
     prisma.oneOff.findMany({ orderBy: { year: 'asc' } }),
     prisma.lifePhase.findMany({ orderBy: { sortOrder: 'asc' } }) as unknown as Promise<LifePhase[]>,
     prisma.expense.findMany(),
@@ -42,8 +42,8 @@ export default async function ProjectionsPage() {
     <ProjectionsClient
       canEdit={me.role === 'CFO'}
       initialSettings={settings}
-      initialJorgePhases={jorgePhases}
-      initialGracePhases={gracePhases}
+      initialPerson1Phases={person1Phases}
+      initialPerson2Phases={person2Phases}
       initialFeeSchedule={feeSchedule}
       initialOneoffs={oneoffs}
       initialLifePhases={lifePhases}

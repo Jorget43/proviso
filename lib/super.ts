@@ -54,39 +54,39 @@ export interface HouseholdSuperInputs {
   desiredRetirementIncome:  number  // household combined annual goal (today's $)
 
   // Person 1
-  jorgeBalance:             number
-  jorgeRetirementAge:       number
-  jorgeAdditionalContribs:  number
+  person1Balance:             number
+  person1RetirementAge:       number
+  person1AdditionalContribs:  number
 
   // Person 2 (partner)
-  partnerEnabled:           boolean
-  graceBalance:             number
-  graceRetirementAge:       number
-  graceAdditionalContribs:  number
+  partnerEnabled:             boolean
+  person2Balance:             number
+  person2RetirementAge:       number
+  person2AdditionalContribs:  number
 }
 
 export interface ProjectionContext {
-  jorgeAge:          number
-  jorgeSalary:       number
-  jorgeSalaryGrowth: number  // decimal e.g. 0.035
-  graceAge:          number
-  graceSalary:       number
-  graceSalaryGrowth: number
+  person1Age:          number
+  person1Salary:       number
+  person1SalaryGrowth: number  // decimal e.g. 0.035
+  person2Age:          number
+  person2Salary:       number
+  person2SalaryGrowth: number
 }
 
 export interface CombinedRow {
-  year:         number
-  jorgeAge:     number
-  graceAge:     number
-  jorgeBalance: number
-  graceBalance: number
-  total:        number
-  totalPV:      number
+  year:           number
+  person1Age:     number
+  person2Age:     number
+  person1Balance: number
+  person2Balance: number
+  total:          number
+  totalPV:        number
 }
 
 export interface HouseholdSuperResult {
-  jorge:                     SuperResult
-  grace:                     SuperResult | null
+  person1:                   SuperResult
+  person2:                   SuperResult | null
   combined:                  CombinedRow[]
   combinedDepletionAge:      number | null   // person 1's age when combined pool depletes
   combinedRetirementTotal:   number
@@ -200,100 +200,100 @@ export function runHouseholdProjection(
   // Each person funds half the household income goal
   const perPersonIncome = inputs.desiredRetirementIncome / (inputs.partnerEnabled ? 2 : 1)
 
-  const jorgeInputs: SuperInputs = {
-    currentBalance:          inputs.jorgeBalance,
-    currentAge:              ctx.jorgeAge,
-    retirementAge:           inputs.jorgeRetirementAge,
-    salaryExcSuper:          ctx.jorgeSalary,
+  const p1Inputs: SuperInputs = {
+    currentBalance:          inputs.person1Balance,
+    currentAge:              ctx.person1Age,
+    retirementAge:           inputs.person1RetirementAge,
+    salaryExcSuper:          ctx.person1Salary,
     sgRate:                  inputs.sgRate,
     investmentReturn:        inputs.investmentReturn,
-    additionalContribs:      inputs.jorgeAdditionalContribs,
+    additionalContribs:      inputs.person1AdditionalContribs,
     fundFeePercent:          inputs.fundFeePercent,
     inflationRate:           inputs.inflationRate,
-    salaryGrowthRate:        ctx.jorgeSalaryGrowth,
+    salaryGrowthRate:        ctx.person1SalaryGrowth,
     desiredRetirementIncome: perPersonIncome,
   }
-  const jorgeResult = runSuperProjection(jorgeInputs)
+  const p1Result = runSuperProjection(p1Inputs)
 
   if (!inputs.partnerEnabled) {
-    const combined: CombinedRow[] = jorgeResult.rows.map(r => ({
-      year:         r.year,
-      jorgeAge:     r.age,
-      graceAge:     ctx.graceAge + (r.year - CURRENT_YEAR),
-      jorgeBalance: r.balance,
-      graceBalance: 0,
-      total:        r.balance,
-      totalPV:      r.presentValue,
+    const combined: CombinedRow[] = p1Result.rows.map(r => ({
+      year:           r.year,
+      person1Age:     r.age,
+      person2Age:     ctx.person2Age + (r.year - CURRENT_YEAR),
+      person1Balance: r.balance,
+      person2Balance: 0,
+      total:          r.balance,
+      totalPV:        r.presentValue,
     }))
     return {
-      jorge:                     jorgeResult,
-      grace:                     null,
+      person1:                   p1Result,
+      person2:                   null,
       combined,
-      combinedDepletionAge:      jorgeResult.depletionAge,
-      combinedRetirementTotal:   jorgeResult.retirementBalance,
-      combinedRetirementTotalPV: jorgeResult.retirementBalancePV,
+      combinedDepletionAge:      p1Result.depletionAge,
+      combinedRetirementTotal:   p1Result.retirementBalance,
+      combinedRetirementTotalPV: p1Result.retirementBalancePV,
       monthlyIncomeGoal:         inputs.desiredRetirementIncome / 12,
     }
   }
 
-  const graceInputs: SuperInputs = {
-    currentBalance:          inputs.graceBalance,
-    currentAge:              ctx.graceAge,
-    retirementAge:           inputs.graceRetirementAge,
-    salaryExcSuper:          ctx.graceSalary,
+  const p2Inputs: SuperInputs = {
+    currentBalance:          inputs.person2Balance,
+    currentAge:              ctx.person2Age,
+    retirementAge:           inputs.person2RetirementAge,
+    salaryExcSuper:          ctx.person2Salary,
     sgRate:                  inputs.sgRate,
     investmentReturn:        inputs.investmentReturn,
-    additionalContribs:      inputs.graceAdditionalContribs,
+    additionalContribs:      inputs.person2AdditionalContribs,
     fundFeePercent:          inputs.fundFeePercent,
     inflationRate:           inputs.inflationRate,
-    salaryGrowthRate:        ctx.graceSalaryGrowth,
+    salaryGrowthRate:        ctx.person2SalaryGrowth,
     desiredRetirementIncome: perPersonIncome,
   }
-  const graceResult = runSuperProjection(graceInputs)
+  const p2Result = runSuperProjection(p2Inputs)
 
   // Build year-aligned combined rows
-  const jorgeByYear: Record<number, SuperRow> = {}
-  const graceByYear: Record<number, SuperRow> = {}
-  for (const r of jorgeResult.rows) jorgeByYear[r.year] = r
-  for (const r of graceResult.rows) graceByYear[r.year] = r
+  const p1ByYear: Record<number, SuperRow> = {}
+  const p2ByYear: Record<number, SuperRow> = {}
+  for (const r of p1Result.rows) p1ByYear[r.year] = r
+  for (const r of p2Result.rows) p2ByYear[r.year] = r
 
   const allYears = Array.from(new Set([
-    ...jorgeResult.rows.map(r => r.year),
-    ...graceResult.rows.map(r => r.year),
+    ...p1Result.rows.map(r => r.year),
+    ...p2Result.rows.map(r => r.year),
   ])).sort((a, b) => a - b)
 
   const combined: CombinedRow[] = allYears.map(year => {
     const yearsFromNow = year - CURRENT_YEAR
-    const jBal = jorgeByYear[year]?.balance ?? 0
-    const gBal = graceByYear[year]?.balance ?? 0
-    const total = jBal + gBal
+    const b1  = p1ByYear[year]?.balance ?? 0
+    const b2  = p2ByYear[year]?.balance ?? 0
+    const total = b1 + b2
     const totalPV = total / Math.pow(1 + inputs.inflationRate, yearsFromNow)
     return {
       year,
-      jorgeAge:     ctx.jorgeAge + yearsFromNow,
-      graceAge:     ctx.graceAge + yearsFromNow,
-      jorgeBalance: jBal,
-      graceBalance: gBal,
+      person1Age:     ctx.person1Age + yearsFromNow,
+      person2Age:     ctx.person2Age + yearsFromNow,
+      person1Balance: b1,
+      person2Balance: b2,
       total,
       totalPV,
     }
   })
 
   // Depletion: first year total balance hits zero
-  const depletionRow     = combined.find(c => c.total <= 0)
+  const depletionRow         = combined.find(c => c.total <= 0)
   const combinedDepletionAge = depletionRow
-    ? ctx.jorgeAge + (depletionRow.year - CURRENT_YEAR)
+    ? ctx.person1Age + (depletionRow.year - CURRENT_YEAR)
     : null
 
   // Combined balance at the later retirement year
-  const jorgeRetYear   = CURRENT_YEAR + (inputs.jorgeRetirementAge - ctx.jorgeAge)
-  const graceRetYear   = CURRENT_YEAR + (inputs.graceRetirementAge - ctx.graceAge)
-  const laterRetYear   = Math.max(jorgeRetYear, graceRetYear)
-  const atRetirement   = combined.find(c => c.year === laterRetYear) ?? combined[combined.length - 1]
+  const p1RetYear  = CURRENT_YEAR + (inputs.person1RetirementAge - ctx.person1Age)
+  const p2RetYear  = CURRENT_YEAR + (inputs.person2RetirementAge - ctx.person2Age)
+  const laterRetYear = Math.max(p1RetYear, p2RetYear)
+  const atRetirement = combined.find(c => c.year === laterRetYear) ?? combined[combined.length - 1]
 
   return {
-    jorge:                     jorgeResult,
-    grace:                     graceResult,
+    person1:                   p1Result,
+    person2:                   p2Result,
     combined,
     combinedDepletionAge,
     combinedRetirementTotal:   atRetirement.total,

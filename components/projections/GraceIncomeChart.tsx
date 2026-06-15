@@ -16,7 +16,7 @@ interface PersonIncomeChartProps {
   person2Growth: number
 }
 
-export default function GraceIncomeChart({
+export default function PartnerIncomeChart({
   labels, person1Data, person2Data, person1Name, person2Name,
   leaveYrs, person1FTE, person2FTE, person1Growth, person2Growth,
 }: PersonIncomeChartProps) {

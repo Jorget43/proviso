@@ -36,9 +36,9 @@ export default async function EofyPage() {
   const sgRate      = superSettings?.sgRate ?? 0.12
 
   const roster = [
-    { name: person1Name, income: income.jorgeFTE, extra: superSettings?.additionalContribs ?? 0 },
+    { name: person1Name, income: income.person1FTE, extra: superSettings?.additionalContribs ?? 0 },
     ...(hs?.partnerEnabled
-      ? [{ name: person2Name, income: income.graceFTE, extra: superSettings?.partnerAdditionalContribs ?? 0 }]
+      ? [{ name: person2Name, income: income.person2FTE, extra: superSettings?.partnerAdditionalContribs ?? 0 }]
       : []),
   ]
 

@@ -12,12 +12,12 @@ import Panel from '@/components/ui/Panel'
 
 export interface IncomeSettings {
   id: number
-  jorgeFTE: number
-  graceFTE: number
-  graceHasHELP: boolean
+  person1FTE: number
+  person2FTE: number
+  person2HasHELP: boolean
   taxMode: boolean
-  jorgeMonthlyNet: number
-  graceMonthlyNet: number
+  person1MonthlyNet: number
+  person2MonthlyNet: number
 }
 
 interface IncomePanelProps {
@@ -161,8 +161,8 @@ function PersonCard({
 }
 
 export default function IncomePanel({ income, currentDays, onUpdate, person1Name, person2Name }: IncomePanelProps) {
-  const graceWorking = income.graceFTE * (currentDays / 5)
-  const gracePct = Math.round(currentDays / 5 * 100)
+  const person2Working = income.person2FTE * (currentDays / 5)
+  const person2Pct = Math.round(currentDays / 5 * 100)
 
   const toggle = (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.72rem', color: 'var(--t2)' }}>
@@ -187,29 +187,29 @@ export default function IncomePanel({ income, currentDays, onUpdate, person1Name
         <div className="income-grid">
           <PersonCard
             name={person2Name}
-            gross={graceWorking}
-            hasHELP={income.graceHasHELP}
+            gross={person2Working}
+            hasHELP={income.person2HasHELP}
             nameColor="var(--pink)"
           >
             <div className="input-prefix">
               <span>FTE/yr</span>
               <input
                 type="number"
-                defaultValue={income.graceFTE}
-                onBlur={e => onUpdate({ graceFTE: parseFloat(e.target.value) || 0 })}
+                defaultValue={income.person2FTE}
+                onBlur={e => onUpdate({ person2FTE: parseFloat(e.target.value) || 0 })}
               />
             </div>
             <div style={{ fontSize: '0.68rem', color: 'var(--teal)', fontWeight: 500, marginTop: 3 }}>
-              {currentDays}d/wk = {fmt(graceWorking)}/yr ({gracePct}% FTE)
+              {currentDays}d/wk = {fmt(person2Working)}/yr ({person2Pct}% FTE)
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
               <input
                 type="checkbox"
-                id="graceHELPchk"
-                checked={income.graceHasHELP}
-                onChange={e => onUpdate({ graceHasHELP: e.target.checked })}
+                id="person2HELPchk"
+                checked={income.person2HasHELP}
+                onChange={e => onUpdate({ person2HasHELP: e.target.checked })}
               />
-              <label htmlFor="graceHELPchk" style={{ fontSize: '0.68rem', color: 'var(--t2)', cursor: 'pointer' }}>
+              <label htmlFor="person2HELPchk" style={{ fontSize: '0.68rem', color: 'var(--t2)', cursor: 'pointer' }}>
                 HELP debt repayments
               </label>
             </div>
@@ -217,7 +217,7 @@ export default function IncomePanel({ income, currentDays, onUpdate, person1Name
 
           <PersonCard
             name={person1Name}
-            gross={income.jorgeFTE}
+            gross={income.person1FTE}
             hasHELP={false}
             nameColor="var(--blue)"
           >
@@ -225,8 +225,8 @@ export default function IncomePanel({ income, currentDays, onUpdate, person1Name
               <span>Gross/yr</span>
               <input
                 type="number"
-                defaultValue={income.jorgeFTE}
-                onBlur={e => onUpdate({ jorgeFTE: parseFloat(e.target.value) || 0 })}
+                defaultValue={income.person1FTE}
+                onBlur={e => onUpdate({ person1FTE: parseFloat(e.target.value) || 0 })}
               />
             </div>
             <div style={{ fontSize: '0.68rem', color: 'var(--t3)', marginTop: 3 }}>
@@ -242,8 +242,8 @@ export default function IncomePanel({ income, currentDays, onUpdate, person1Name
               <span>$/mo net</span>
               <input
                 type="number"
-                defaultValue={income.graceMonthlyNet}
-                onBlur={e => onUpdate({ graceMonthlyNet: parseFloat(e.target.value) || 0 })}
+                defaultValue={income.person2MonthlyNet}
+                onBlur={e => onUpdate({ person2MonthlyNet: parseFloat(e.target.value) || 0 })}
               />
             </div>
           </div>
@@ -253,8 +253,8 @@ export default function IncomePanel({ income, currentDays, onUpdate, person1Name
               <span>$/mo net</span>
               <input
                 type="number"
-                defaultValue={income.jorgeMonthlyNet}
-                onBlur={e => onUpdate({ jorgeMonthlyNet: parseFloat(e.target.value) || 0 })}
+                defaultValue={income.person1MonthlyNet}
+                onBlur={e => onUpdate({ person1MonthlyNet: parseFloat(e.target.value) || 0 })}
               />
             </div>
           </div>

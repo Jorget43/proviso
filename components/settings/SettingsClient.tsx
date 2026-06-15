@@ -12,8 +12,8 @@ interface Props {
   person1Name:          string
   person2Name:          string
   partnerEnabled:       boolean
-  jorgeFTE:             number
-  graceFTE:             number
+  person1FTE:           number
+  person2FTE:           number
   mortgageBalance:      number
   superBalance:         number
   partnerSuperBalance:  number
@@ -30,7 +30,7 @@ interface Props {
 
 export default function SettingsClient({
   person1Name, person2Name, partnerEnabled,
-  jorgeFTE, graceFTE, mortgageBalance,
+  person1FTE, person2FTE, mortgageBalance,
   superBalance, partnerSuperBalance,
   parentalLeaveEnabled,
   currentRole, currentUserId, users, hasTOTP, passkeys, watchdog, buildVersion, buildDate,
@@ -57,8 +57,8 @@ export default function SettingsClient({
         <div className="da-grid" style={{ gap: '0.6rem' }}>
           <div className="da-row"><span className="da-label">Person 1</span><span>{person1Name}</span></div>
           <div className="da-row"><span className="da-label">Person 2</span><span>{partnerEnabled ? person2Name : '—'}</span></div>
-          <div className="da-row"><span className="da-label">{person1Name} income</span><span>{fmt(jorgeFTE)}/yr</span></div>
-          {partnerEnabled && <div className="da-row"><span className="da-label">{person2Name} income</span><span>{fmt(graceFTE)}/yr</span></div>}
+          <div className="da-row"><span className="da-label">{person1Name} income</span><span>{fmt(person1FTE)}/yr</span></div>
+          {partnerEnabled && <div className="da-row"><span className="da-label">{person2Name} income</span><span>{fmt(person2FTE)}/yr</span></div>}
           <div className="da-row"><span className="da-label">Mortgage balance</span><span>{mortgageBalance > 0 ? fmt(mortgageBalance) : '—'}</span></div>
           <div className="da-row"><span className="da-label">{person1Name} super</span><span>{fmt(superBalance)}</span></div>
           {partnerEnabled && <div className="da-row"><span className="da-label">{person2Name} super</span><span>{fmt(partnerSuperBalance)}</span></div>}

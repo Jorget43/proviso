@@ -2,14 +2,14 @@
 import { GRACE_FTE } from '@/lib/constants'
 import { fmt } from '@/lib/formatting'
 
-export interface GracePhaseRow {
+export interface WorkPhaseRow {
   id:   number
   year: number
   days: number
 }
 
-interface GraceTimelineProps {
-  phases:      GracePhaseRow[]
+interface WorkPhaseTimelineProps {
+  phases:      WorkPhaseRow[]
   currentYear: number
   fte?:        number
   showLeave?:  boolean
@@ -29,9 +29,9 @@ function phaseIncome(days: number, fte: number, showLeave: boolean): string {
   return fmt(fte * (days / 5)) + '/yr'
 }
 
-export default function GraceTimeline({
+export default function WorkPhaseTimeline({
   phases, currentYear, fte = GRACE_FTE, showLeave = true, onUpdate, onDelete, onAdd,
-}: GraceTimelineProps) {
+}: WorkPhaseTimelineProps) {
   const sorted = [...phases].sort((a, b) => a.year - b.year)
   const kStr   = Math.round(fte / 1000)
 
