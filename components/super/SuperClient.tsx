@@ -27,11 +27,13 @@ interface Props {
   person1Name:       string
   person2Name:       string
   superHistory:      SuperHistoryItem[]
+  isRenting:         boolean
+  rentMonthly:       number
 }
 
 type Field = keyof HouseholdSuperInputs
 
-export default function SuperClient({ canEdit, initial, context, mortgage, budgetAnnualSpend, person1Name, person2Name, superHistory }: Props) {
+export default function SuperClient({ canEdit, initial, context, mortgage, budgetAnnualSpend, person1Name, person2Name, superHistory, isRenting, rentMonthly }: Props) {
   const [inputs, setInputs] = useState<HouseholdSuperInputs>(initial)
   const [saving, setSaving]  = useState(false)
 
@@ -51,30 +53,50 @@ export default function SuperClient({ canEdit, initial, context, mortgage, budge
     setSaving(false)
   }
 
-  // Mortgage hint calculations
+  // Retirement year calculations
   const currentYear           = new Date().getFullYear()
   const person1RetirementYear = currentYear + (inputs.person1RetirementAge - context.person1Age)
   const person2RetirementYear = currentYear + (inputs.person2RetirementAge - context.person2Age)
+
+  // Mortgage hints
   const mortgagePaidOff      = mortgage.mortgageEndYear < person1RetirementYear
+  const mortgageStillLive    = mortgage.mortgagePaymentMonthly > 0 && !mortgagePaidOff
   const mortgageYearsBefore  = person1RetirementYear - mortgage.mortgageEndYear
+  const mortgageYearsAfter   = mortgage.mortgageEndYear - person1RetirementYear
   const mortgageAnnual       = mortgage.mortgagePaymentMonthly * 12
   const suggestedIncome      = mortgagePaidOff && mortgageAnnual > 0
     ? Math.max(0, Math.round((inputs.desiredRetirementIncome - mortgageAnnual) / 1000) * 1000)
     : null
 
+  // Inflation-adjusted nominal equivalent at person 1 retirement
+  const yearsToRetirement1 = Math.max(0, inputs.person1RetirementAge - context.person1Age)
+  const nominalAtRetirement = Math.round(
+    inputs.desiredRetirementIncome * Math.pow(1 + inputs.inflationRate, yearsToRetirement1) / 1000
+  ) * 1000
+
   function numInput(field: Field, label: string, prefix = '$', step = 1000) {
     return (
       <div className="da-row">
         <span className="da-label">{label}</span>
-        <div className="da-input">
-          {prefix && <span className="input-prefix">{prefix}</span>}
-          <input
-            type="number"
-            step={step}
-            value={(inputs[field] as number)}
-            onChange={e => set(field, parseFloat(e.target.value) || 0)}
-          />
-        </div>
+        {prefix
+          ? <div className="input-prefix" style={{ flex: 1 }}>
+              <span>{prefix}</span>
+              <input
+                type="number"
+                step={step}
+                value={(inputs[field] as number)}
+                onChange={e => set(field, parseFloat(e.target.value) || 0)}
+                style={{ textAlign: 'right' }}
+              />
+            </div>
+          : <input
+              className="da-input"
+              type="number"
+              step={step}
+              value={(inputs[field] as number)}
+              onChange={e => set(field, parseFloat(e.target.value) || 0)}
+            />
+        }
       </div>
     )
   }
@@ -141,7 +163,8 @@ export default function SuperClient({ canEdit, initial, context, mortgage, budge
               <div>
                 {ageInput('person1RetirementAge', 'Planned retirement age')}
                 <p className="small" style={{ marginTop: 3 }}>
-                  {Math.max(0, inputs.person1RetirementAge - context.person1Age)}yr from now
+                  Age {inputs.person1RetirementAge} · {person1RetirementYear}
+                  {' · '}{Math.max(0, inputs.person1RetirementAge - context.person1Age)}yr from now
                   {inputs.person1RetirementAge < 60 && ' · Before preservation age (60)'}
                   {inputs.person1RetirementAge !== 67 && inputs.person1RetirementAge >= 60 && ' · Standard pension age: 67'}
                 </p>
@@ -170,7 +193,8 @@ export default function SuperClient({ canEdit, initial, context, mortgage, budge
                 <div>
                   {ageInput('person2RetirementAge', 'Planned retirement age')}
                   <p className="small" style={{ marginTop: 3 }}>
-                    {Math.max(0, inputs.person2RetirementAge - context.person2Age)}yr from now
+                    Age {inputs.person2RetirementAge} · {person2RetirementYear}
+                    {' · '}{Math.max(0, inputs.person2RetirementAge - context.person2Age)}yr from now
                     {inputs.person2RetirementAge < 60 && ' · Before preservation age (60)'}
                     {inputs.person2RetirementAge !== 67 && inputs.person2RetirementAge >= 60 && ' · Standard pension age: 67'}
                   </p>
@@ -194,30 +218,76 @@ export default function SuperClient({ canEdit, initial, context, mortgage, budge
 
           {/* Retirement income goal */}
           <Panel title="Retirement goal">
-            <div className="da-grid">
-              {numInput('desiredRetirementIncome', "Household income goal (today's $)", '$', 5000)}
+            {/* Retirement timeline summary */}
+            <div style={{ fontSize: '0.71rem', color: 'var(--t3)', marginBottom: 10, lineHeight: 1.6 }}>
+              <div>
+                <strong style={{ color: 'var(--t2)' }}>{person1Name}</strong>
+                {' — '}retires age {inputs.person1RetirementAge} in <strong style={{ color: 'var(--t2)' }}>{person1RetirementYear}</strong>
+                {' '}({Math.max(0, inputs.person1RetirementAge - context.person1Age)} yrs from now)
+              </div>
+              {inputs.partnerEnabled && (
+                <div>
+                  <strong style={{ color: 'var(--t2)' }}>{person2Name}</strong>
+                  {' — '}retires age {inputs.person2RetirementAge} in <strong style={{ color: 'var(--t2)' }}>{person2RetirementYear}</strong>
+                  {' '}({Math.max(0, inputs.person2RetirementAge - context.person2Age)} yrs from now)
+                </div>
+              )}
             </div>
+
+            <div className="da-grid">
+              {numInput('desiredRetirementIncome', "Annual income goal (today's $)", '$', 5000)}
+            </div>
+
+            {/* Nominal equivalent at retirement */}
+            {yearsToRetirement1 > 0 && (
+              <p className="small" style={{ marginTop: 4 }}>
+                ≈ <strong>${nominalAtRetirement.toLocaleString('en-AU')}</strong>/yr in {person1RetirementYear} dollars
+                {' '}(at {(inputs.inflationRate * 100).toFixed(1)}% inflation)
+              </p>
+            )}
+
+            {/* Budget spend hint */}
             {budgetAnnualSpend > 0 && inputs.desiredRetirementIncome !== budgetAnnualSpend && (
-              <div style={{ marginTop: '0.4rem', fontSize: '0.72rem', color: 'var(--t3)', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div style={{ marginTop: 6, fontSize: '0.72rem', color: 'var(--t3)', display: 'flex', alignItems: 'center', gap: 6 }}>
                 Current annual spend: ${budgetAnnualSpend.toLocaleString('en-AU')}
                 <button className="hint-link" onClick={() => set('desiredRetirementIncome', budgetAnnualSpend)}>
-                  Reset to budget ↺
+                  Use budget ↺
                 </button>
               </div>
             )}
+
+            {/* Mortgage cleared before retirement — suggest lower goal */}
             {suggestedIncome !== null && mortgage.mortgagePaymentMonthly > 0 && (
               <div className="super-hint">
                 <span>
-                  Mortgage ends {mortgage.mortgageEndYear} ({mortgageYearsBefore} yr before retirement).
-                  Without the ${Math.round(mortgage.mortgagePaymentMonthly / 1000)}k/mo mortgage payment,
+                  Mortgage clears {mortgage.mortgageEndYear} ({mortgageYearsBefore} yr before retirement).
+                  Without the ${Math.round(mortgage.mortgagePaymentMonthly / 1000)}k/mo repayment,
                   consider a lower target:
                 </span>
-                <button
-                  className="hint-link"
-                  onClick={() => set('desiredRetirementIncome', suggestedIncome)}
-                >
+                <button className="hint-link" onClick={() => set('desiredRetirementIncome', suggestedIncome)}>
                   Apply ${suggestedIncome.toLocaleString('en-AU')}
                 </button>
+              </div>
+            )}
+
+            {/* Mortgage still running at retirement — flag higher goal */}
+            {mortgageStillLive && (
+              <div className="super-hint" style={{ background: 'var(--red-lt)', border: '1px solid rgba(180,30,30,0.2)', borderLeft: '3px solid var(--red)' }}>
+                <span>
+                  ⚠ Mortgage continues until {mortgage.mortgageEndYear}
+                  {' '}({mortgageYearsAfter} yr past retirement). Income goal must cover the
+                  ${Math.round(mortgage.mortgagePaymentMonthly / 1000)}k/mo repayment.
+                </span>
+              </div>
+            )}
+
+            {/* Renting at retirement — flag ongoing rent cost */}
+            {isRenting && rentMonthly > 0 && (
+              <div className="super-hint">
+                <span>
+                  ⚠ Renting at ${rentMonthly.toLocaleString('en-AU')}/mo. Include rent in your
+                  income goal unless you plan to purchase before retirement.
+                </span>
               </div>
             )}
           </Panel>

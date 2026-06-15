@@ -1,6 +1,7 @@
 'use client'
 import { Chart as ChartJS, BarElement, LinearScale, CategoryScale, Tooltip, Legend } from 'chart.js'
 import { Bar } from 'react-chartjs-2'
+import { crosshair } from '@/lib/chartPlugins'
 ChartJS.register(BarElement, LinearScale, CategoryScale, Tooltip, Legend)
 
 interface IncExpProjChartProps {
@@ -17,7 +18,7 @@ export default function IncExpProjChart({ labels, incData, expData, phaseData, s
 
   return (
     <div className="chart-wrap" style={{ height: 210 }}>
-      <Bar data={{
+      <Bar plugins={[crosshair]} data={{
         labels,
         datasets: [
           { label: 'Annual income',     data: incData,   backgroundColor: 'rgba(22,107,69,0.72)',  stack: 'a' },
@@ -27,6 +28,7 @@ export default function IncExpProjChart({ labels, incData, expData, phaseData, s
         ],
       }} options={{
         responsive: true, maintainAspectRatio: false,
+        interaction: { mode: 'index' as const, intersect: false },
         plugins: {
           legend: { display: true, position: 'top', labels: { font: { size: 10 }, color: '#6A5F4A', boxWidth: 8, boxHeight: 8 } },
           tooltip: { callbacks: { label: ctx => { const v = ctx.parsed.y ?? 0; return v > 0 ? ` ${ctx.dataset.label}: $${v.toLocaleString('en-AU')}` : '' } } },

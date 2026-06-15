@@ -3,6 +3,7 @@ import { Chart as ChartJS, BarElement, LinearScale, CategoryScale, Tooltip, Lege
 import { Bar } from 'react-chartjs-2'
 import { fmtK } from '@/lib/formatting'
 import { SF_LEVELS } from '@/lib/schoolFees'
+import { crosshair } from '@/lib/chartPlugins'
 ChartJS.register(BarElement, LinearScale, CategoryScale, Tooltip, Legend)
 
 interface SchoolFeeChartProps {
@@ -26,7 +27,7 @@ export default function SchoolFeeChart({ labels, sfC1Arr, sfC2Arr, sfSibArr, sfT
   return (
     <>
       <div className="chart-wrap" style={{ height: 220 }}>
-        <Bar data={{
+        <Bar plugins={[crosshair]} data={{
           labels,
           datasets: [
             { label: 'Child 1',             data: sfC1Arr,  backgroundColor: 'rgba(30,95,168,0.75)',  stack: 'a', borderRadius: 3 },
@@ -35,6 +36,7 @@ export default function SchoolFeeChart({ labels, sfC1Arr, sfC2Arr, sfSibArr, sfT
           ],
         }} options={{
           responsive: true, maintainAspectRatio: false,
+          interaction: { mode: 'index' as const, intersect: false },
           plugins: {
             legend: { display: true, position: 'top', labels: { font: { size: 10 }, color: '#6A5F4A', boxWidth: 8, boxHeight: 8 } },
             tooltip: { callbacks: { label: ctx => { const v = ctx.parsed.y ?? 0; return v > 0 ? ` ${ctx.dataset.label}: $${v.toLocaleString('en-AU')}` : '' } } },

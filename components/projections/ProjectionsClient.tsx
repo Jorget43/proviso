@@ -624,7 +624,7 @@ export default function ProjectionsClient({
           </div>
 
           <div style={{ marginTop: '1rem' }}>
-            <Panel title="One-off home expenses" dotColor="var(--blue)">
+            <Panel title="One-off expenses" dotColor="var(--blue)">
               <OneOffPanel oneoffs={oneoffs} onAdd={addOneoff} onUpdate={updateOneoff} onDelete={deleteOneoff} />
             </Panel>
           </div>

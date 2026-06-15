@@ -83,19 +83,21 @@ export default function BudgetClient({
 
   const monthlyExpenses = useMemo(
     () => expenses.reduce((s, e) => s + toMonthly(e.amt, e.freq), 0)
+          + annualExpenses.reduce((s, a) => s + a.amt / 12, 0)
           + (rentSettings?.enabled ? rentSettings.monthlyRent : 0),
-    [expenses, rentSettings],
+    [expenses, annualExpenses, rentSettings],
   )
 
   const catMonthly = useMemo(() => {
     const m: Record<string, number> = {}
     CATS.forEach(c => { m[c] = 0 })
     expenses.forEach(e => { m[e.cat] = (m[e.cat] ?? 0) + toMonthly(e.amt, e.freq) })
+    annualExpenses.forEach(a => { m[a.cat] = (m[a.cat] ?? 0) + a.amt / 12 })
     if (rentSettings?.enabled) {
       m['Home'] = (m['Home'] ?? 0) + rentSettings.monthlyRent
     }
     return m
-  }, [expenses, rentSettings])
+  }, [expenses, annualExpenses, rentSettings])
 
   const delta = monthlyIncome - monthlyExpenses
   const savingsRate = monthlyIncome > 0 ? delta / monthlyIncome * 100 : 0

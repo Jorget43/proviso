@@ -369,6 +369,35 @@ model WebAuthnChallenge {
   expiresAt DateTime
 }
 
+model Donation {
+  id          Int      @id @default(autoincrement())
+  charity     String
+  abn         String   @default("")
+  amount      Float
+  date        String   // YYYY-MM-DD
+  financialYr Int      // ATO FY ending year, e.g. 2025 = FY24-25
+  source      String   @default("manual") // manual | imported
+  txnId       Int?     // linked Transaction.id when imported
+  notes       String   @default("")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model WorkExpense {
+  id          Int      @id @default(autoincrement())
+  description String
+  amount      Float
+  date        String   // YYYY-MM-DD
+  category    String   @default("Other") // Travel | Equipment | Meals | Professional Dev | Communication | Other
+  financialYr Int      // ATO FY ending year
+  source      String   @default("manual") // manual | imported
+  txnId       Int?     // linked Transaction.id when imported
+  receiptRef  String   @default("")
+  notes       String   @default("")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
 model RentSettings {
   id                    Int     @id @default(1)
   enabled               Boolean @default(false)

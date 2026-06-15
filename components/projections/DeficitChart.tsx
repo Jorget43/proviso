@@ -1,28 +1,9 @@
 'use client'
-import { Chart as ChartJS, BarElement, LineElement, PointElement, LinearScale, CategoryScale, Tooltip, Legend, type Plugin } from 'chart.js'
+import { Chart as ChartJS, BarElement, LineElement, PointElement, LinearScale, CategoryScale, Tooltip, Legend } from 'chart.js'
 import { Chart } from 'react-chartjs-2'
 import { fmtK, fmtS } from '@/lib/formatting'
+import { crosshair } from '@/lib/chartPlugins'
 ChartJS.register(BarElement, LineElement, PointElement, LinearScale, CategoryScale, Tooltip, Legend)
-
-const crosshair: Plugin = {
-  id: 'crosshair',
-  afterDraw(chart) {
-    const active = chart.tooltip?.getActiveElements()
-    if (!active?.length) return
-    const ctx = chart.ctx
-    const x = active[0].element.x
-    const { top, bottom } = chart.scales['y'] ?? chart.scales['y2'] ?? Object.values(chart.scales)[0]
-    ctx.save()
-    ctx.beginPath()
-    ctx.moveTo(x, top)
-    ctx.lineTo(x, bottom)
-    ctx.lineWidth = 1
-    ctx.strokeStyle = 'rgba(0,0,0,0.18)'
-    ctx.setLineDash([4, 4])
-    ctx.stroke()
-    ctx.restore()
-  },
-}
 
 interface DeficitChartProps {
   labels:           string[]

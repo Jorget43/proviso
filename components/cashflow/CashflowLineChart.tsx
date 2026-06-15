@@ -9,6 +9,7 @@ import {
   Tooltip,
 } from 'chart.js'
 import { Line } from 'react-chartjs-2'
+import { crosshair } from '@/lib/chartPlugins'
 
 ChartJS.register(LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip)
 
@@ -26,6 +27,7 @@ export default function CashflowLineChart({ labels, data, color, note }: Cashflo
     <>
       <div className="chart-wrap" style={{ height: 240 }}>
         <Line
+          plugins={[crosshair]}
           data={{
             labels,
             datasets: [{
@@ -42,6 +44,7 @@ export default function CashflowLineChart({ labels, data, color, note }: Cashflo
           options={{
             responsive: true,
             maintainAspectRatio: false,
+            interaction: { mode: 'index' as const, intersect: false },
             plugins: {
               legend: { display: false },
               tooltip: {

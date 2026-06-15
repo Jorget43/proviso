@@ -1,6 +1,7 @@
 'use client'
 import { Chart as ChartJS, LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip } from 'chart.js'
 import { Line } from 'react-chartjs-2'
+import { crosshair } from '@/lib/chartPlugins'
 ChartJS.register(LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip)
 
 interface MortPaydownChartProps {
@@ -22,8 +23,9 @@ export default function MortPaydownChart({ labels, mortData, endDate }: MortPayd
         <Line data={{
           labels,
           datasets: [{ label: 'Mortgage balance', data: mortData, borderColor: '#9B2525', backgroundColor: 'rgba(155,37,37,0.07)', fill: true, tension: 0.4, borderWidth: 2, pointRadius: 2 }],
-        }} options={{
+        }} plugins={[crosshair]} options={{
           responsive: true, maintainAspectRatio: false,
+          interaction: { mode: 'index' as const, intersect: false },
           plugins: {
             legend: { display: false },
             tooltip: { callbacks: { label: ctx => ` Mortgage: $${(ctx.parsed.y as number).toLocaleString('en-AU')}` } },

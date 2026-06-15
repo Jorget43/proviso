@@ -1,6 +1,7 @@
 'use client'
 import { Chart as ChartJS, LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip, Legend } from 'chart.js'
 import { Line } from 'react-chartjs-2'
+import { crosshair } from '@/lib/chartPlugins'
 ChartJS.register(LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip, Legend)
 
 interface NetWorthChartProps {
@@ -24,8 +25,9 @@ export default function NetWorthChart({ labels, nwData, nwNoFees, investData, ca
 
   return (
     <div className="chart-wrap" style={{ height: 260 }}>
-      <Line data={{ labels, datasets: datasets as never[] }} options={{
+      <Line data={{ labels, datasets: datasets as never[] }} plugins={[crosshair]} options={{
         responsive: true, maintainAspectRatio: false,
+        interaction: { mode: 'index' as const, intersect: false },
         plugins: {
           legend: { display: true, position: 'top', labels: { font: { size: 10 }, color: '#6A5F4A', boxWidth: 8, boxHeight: 8, usePointStyle: true } },
           tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label}: $${(ctx.parsed.y as number).toLocaleString('en-AU')}` } },

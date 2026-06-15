@@ -1,6 +1,7 @@
 'use client'
 import { Chart as ChartJS, BarElement, LineElement, PointElement, LinearScale, CategoryScale, Tooltip, Legend } from 'chart.js'
 import { Chart } from 'react-chartjs-2'
+import { crosshair } from '@/lib/chartPlugins'
 ChartJS.register(BarElement, LineElement, PointElement, LinearScale, CategoryScale, Tooltip, Legend)
 
 interface PersonIncomeChartProps {
@@ -30,7 +31,7 @@ export default function PartnerIncomeChart({
 
   return (
     <div className="chart-wrap" style={{ height: 210 }}>
-      <Chart type="bar" data={{
+      <Chart type="bar" plugins={[crosshair]} data={{
         labels,
         datasets: [
           { type: 'bar' as const,  label: person1Name,         data: person1Data, backgroundColor: 'rgba(30,95,168,0.72)', borderRadius: 3, order: 2 },
@@ -40,6 +41,7 @@ export default function PartnerIncomeChart({
         ],
       }} options={{
         responsive: true, maintainAspectRatio: false,
+        interaction: { mode: 'index' as const, intersect: false },
         plugins: {
           legend: { display: true, position: 'top', labels: { font: { size: 10 }, color: '#6A5F4A', boxWidth: 8, boxHeight: 8 } },
           tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label}: $${(ctx.parsed.y as number).toLocaleString('en-AU')}` } },

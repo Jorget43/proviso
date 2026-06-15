@@ -52,10 +52,10 @@ export default function ExpenseTable({
 }: ExpenseTableProps) {
   const [addCat, setAddCat] = useState<string>(CATS[0])
 
-  // Annual expense edit state
-  const [editId, setEditId]       = useState<number | null>(null)
-  const [adding, setAdding]       = useState(false)
-  const [form, setForm]           = useState<typeof BLANK>(BLANK)
+  // Annual expense edit/add state
+  const [editId, setEditId]           = useState<number | null>(null)
+  const [addingCat, setAddingCat]     = useState<string | null>(null)  // which cat is open for add
+  const [form, setForm]               = useState<typeof BLANK>(BLANK)
   const [annualError, setAnnualError] = useState<string | null>(null)
 
   function patchForm<K extends keyof typeof BLANK>(k: K, v: any) {
@@ -64,14 +64,21 @@ export default function ExpenseTable({
 
   function startEdit(item: AnnualExpense) {
     setEditId(item.id)
-    setAdding(false)
+    setAddingCat(null)
     setForm({ name: item.name, cat: item.cat, amt: String(item.amt), month: item.month })
+    setAnnualError(null)
+  }
+
+  function startAdd(cat: string) {
+    setAddingCat(cat)
+    setEditId(null)
+    setForm({ ...BLANK, cat })
     setAnnualError(null)
   }
 
   function cancelAnnual() {
     setEditId(null)
-    setAdding(false)
+    setAddingCat(null)
     setForm(BLANK)
     setAnnualError(null)
   }
@@ -86,7 +93,7 @@ export default function ExpenseTable({
         setEditId(null)
       } else {
         await onAnnualAdd(data)
-        setAdding(false)
+        setAddingCat(null)
       }
       setForm(BLANK)
     } catch {
@@ -99,12 +106,15 @@ export default function ExpenseTable({
     try { await onAnnualDelete(id) } catch { setAnnualError('Failed to delete') }
   }
 
-  const annualTotal = annualExpenses.reduce((s, i) => s + i.amt, 0)
-  const showAnnual = annualExpenses.length > 0 || adding
-
   return (
     <Panel title="Expenses" dotColor="var(--red)" rawBody>
-      {/* ── Regular monthly expenses ─────────────────────────────────────────── */}
+      {annualError && (
+        <div style={{ fontSize: '0.73rem', color: 'var(--red)', padding: '6px 12px', borderBottom: '1px solid var(--border)' }}>
+          {annualError}
+        </div>
+      )}
+
+      {/* ── Main expenses table (regular + annual, merged by category) ─────────── */}
       <div style={{ overflowX: 'auto' }}>
         <table className="expense-table">
           <thead>
@@ -115,29 +125,48 @@ export default function ExpenseTable({
               <th className="r">Amount</th>
               <th className="r">Monthly</th>
               <th className="r">Annual</th>
+              <th className="r" style={{ color: 'var(--t3)', fontWeight: 500 }}>Next expected</th>
             </tr>
           </thead>
           <tbody>
             {CATS.map(cat => {
-              const items = expenses.filter(e => e.cat === cat)
-              if (!items.length) return null
-              const catTotal = items.reduce((s, e) => s + toMonthly(e.amt, e.freq), 0)
+              const items      = expenses.filter(e => e.cat === cat)
+              const catAnnuals = annualExpenses.filter(a => a.cat === cat)
+              if (!items.length && !catAnnuals.length && addingCat !== cat) return null
+
+              const catMonthly = items.reduce((s, e) => s + toMonthly(e.amt, e.freq), 0)
+                + catAnnuals.reduce((s, a) => s + a.amt / 12, 0)
+
               return [
                 <tr key={`cat-${cat}`} className="cat-row">
-                  <td colSpan={6}>
+                  <td colSpan={7}>
                     <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <span>{cat} <span>&mdash; {fmt(catTotal)}/mo</span></span>
-                      <button
-                        className="add-btn"
-                        style={{ fontSize: '0.68rem', padding: '1px 8px' }}
-                        onClick={() => onAdd(cat)}
-                        title={`Add a new ${cat} item`}
-                      >
-                        + add
-                      </button>
+                      <span>{cat} <span>&mdash; {fmt(catMonthly)}/mo</span></span>
+                      {canEdit && (
+                        <span style={{ display: 'flex', gap: 6 }}>
+                          <button
+                            className="add-btn"
+                            style={{ fontSize: '0.68rem', padding: '1px 8px' }}
+                            onClick={() => onAdd(cat)}
+                            title={`Add a regular ${cat} expense`}
+                          >
+                            + add
+                          </button>
+                          <button
+                            className="add-btn"
+                            style={{ fontSize: '0.68rem', padding: '1px 8px', background: 'var(--teal)', opacity: editId !== null || addingCat !== null ? 0.4 : 1 }}
+                            onClick={() => editId === null && addingCat === null && startAdd(cat)}
+                            title={`Add a one-off annual ${cat} expense`}
+                          >
+                            + annual
+                          </button>
+                        </span>
+                      )}
                     </span>
                   </td>
                 </tr>,
+
+                // Regular expense rows
                 ...items.map(e => {
                   const mo = toMonthly(e.amt, e.freq)
                   return (
@@ -174,9 +203,55 @@ export default function ExpenseTable({
                       </td>
                       <td className="computed">{fmt(mo)}</td>
                       <td className="computed">{fmt(mo * 12)}</td>
+                      <td className="computed" />
                     </tr>
                   )
                 }),
+
+                // Annual expense rows for this category
+                ...catAnnuals.map(a => editId === a.id ? (
+                  <tr key={`ann-edit-${a.id}`}>
+                    <td colSpan={7} style={{ padding: '8px 12px' }}>
+                      <AnnualForm form={form} patch={patchForm} onSubmit={saveAnnual} onCancel={cancelAnnual} />
+                    </td>
+                  </tr>
+                ) : (
+                  <tr key={`ann-${a.id}`} style={{ background: 'var(--surface2)' }}>
+                    <td style={{ whiteSpace: 'nowrap' }}>
+                      {canEdit && (
+                        <>
+                          <button className="del-btn" onClick={() => deleteAnnual(a.id)}>&#215;</button>
+                          <button
+                            className="hint-link"
+                            style={{ fontSize: '0.65rem', marginLeft: 3 }}
+                            onClick={() => startEdit(a)}
+                          >✎</button>
+                        </>
+                      )}
+                    </td>
+                    <td>
+                      <span style={{ fontSize: '0.8rem', color: 'var(--t2)', paddingLeft: 2 }}>{a.name}</span>
+                    </td>
+                    <td>
+                      <span style={{ fontSize: '0.72rem', color: 'var(--teal)', fontWeight: 500 }}>
+                        yearly · {MONTH_SHORT[a.month - 1]}
+                      </span>
+                    </td>
+                    <td className="r" style={{ fontVariantNumeric: 'tabular-nums', fontSize: '0.8rem' }}>{fmt(a.amt)}</td>
+                    <td className="computed" style={{ color: 'var(--t3)' }}>{fmt(a.amt / 12)}</td>
+                    <td className="computed">{fmt(a.amt)}</td>
+                    <td className="computed" style={{ color: 'var(--teal)', fontWeight: 500 }}>{nextExpected(a.month)}</td>
+                  </tr>
+                )),
+
+                // Add annual expense form (inline within this category)
+                addingCat === cat && (
+                  <tr key={`ann-add-${cat}`}>
+                    <td colSpan={7} style={{ padding: '8px 12px', background: 'var(--surface2)' }}>
+                      <AnnualForm form={form} patch={patchForm} onSubmit={saveAnnual} onCancel={cancelAnnual} />
+                    </td>
+                  </tr>
+                ),
               ]
             })}
 
@@ -184,7 +259,7 @@ export default function ExpenseTable({
             {rentMonthly !== undefined && (
               <>
                 <tr className="cat-row">
-                  <td colSpan={6}>
+                  <td colSpan={7}>
                     <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                       <span>Housing &mdash; {fmt(rentMonthly)}/mo</span>
                       <span style={{ fontSize: '0.66rem', color: 'var(--t3)', fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>
@@ -214,107 +289,12 @@ export default function ExpenseTable({
                   </td>
                   <td className="computed">{fmt(rentMonthly)}</td>
                   <td className="computed">{fmt(rentMonthly * 12)}</td>
+                  <td className="computed" />
                 </tr>
               </>
             )}
           </tbody>
         </table>
-      </div>
-
-      {/* ── Annual & irregular expenses ──────────────────────────────────────── */}
-      <div style={{ borderTop: '1px solid var(--border)' }}>
-        {/* Section header */}
-        <div style={{
-          padding: '5px 10px 5px 8px',
-          background: 'var(--surface2)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          borderBottom: showAnnual || annualError ? '1px solid var(--border)' : undefined,
-        }}>
-          <span style={{ fontSize: '0.65rem', fontWeight: 600, color: 'var(--t2)', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-            Annual &amp; irregular
-            <span style={{ fontWeight: 400, color: 'var(--t3)', textTransform: 'none', letterSpacing: 0, marginLeft: 6 }}>
-              — lump-sum costs by month
-            </span>
-          </span>
-          {canEdit && !adding && !editId && (
-            <button
-              className="add-btn"
-              style={{ fontSize: '0.68rem', padding: '1px 8px' }}
-              onClick={() => { setAdding(true); setForm(BLANK) }}
-            >
-              + add
-            </button>
-          )}
-        </div>
-
-        {annualError && (
-          <div style={{ fontSize: '0.73rem', color: 'var(--red)', padding: '6px 12px', borderBottom: '1px solid var(--border)' }}>
-            {annualError}
-          </div>
-        )}
-
-        {showAnnual && (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
-              <thead>
-                <tr>
-                  {['Name', 'Category', 'Amount', 'Month', 'Next expected', ''].map(h => (
-                    <th key={h} style={{
-                      textAlign: 'left', padding: '4px 8px',
-                      color: 'var(--t3)', fontWeight: 500, fontSize: '0.7rem',
-                      borderBottom: '1px solid var(--border)',
-                    }}>
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {annualExpenses.map(item => editId === item.id ? (
-                  <tr key={item.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                    <td colSpan={6} style={{ padding: '8px 12px' }}>
-                      <AnnualForm form={form} patch={patchForm} onSubmit={saveAnnual} onCancel={cancelAnnual} />
-                    </td>
-                  </tr>
-                ) : (
-                  <tr key={item.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                    <td style={tdA}>{item.name}</td>
-                    <td style={tdA}><span className={`pill pill-${item.cat.toLowerCase()}`}>{item.cat}</span></td>
-                    <td style={{ ...tdA, fontVariantNumeric: 'tabular-nums' }}>{fmt(item.amt)}</td>
-                    <td style={tdA}>{MONTH_SHORT[item.month - 1]}</td>
-                    <td style={{ ...tdA, color: 'var(--t3)' }}>{nextExpected(item.month)}</td>
-                    <td style={{ ...tdA, whiteSpace: 'nowrap' }}>
-                      {canEdit && (
-                        <>
-                          <button className="hint-link" style={{ fontSize: '0.7rem', marginRight: 6 }} onClick={() => startEdit(item)}>Edit</button>
-                          <button className="del-btn" onClick={() => deleteAnnual(item.id)} aria-label={`Delete ${item.name}`}>&#215;</button>
-                        </>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-                {adding && (
-                  <tr>
-                    <td colSpan={6} style={{ padding: '8px 12px' }}>
-                      <AnnualForm form={form} patch={patchForm} onSubmit={saveAnnual} onCancel={cancelAnnual} />
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-              {annualExpenses.length > 0 && (
-                <tfoot>
-                  <tr>
-                    <td colSpan={2} style={{ padding: '6px 8px', fontSize: '0.72rem', color: 'var(--t3)' }}>Annual total</td>
-                    <td style={{ padding: '6px 8px', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{fmt(annualTotal)}</td>
-                    <td colSpan={3} />
-                  </tr>
-                </tfoot>
-              )}
-            </table>
-          </div>
-        )}
       </div>
 
       {/* ── Bottom add bar ───────────────────────────────────────────────────── */}
@@ -325,12 +305,22 @@ export default function ExpenseTable({
         display: 'flex',
         gap: 8,
         alignItems: 'center',
+        flexWrap: 'wrap',
       }}>
         <span className="small">Add item to</span>
         <select className="freq-select" value={addCat} onChange={e => setAddCat(e.target.value)}>
           {CATS.map(c => <option key={c}>{c}</option>)}
         </select>
         <button className="add-btn" onClick={() => onAdd(addCat)}>+ Add expense</button>
+        <span style={{ color: 'var(--border)', margin: '0 2px' }}>|</span>
+        <button
+          className="add-btn"
+          style={{ background: 'var(--teal)' }}
+          onClick={() => editId === null && addingCat === null && startAdd(addCat)}
+          disabled={editId !== null || addingCat !== null}
+        >
+          + Add one-off annual
+        </button>
       </div>
     </Panel>
   )
@@ -358,7 +348,7 @@ function AnnualForm({ form, patch, onSubmit, onCancel }: {
         <span style={lspan}>Amount</span>
         <div style={{ position: 'relative' }}>
           <span className="input-prefix">$</span>
-          <input type="number" min="0" step="1" value={form.amt as string} onChange={e => patch('amt', e.target.value)}
+          <input type="number" min="0" step="1" value={form.amt} onChange={e => patch('amt', e.target.value)}
             required placeholder="0" style={{ ...inp, paddingLeft: 24, width: 100 }} />
         </div>
       </label>
@@ -378,8 +368,7 @@ function AnnualForm({ form, patch, onSubmit, onCancel }: {
   )
 }
 
-const tdA: React.CSSProperties  = { padding: '8px 8px', verticalAlign: 'middle' }
-const lbl: React.CSSProperties  = { display: 'flex', flexDirection: 'column', gap: 3 }
+const lbl: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 3 }
 const lspan: React.CSSProperties = { fontSize: '0.68rem', color: 'var(--t3)' }
-const inp: React.CSSProperties  = { padding: '6px 8px', fontSize: '0.8rem', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 5, color: 'var(--t1)', width: 160 }
-const sel: React.CSSProperties  = { ...inp, width: 'auto' }
+const inp: React.CSSProperties = { padding: '6px 8px', fontSize: '0.8rem', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 5, color: 'var(--t1)', width: 160 }
+const sel: React.CSSProperties = { ...inp, width: 'auto' }

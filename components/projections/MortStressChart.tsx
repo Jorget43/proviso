@@ -1,6 +1,7 @@
 'use client'
 import { Chart as ChartJS, BarElement, LineElement, PointElement, LinearScale, CategoryScale, Tooltip, Legend } from 'chart.js'
 import { Chart } from 'react-chartjs-2'
+import { crosshair } from '@/lib/chartPlugins'
 ChartJS.register(BarElement, LineElement, PointElement, LinearScale, CategoryScale, Tooltip, Legend)
 
 interface MortStressChartProps {
@@ -32,7 +33,7 @@ export default function MortStressChart({ labels, stressData }: MortStressChartP
         ))}
       </div>
       <div className="chart-wrap" style={{ height: 200 }}>
-        <Chart type="bar" data={{
+        <Chart type="bar" plugins={[crosshair]} data={{
           labels,
           datasets: [
             { type: 'bar' as const,  label: 'Housing cost ratio', data: stressData, backgroundColor: barColors, borderRadius: 3 },
@@ -40,6 +41,7 @@ export default function MortStressChart({ labels, stressData }: MortStressChartP
           ],
         }} options={{
           responsive: true, maintainAspectRatio: false,
+          interaction: { mode: 'index' as const, intersect: false },
           plugins: {
             legend: { display: true, position: 'top', labels: { font: { size: 10 }, color: '#6A5F4A', boxWidth: 8, boxHeight: 8 } },
             tooltip: { callbacks: { label: ctx => ctx.dataset.label === '30% threshold' ? '' : ` ${ctx.dataset.label}: ${(ctx.parsed.y as number).toFixed(1)}%` } },
