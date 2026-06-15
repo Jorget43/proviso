@@ -7,14 +7,28 @@ import { CATS } from '@/lib/constants'
 import MetricCard from '@/components/ui/MetricCard'
 import ReadOnlyFence from '@/components/ui/ReadOnlyFence'
 import IncomePanel, { type IncomeSettings } from './IncomePanel'
-import ExpenseTable, { type Expense } from './ExpenseTable'
+import ExpenseTable, { type Expense, type AnnualExpense } from './ExpenseTable'
 import ChildcarePanel, { type ChildcareSettings } from './ChildcarePanel'
 import SpendDonut from './SpendDonut'
 import MonthlySummary from './MonthlySummary'
-import AnnualExpensesPanel, { type AnnualExpense } from './AnnualExpensesPanel'
 
 const CHILDCARE_CAT  = 'Children'
 const CHILDCARE_NAME = 'Childcare'
+
+interface RentSettings {
+  id:                    number
+  enabled:               boolean
+  monthlyRent:           number
+  annualIncreaseRate:    number
+  purchasePlanEnabled:   boolean
+  targetPurchaseYear:    number
+  targetPropertyValue:   number
+  depositPct:            number
+  depositFromCash:       number
+  depositFromInvestments: number
+  newMortgageRate:       number
+  newMortgageTermYrs:    number
+}
 
 interface BudgetClientProps {
   canEdit: boolean
@@ -22,6 +36,7 @@ interface BudgetClientProps {
   initialIncome: IncomeSettings
   initialChildcare: ChildcareSettings
   initialAnnualExpenses: AnnualExpense[]
+  initialRentSettings: RentSettings | null
   currentDays: number
   cashOnHand: number
   person1Name: string
@@ -34,6 +49,7 @@ export default function BudgetClient({
   initialIncome,
   initialChildcare,
   initialAnnualExpenses,
+  initialRentSettings,
   currentDays,
   cashOnHand,
   person1Name,
@@ -42,6 +58,8 @@ export default function BudgetClient({
   const [expenses, setExpenses] = useState<Expense[]>(initialExpenses)
   const [income, setIncome] = useState<IncomeSettings>(initialIncome)
   const [childcare, setChildcare] = useState<ChildcareSettings>(initialChildcare)
+  const [annualExpenses, setAnnualExpenses] = useState<AnnualExpense[]>(initialAnnualExpenses)
+  const [rentSettings, setRentSettings] = useState<RentSettings | null>(initialRentSettings)
 
   // Combined gross family income drives the CCS taper (person 1 full FTE + person 2 pro-rata).
   const familyIncome = useMemo(
@@ -64,20 +82,25 @@ export default function BudgetClient({
   const monthlyIncome = person1Net + person2Net
 
   const monthlyExpenses = useMemo(
-    () => expenses.reduce((s, e) => s + toMonthly(e.amt, e.freq), 0),
-    [expenses],
+    () => expenses.reduce((s, e) => s + toMonthly(e.amt, e.freq), 0)
+          + (rentSettings?.enabled ? rentSettings.monthlyRent : 0),
+    [expenses, rentSettings],
   )
 
   const catMonthly = useMemo(() => {
     const m: Record<string, number> = {}
     CATS.forEach(c => { m[c] = 0 })
     expenses.forEach(e => { m[e.cat] = (m[e.cat] ?? 0) + toMonthly(e.amt, e.freq) })
+    if (rentSettings?.enabled) {
+      m['Home'] = (m['Home'] ?? 0) + rentSettings.monthlyRent
+    }
     return m
-  }, [expenses])
+  }, [expenses, rentSettings])
 
   const delta = monthlyIncome - monthlyExpenses
   const savingsRate = monthlyIncome > 0 ? delta / monthlyIncome * 100 : 0
 
+  // ── Regular expense CRUD ────────────────────────────────────────────────────
   const addExpense = useCallback(async (cat: string = 'Fun') => {
     const res = await fetch('/api/expenses', {
       method: 'POST',
@@ -103,6 +126,36 @@ export default function BudgetClient({
     await fetch(`/api/expenses/${id}`, { method: 'DELETE' })
   }, [])
 
+  // ── Annual expense CRUD ─────────────────────────────────────────────────────
+  const createAnnualExpense = useCallback(async (data: { name: string; cat: string; amt: number; month: number }) => {
+    const res = await fetch('/api/annual-expenses', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    })
+    if (!res.ok) throw new Error((await res.json()).error ?? 'Failed to save')
+    const created: AnnualExpense = await res.json()
+    setAnnualExpenses(prev => [...prev, created].sort((a, b) => a.month - b.month))
+  }, [])
+
+  const updateAnnualExpense = useCallback(async (id: number, data: { name: string; cat: string; amt: number; month: number }) => {
+    const res = await fetch(`/api/annual-expenses/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    })
+    if (!res.ok) throw new Error((await res.json()).error ?? 'Failed to save')
+    const updated: AnnualExpense = await res.json()
+    setAnnualExpenses(prev => prev.map(i => i.id === id ? updated : i))
+  }, [])
+
+  const deleteAnnualExpense = useCallback(async (id: number) => {
+    const res = await fetch(`/api/annual-expenses/${id}`, { method: 'DELETE' })
+    if (!res.ok) throw new Error('Failed to delete')
+    setAnnualExpenses(prev => prev.filter(i => i.id !== id))
+  }, [])
+
+  // ── Income & childcare settings ─────────────────────────────────────────────
   const updateIncome = useCallback(async (patch: Partial<IncomeSettings>) => {
     setIncome(prev => ({ ...prev, ...patch }))
     await fetch('/api/income-settings', {
@@ -121,9 +174,19 @@ export default function BudgetClient({
     })
   }, [])
 
+  // ── Rent settings ───────────────────────────────────────────────────────────
+  const updateRentMonthly = useCallback(async (monthlyRent: number) => {
+    setRentSettings(prev => prev ? { ...prev, monthlyRent } : prev)
+    if (!rentSettings) return
+    await fetch('/api/rent-settings', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...rentSettings, monthlyRent }),
+    })
+  }, [rentSettings])
+
+  // ── Childcare managed budget line ───────────────────────────────────────────
   // Keep a managed "Childcare" budget line in sync with the CCS calculation.
-  // When enabled, its amount is the net out-of-pocket monthly cost; when
-  // disabled, the managed line is removed.
   const childcareSyncing = useRef(false)
   useEffect(() => {
     const managed = expenses.find(e => e.cat === CHILDCARE_CAT && e.name === CHILDCARE_NAME)
@@ -209,6 +272,13 @@ export default function BudgetClient({
           onAdd={addExpense}
           onUpdate={updateExpense}
           onDelete={deleteExpense}
+          annualExpenses={annualExpenses}
+          canEdit={canEdit}
+          onAnnualAdd={createAnnualExpense}
+          onAnnualUpdate={updateAnnualExpense}
+          onAnnualDelete={deleteAnnualExpense}
+          rentMonthly={rentSettings?.enabled ? rentSettings.monthlyRent : undefined}
+          onRentUpdate={updateRentMonthly}
         />
       </ReadOnlyFence>
 
@@ -229,8 +299,6 @@ export default function BudgetClient({
           cashOnHand={cashOnHand}
         />
       </div>
-
-      <AnnualExpensesPanel initialItems={initialAnnualExpenses} canEdit={canEdit} />
     </div>
   )
 }
