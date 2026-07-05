@@ -18,6 +18,7 @@ import SchoolFeeChart     from './SchoolFeeChart'
 import WorkPhaseTimeline, { type WorkPhaseRow } from './WorkPhaseTimeline'
 import OneOffPanel,       { type OneOffRow }      from './OneOffPanel'
 import LifePhasesPanel                            from './LifePhasesPanel'
+import NetWorthHistoryPanel, { type NetWorthSnapshotRow } from './NetWorthHistoryPanel'
 import type { LifePhase } from '@/lib/lifephases'
 
 interface ProjSettings {
@@ -86,6 +87,7 @@ interface ProjectionsClientProps {
   person1Name:          string
   person2Name:          string
   initialRentSettings:  RentSettingsType | null
+  initialSnapshots:     NetWorthSnapshotRow[]
 }
 
 const DEFAULT_RENT: RentSettingsType = {
@@ -102,7 +104,7 @@ export default function ProjectionsClient({
   income, baseMonthlyExpenses,
   mortBalance, mortRate, mortPayment, mortEndDate,
   cashOnHand, propValue, cryptoValue, currentYear,
-  person1Name, person2Name, initialRentSettings,
+  person1Name, person2Name, initialRentSettings, initialSnapshots,
 }: ProjectionsClientProps) {
   const [settings,       setSettings]       = useState<ProjSettings>(initialSettings)
   const [person1Phases,  setPerson1Phases]  = useState<WorkPhaseRow[]>(initialPerson1Phases)
@@ -111,6 +113,7 @@ export default function ProjectionsClient({
   const [oneoffs,     setOneoffs]     = useState<OneOffRow[]>(initialOneoffs)
   const [lifePhases,  setLifePhases]  = useState<LifePhase[]>(initialLifePhases)
   const [rentSt,      setRentSt]      = useState<RentSettingsType>(initialRentSettings ?? DEFAULT_RENT)
+  const [snapshots,   setSnapshots]   = useState<NetWorthSnapshotRow[]>(initialSnapshots)
 
   const sfSchedule = useMemo<FeeSchedule>(() => {
     if (settings.sfPresetKey) {
@@ -193,6 +196,18 @@ export default function ProjectionsClient({
   const nwNoFeesFinal = output.base.nwArr[output.base.nwArr.length - 1]
   const nwFeeCost   = sfOn ? nwNoFeesFinal - finalNW : 0
   const totalRentPaid = main.rentArr.reduce((s, v) => s + v, 0)
+
+  // ── Actual net worth history, bucketed to one point per calendar year ──
+  // (latest snapshot within each year; "now" falls back to the live baseline
+  // until the first auto-snapshot lands, so the actual line always starts
+  // continuous with where the projected line begins)
+  const { historyLabels, historyData } = useMemo(() => {
+    const byYear = new Map<number, number>()
+    for (const s of snapshots) byYear.set(new Date(s.takenAt).getFullYear(), s.netWorth)
+    if (!byYear.has(currentYear)) byYear.set(currentYear, initNW)
+    const years = [...byYear.keys()].filter(y => y <= currentYear).sort((a, b) => a - b)
+    return { historyLabels: years.map(String), historyData: years.map(y => byYear.get(y)!) }
+  }, [snapshots, currentYear, initNW])
 
   // ── Settings patch helpers ──
   const patchSettings = useCallback(async (patch: Partial<ProjSettings>) => {
@@ -294,6 +309,22 @@ export default function ProjectionsClient({
     await fetch(`/api/one-offs/${id}`, { method: 'DELETE' })
   }, [])
 
+  // ── Net worth snapshot CRUD ──
+  const addSnapshot = useCallback(async (takenAt: string, netWorth: number) => {
+    const res = await fetch('/api/net-worth-snapshots', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ takenAt, netWorth }),
+    })
+    const created: NetWorthSnapshotRow = await res.json()
+    setSnapshots(prev => [...prev, created].sort((a, b) => new Date(a.takenAt).getTime() - new Date(b.takenAt).getTime()))
+  }, [])
+
+  const deleteSnapshot = useCallback(async (id: number) => {
+    setSnapshots(prev => prev.filter(s => s.id !== id))
+    await fetch(`/api/net-worth-snapshots/${id}`, { method: 'DELETE' })
+  }, [])
+
   // ── Life phase toggle ──
   const toggleLifePhase = useCallback(async (id: number, enabled: boolean) => {
     setLifePhases(prev => prev.map(p => p.id === id ? { ...p, enabled } : p))
@@ -362,8 +393,14 @@ export default function ProjectionsClient({
             <NetWorthChart
               labels={output.labels} nwData={main.nwArr} nwNoFees={sfOn ? output.base.nwArr : null}
               investData={main.investArr} cashData={main.cashArr} sfOn={sfOn}
+              historyLabels={historyLabels} historyData={historyData}
             />
           </Panel>
+          <div style={{ marginTop: '1rem' }}>
+            <Panel title="Projection accuracy" dotColor="var(--amber)">
+              <NetWorthHistoryPanel snapshots={snapshots} onAdd={addSnapshot} onDelete={deleteSnapshot} />
+            </Panel>
+          </div>
           <div style={{ marginTop: '1rem' }}>
             <Panel title="Income by person" dotColor="var(--pink)">
               <PartnerIncomeChart

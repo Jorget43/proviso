@@ -2,12 +2,13 @@ export const dynamic = 'force-dynamic'
 import { prisma } from '@/lib/db'
 import { requireSession } from '@/lib/auth'
 import { toMonthly } from '@/lib/formatting'
+import { computeCurrentNetWorth } from '@/lib/netWorth'
 import type { LifePhase } from '@/lib/lifephases'
 import ProjectionsClient from '@/components/projections/ProjectionsClient'
 
 export default async function ProjectionsPage() {
   const me = await requireSession()
-  const [income, settings, person1Phases, person2Phases, oneoffs, lifePhases, expenses, debts, assets, mortgage, hs, feeSchedule, rentSettings] = await Promise.all([
+  const [income, settings, person1Phases, person2Phases, oneoffs, lifePhases, expenses, debts, assets, mortgage, hs, feeSchedule, rentSettings, snapshots] = await Promise.all([
     prisma.incomeSettings.findUniqueOrThrow({ where: { id: 1 } }),
     prisma.projectionSettings.findUniqueOrThrow({ where: { id: 1 } }),
     prisma.person1Phase.findMany({ orderBy: { year: 'asc' } }),
@@ -21,20 +22,12 @@ export default async function ProjectionsPage() {
     prisma.householdSettings.findUnique({ where: { id: 1 } }),
     prisma.schoolFeeLevel.findMany({ orderBy: { id: 'asc' } }),
     (prisma.rentSettings as any).findUnique({ where: { id: 1 } }),
+    prisma.netWorthSnapshot.findMany({ orderBy: { takenAt: 'asc' } }),
   ])
 
   const baseMonthlyExpenses = expenses.reduce((s, e) => s + toMonthly(e.amt, e.freq), 0)
 
-  const mortDebt   = debts.find(d => d.name.toLowerCase().includes('mortgage'))?.amt ?? mortgage.balance
-  const equity     = assets.find(a => a.name.toLowerCase().includes('house') || a.name.toLowerCase().includes('equity'))?.amt ?? 0
-  const propValue  = mortDebt + equity
-  const cryptoValue= assets.find(a => a.name.toLowerCase().includes('crypto'))?.amt ?? 0
-  // Cash that offsets the mortgage = accounts flagged isOffset on Debts & Assets.
-  // Falls back to the legacy 'cash'-named asset when nothing is flagged yet.
-  const offsetAssets = assets.filter(a => a.isOffset)
-  const cashOnHand = offsetAssets.length > 0
-    ? offsetAssets.reduce((s, a) => s + a.amt, 0)
-    : assets.find(a => a.name.toLowerCase().includes('cash'))?.amt ?? 0
+  const { mortDebt, propValue, cryptoValue, cashOnHand } = computeCurrentNetWorth(debts, assets, mortgage)
 
   const currentYear = new Date().getFullYear()
 
@@ -60,6 +53,7 @@ export default async function ProjectionsPage() {
       person1Name={hs?.person1Name ?? 'Person 1'}
       person2Name={hs?.person2Name ?? 'Person 2'}
       initialRentSettings={rentSettings ?? null}
+      initialSnapshots={snapshots.map(s => ({ ...s, takenAt: s.takenAt.toISOString() }))}
     />
   )
 }

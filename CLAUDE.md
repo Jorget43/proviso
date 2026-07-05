@@ -58,6 +58,7 @@ EOFY is seasonal — surfaced via May/June `◷ EOFY` pill in `TopNav`, reachabl
 - **CGT engine** (`lib/cgt.ts`): per-parcel cost base, 12-month 50% discount eligibility, estimated CGT at owner's marginal rate
 - **Childcare engine** (`lib/childcare.ts`): ATO 2024–25 CCS subsidy taper; syncs to managed `Childcare` expense line
 - **PDF import** (`lib/pdfExtract.ts`, `lib/pdfStatement.ts`): client-side `pdf.js` — no data leaves the device
+- **Net worth baseline** (`lib/netWorth.ts`): `computeCurrentNetWorth()` — the house/cash/crypto/mortgage heuristic shared by the Projections page's year-0 baseline and the monthly `NetWorthSnapshot` auto-capture, so "actual" stays scope-consistent with the projected line
 
 ## DB singleton
 
@@ -134,7 +135,7 @@ All migrations must be **additive only** — Watchtower applies them automatical
 - **`proxy.ts`**: optimistic cookie gate (fast, not the security boundary); `requireSession()` is the real boundary
 - **`lib/rbac.ts`**: scopes `actuals:write`, `budget:write`, `users:write`, `child:write`; `authorize(action)` called at the top of all mutating handlers
 - **Roles**: CFO (all scopes), PARTNER (`actuals:write` only), CHILD (`child:write` only — `/child` pocket money page)
-- **57 mutating route handlers** have `authorize()` guards; update the count when adding routes. Passkey management routes (`register-options`, `register-verify`, DELETE `passkey/[id]`) use `getSession()` directly (all roles can manage their own passkeys) — they are auth-gated but not RBAC-gated.
+- **59 mutating route handlers** have `authorize()` guards; update the count when adding routes. Passkey management routes (`register-options`, `register-verify`, DELETE `passkey/[id]`) use `getSession()` directly (all roles can manage their own passkeys) — they are auth-gated but not RBAC-gated.
 
 ## Roadmap
 
@@ -207,6 +208,14 @@ Items 1–4 shipped. Item 5 not yet built.
 - **`components/settings/PasskeyPanel.tsx`**: list + add + remove passkeys; `@simplewebauthn/browser` dynamically imported on button click; HTTPS warning shown on plain-HTTP origins
 - **`components/auth/AuthForm.tsx`**: "Sign in with passkey" button below the login form (login mode only); uses discoverable credentials (empty `allowCredentials`) so browser prompts to pick
 - **Discoverable credentials**: `generateAuthenticationOptions` is called with no `allowCredentials` so any stored passkey for this RP can be used — no username entry required
+
+### Phase 13 — Projection accuracy tracker (shipped 2026-07-05)
+
+- **Migration 0029**: `NetWorthSnapshot` table (`totalAssets`/`totalDebts` nullable — null for manual entries, populated for auto-captures; `netWorth`; `source: 'auto' | 'manual'`)
+- **`lib/netWorthSnapshotScheduler.ts`**: runs `takeNetWorthSnapshot()` once immediately on boot, then monthly (1st, 06:00 AEST) via `node-cron` — registered unconditionally in `instrumentation.ts` (unlike watchdog, this ships to all users, not gated behind `WATCHDOG_ENABLED`)
+- **`GET/POST /api/net-worth-snapshots`**, **`DELETE /api/net-worth-snapshots/[id]`** — manual backfill takes a date + a single net-worth number (not a full asset/debt breakdown)
+- **`components/projections/NetWorthChart.tsx`**: gained an "Actual net worth" overlay series (`historyLabels`/`historyData` props) — bucketed to one point per calendar year in `ProjectionsClient.tsx`, anchored to the live baseline (`initNW`) for the current year until the first auto-snapshot lands, so it's always continuous with where the projected line starts
+- **`components/projections/NetWorthHistoryPanel.tsx`**: snapshot list + manual add/delete, in a new "Projection accuracy" panel on `/projections`
 
 ## Security checklist for new features
 

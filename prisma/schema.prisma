@@ -335,6 +335,16 @@ model WebAuthnChallenge {
   expiresAt DateTime
 }
 
+model NetWorthSnapshot {
+  id          Int      @id @default(autoincrement())
+  takenAt     DateTime @default(now())
+  totalAssets Float?   // null for manual entries — only netWorth is known
+  totalDebts  Float?
+  netWorth    Float
+  source      String   @default("auto") // 'auto' | 'manual'
+  createdAt   DateTime @default(now())
+}
+
 model Donation {
   id          Int      @id @default(autoincrement())
   charity     String
