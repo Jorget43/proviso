@@ -1,5 +1,5 @@
 'use client'
-import { GRACE_FTE } from '@/lib/constants'
+import { PARTNER_FTE } from '@/lib/constants'
 import { fmt } from '@/lib/formatting'
 
 export interface WorkPhaseRow {
@@ -30,7 +30,7 @@ function phaseIncome(days: number, fte: number, showLeave: boolean): string {
 }
 
 export default function WorkPhaseTimeline({
-  phases, currentYear, fte = GRACE_FTE, showLeave = true, onUpdate, onDelete, onAdd,
+  phases, currentYear, fte = PARTNER_FTE, showLeave = true, onUpdate, onDelete, onAdd,
 }: WorkPhaseTimelineProps) {
   const sorted = [...phases].sort((a, b) => a.year - b.year)
   const kStr   = Math.round(fte / 1000)

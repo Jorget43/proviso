@@ -9,7 +9,7 @@ import { simulateMortgageYear, computeMonthlyRepayment } from './mortgage';
 import { schoolFeesForYear, type FeeSchedule } from './schoolFees';
 import { lifePhaseCostForYear } from './lifephases';
 import type { LifePhase }       from './lifephases';
-import { GRACE_FTE, PPL_MONTHLY, PPL_MONTHS } from './constants';
+import { PARTNER_FTE, PPL_MONTHLY, PPL_MONTHS } from './constants';
 
 export interface WorkPhase {
   year: number;
@@ -138,7 +138,7 @@ function getPhaseForYear(yr: number, sortedPhases: WorkPhase[]): WorkPhase {
 }
 
 function daysToAnnual(days: number): number {
-  return days === 0 ? 0 : GRACE_FTE * (days / 5);
+  return days === 0 ? 0 : PARTNER_FTE * (days / 5);
 }
 
 

@@ -23,7 +23,7 @@ This repo is public. Never let any of the following into the codebase, comments,
 - Comments must describe behaviour, not the developer's situation ("Person 1 defaults to 5 days" not "Jorge defaults to 5 days").
 - Seed data and default values must look like realistic placeholders, not copies of real household data.
 - If you find a personal reference while working on something else, fix it in the same PR.
-- The remaining DB column/table names that still contain personal names (`JorgePhase`, `GracePhase`, `jorgeFTE`, etc.) are a known legacy issue tracked in `CLEANUP_PLAN.md` (local only, not in repo). Do not add more; fix existing ones when the migration work is done.
+- Legacy personal-name DB columns/tables (`JorgePhase`, `GracePhase`, `jorgeFTE`, etc.) were removed in migration `0028_drop_legacy_person_cols` (2026-07-05) — the `person1`/`person2` equivalents added in `0024`/`0025` are now the only naming. Don't reintroduce personal names in schema, code, or sample/demo data.
 
 ## Status: all tabs live
 

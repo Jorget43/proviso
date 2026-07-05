@@ -12,7 +12,7 @@ export const CAT_COLORS = [
   '#C44B00', '#0E7490', '#855E0C',
 ];
 
-export const GRACE_FTE = 100000;
+export const PARTNER_FTE = 100000;
 export const PPL_MONTHLY = 1373;
 export const PPL_MONTHS = 4;
 
