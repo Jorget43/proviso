@@ -1,6 +1,6 @@
 export const dynamic = 'force-dynamic'
 import { prisma } from '@/lib/db'
-import { requireSession } from '@/lib/auth'
+import { requireAdult } from '@/lib/auth'
 import DebtsClient from '@/components/debts/DebtsClient'
 
 function currentFyEnding(): number {
@@ -11,7 +11,7 @@ function currentFyEnding(): number {
 }
 
 export default async function DebtsPage() {
-  const me = await requireSession()
+  const me = await requireAdult()
   const fyEnding = currentFyEnding()
   const currentYear = new Date().getFullYear()
 

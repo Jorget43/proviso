@@ -95,6 +95,16 @@ export async function requireSession(): Promise<SessionUser> {
   return session
 }
 
+// Adult-only pages (household finances, settings). Authenticates first, then
+// bounces CHILD users to their own pocket-money page so they never reach
+// server-rendered household data. Mirrors the inverse redirect in
+// app/child/page.tsx.
+export async function requireAdult(): Promise<SessionUser> {
+  const session = await requireSession()
+  if (session.role === 'CHILD') redirect('/child')
+  return session
+}
+
 // First-run gate: is any user set up yet?
 export async function hasAnyUser(): Promise<boolean> {
   return (await prisma.user.count()) > 0

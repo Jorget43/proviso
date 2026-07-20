@@ -1,8 +1,11 @@
 import { prisma } from '@/lib/db'
-import { authorize } from '@/lib/rbac'
+import { withErrors } from '@/lib/apiHandler'
+import { authorize, requireAdultRead } from '@/lib/rbac'
 import { NextResponse } from 'next/server'
 
 export async function GET(req: Request) {
+  const gate = await requireAdultRead()
+  if (!gate.ok) return gate.res
   const member = new URL(req.url).searchParams.get('member')
   const rows = await prisma.superHistory.findMany({
     where:   member ? { member } : undefined,
@@ -11,7 +14,7 @@ export async function GET(req: Request) {
   return NextResponse.json(rows)
 }
 
-export async function PUT(req: Request) {
+export const PUT = withErrors(async (req: Request) => {
   const gate = await authorize('budget:write')
   if (!gate.ok) return gate.res
   const { member, financialYearEnding, concessionalCap, concessionalUtilised, totalSuperBalance } = await req.json()
@@ -23,4 +26,4 @@ export async function PUT(req: Request) {
   })
 
   return NextResponse.json(record)
-}
+})

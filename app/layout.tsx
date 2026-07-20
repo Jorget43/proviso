@@ -4,6 +4,7 @@ import './globals.css'
 import TopNav from '@/components/layout/TopNav'
 import UpdateBanner from '@/components/ui/UpdateBanner'
 import { getSession } from '@/lib/auth'
+import { getLatestVersion, isUpdateAvailable } from '@/lib/versionCheck'
 
 const dmSans = DM_Sans({
   variable: '--font-dm-sans',
@@ -32,11 +33,19 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 
   const currentVersion = process.env.PROVISO_VERSION ?? 'dev'
 
+  // "Update available" is CFO-only (they run the deployment). getLatestVersion
+  // reads the VersionCheck row the scheduler populates and fails soft to null.
+  let latestVersion: string | null = null
+  if (session?.role === 'CFO') {
+    const latest = await getLatestVersion()
+    if (latest && isUpdateAvailable(currentVersion, latest.latestTag)) latestVersion = latest.latestTag
+  }
+
   return (
     <html lang="en" className={`${dmSans.variable} ${dmSerif.variable}`}>
       <body>
         <TopNav user={session ? { name: session.name, role: session.role } : null} />
-        {session && <UpdateBanner currentVersion={currentVersion} />}
+        {session && <UpdateBanner currentVersion={currentVersion} latestVersion={latestVersion} />}
         {children}
       </body>
     </html>

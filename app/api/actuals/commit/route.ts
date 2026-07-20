@@ -1,11 +1,13 @@
 import { NextRequest } from 'next/server'
+import { withErrors, parseBody } from '@/lib/apiHandler'
+import { transactionArraySchema } from '@/lib/schemas'
 import { authorize } from '@/lib/rbac'
 import { prisma } from '@/lib/db'
 
-export async function POST(request: NextRequest) {
+export const POST = withErrors(async (request: NextRequest) => {
   const gate = await authorize('actuals:write')
   if (!gate.ok) return gate.res
-  const body: { dateStr: string; ym: string; desc: string; amt: number; cat: string; originalCat: string; catSource: string; lumpy: boolean }[] = await request.json()
+  const body = await parseBody(request, transactionArraySchema)
 
   const result = await (prisma.transaction.createMany as Function)({
     data: body.map((t: typeof body[0]) => ({
@@ -23,4 +25,4 @@ export async function POST(request: NextRequest) {
 
   const all = await prisma.transaction.findMany({ orderBy: { importedAt: 'asc' } })
   return Response.json({ committed: result.count, skipped: body.length - result.count, transactions: all })
-}
+})

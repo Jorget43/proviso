@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
-import { authorize } from '@/lib/rbac'
+import { withErrors } from '@/lib/apiHandler'
+import { authorize, requireAdultRead } from '@/lib/rbac'
 import { prisma } from '@/lib/db'
 
 const DB_DEFAULTS = {
@@ -23,11 +24,13 @@ const DB_DEFAULTS = {
 }
 
 export async function GET() {
+  const gate = await requireAdultRead()
+  if (!gate.ok) return gate.res
   const s = await prisma.superSettings.findFirst()
   return Response.json(s ?? DB_DEFAULTS)
 }
 
-export async function PUT(req: NextRequest) {
+export const PUT = withErrors(async (req: NextRequest) => {
   const gate = await authorize('budget:write')
   if (!gate.ok) return gate.res
   // Body uses HouseholdSuperInputs field names; map to DB column names
@@ -52,4 +55,4 @@ export async function PUT(req: NextRequest) {
     create: { ...DB_DEFAULTS, ...dbData, id: 1 },
   })
   return Response.json(s)
-}
+})

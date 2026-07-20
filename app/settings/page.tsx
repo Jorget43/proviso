@@ -1,11 +1,11 @@
 export const dynamic = 'force-dynamic'
 import { prisma } from '@/lib/db'
-import { requireSession } from '@/lib/auth'
+import { requireAdult } from '@/lib/auth'
 import { computeWatchdog } from '@/lib/watchdog'
 import SettingsClient from '@/components/settings/SettingsClient'
 
 export default async function SettingsPage() {
-  const me = await requireSession()
+  const me = await requireAdult()
   const [hs, income, projSettings, mortgage, superSettings] = await Promise.all([
     prisma.householdSettings.findUnique({ where: { id: 1 } }),
     prisma.incomeSettings.findUniqueOrThrow({ where: { id: 1 } }),

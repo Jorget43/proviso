@@ -1,10 +1,10 @@
 export const dynamic = 'force-dynamic'
 import { prisma } from '@/lib/db'
-import { requireSession } from '@/lib/auth'
+import { requireAdult } from '@/lib/auth'
 import BudgetClient from '@/components/budget/BudgetClient'
 
 export default async function BudgetPage() {
-  const me = await requireSession()
+  const me = await requireAdult()
   const [expenses, income, person2Phases, assets, hs, childcare, annualExpenses, rentSettings] = await Promise.all([
     prisma.expense.findMany({ orderBy: { id: 'asc' } }),
     prisma.incomeSettings.findUniqueOrThrow({ where: { id: 1 } }),

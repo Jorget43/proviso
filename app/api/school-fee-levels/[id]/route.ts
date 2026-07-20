@@ -1,8 +1,9 @@
 import { NextRequest } from 'next/server'
+import { withErrors } from '@/lib/apiHandler'
 import { authorize } from '@/lib/rbac'
 import { prisma } from '@/lib/db'
 
-export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export const PUT = withErrors(async (request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
   const gate = await authorize('budget:write')
   if (!gate.ok) return gate.res
   const { id } = await params
@@ -12,4 +13,4 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     data: { tuition, fixed },
   })
   return Response.json(updated)
-}
+})

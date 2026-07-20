@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db'
+import { withErrors } from '@/lib/apiHandler'
 import { getSession } from '@/lib/auth'
 import { authorize } from '@/lib/rbac'
 
@@ -21,7 +22,7 @@ export async function GET(req: Request) {
   return Response.json({ txs })
 }
 
-export async function POST(req: Request) {
+export const POST = withErrors(async (req: Request) => {
   const gate = await authorize('child:write')
   if (!gate.ok) return gate.res
 
@@ -47,4 +48,4 @@ export async function POST(req: Request) {
     },
   })
   return Response.json({ tx })
-}
+})

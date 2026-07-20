@@ -6,6 +6,8 @@ import {
   calcAfterTax,
   effectiveRate,
   marginalRate,
+  TAX_THRESHOLDS_2425,
+  TAX_RATES_2425,
 } from '@/lib/tax'
 import { fmt } from '@/lib/formatting'
 import Panel from '@/components/ui/Panel'
@@ -28,14 +30,17 @@ interface IncomePanelProps {
   person2Name: string
 }
 
-const BRACKETS = [
-  { lo: 0,      hi: 18200,  label: 'Nil', color: 'var(--green)' },
-  { lo: 18200,  hi: 45000,  label: '16%', color: '#C8A830' },
-  { lo: 45000,  hi: 135000, label: '30%', color: 'var(--amber)' },
-  { lo: 135000, hi: 190000, label: '37%', color: '#C05C35' },
-  { lo: 190000, hi: 250000, label: '45%', color: 'var(--red)' },
-]
+// Visual ceiling for the bracket bar — the Div 293 threshold.
 const DISPLAY_MAX = 250000
+const BRACKET_COLORS = ['var(--green)', '#C8A830', 'var(--amber)', '#C05C35', 'var(--red)']
+// Derived from the canonical ATO brackets in lib/tax.ts (tracked by the
+// assumptions watchdog) so the display never drifts from the tax engine.
+const BRACKETS = TAX_THRESHOLDS_2425.map((lo, i) => ({
+  lo,
+  hi: TAX_THRESHOLDS_2425[i + 1] ?? DISPLAY_MAX,
+  label: TAX_RATES_2425[i] === 0 ? 'Nil' : `${Math.round(TAX_RATES_2425[i] * 100)}%`,
+  color: BRACKET_COLORS[i],
+}))
 
 function BracketBar({ gross }: { gross: number }) {
   const capped = Math.min(gross, DISPLAY_MAX)

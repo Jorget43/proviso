@@ -1,13 +1,16 @@
 import { prisma } from '@/lib/db'
-import { authorize } from '@/lib/rbac'
+import { withErrors } from '@/lib/apiHandler'
+import { authorize, requireAdultRead } from '@/lib/rbac'
 import { NextRequest } from 'next/server'
 
 export async function GET() {
+  const gate = await requireAdultRead()
+  if (!gate.ok) return gate.res
   const parcels = await prisma.investmentParcel.findMany({ orderBy: { id: 'asc' } })
   return Response.json(parcels)
 }
 
-export async function POST(request: NextRequest) {
+export const POST = withErrors(async (request: NextRequest) => {
   const gate = await authorize('budget:write')
   if (!gate.ok) return gate.res
   const body = await request.json()
@@ -23,4 +26,4 @@ export async function POST(request: NextRequest) {
     },
   })
   return Response.json(parcel, { status: 201 })
-}
+})

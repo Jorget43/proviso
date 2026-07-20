@@ -1,6 +1,8 @@
 const CURRENT_YEAR = new Date().getFullYear()
 const CONCESSIONAL_CAP_BASE = 30_000   // FY25
-const DIV293_THRESHOLD      = 250_000
+// Canonical home for the Div 293 threshold (tracked by lib/watchdog.ts). Other
+// modules (e.g. lib/eofy.ts) import this rather than re-declaring it.
+export const DIV293_THRESHOLD = 250_000
 
 export interface SuperInputs {
   currentBalance:          number

@@ -1,9 +1,10 @@
 import { prisma } from '@/lib/db'
+import { withErrors } from '@/lib/apiHandler'
 import { authorize } from '@/lib/rbac'
 import { NextResponse } from 'next/server'
 
 // Reset onboarding so the wizard can be re-run
-export async function POST() {
+export const POST = withErrors(async () => {
   const gate = await authorize('budget:write')
   if (!gate.ok) return gate.res
   await prisma.householdSettings.update({
@@ -11,4 +12,4 @@ export async function POST() {
     data:  { onboardingDone: false },
   })
   return NextResponse.json({ ok: true })
-}
+})

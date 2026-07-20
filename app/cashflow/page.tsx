@@ -1,6 +1,6 @@
 export const dynamic = 'force-dynamic'
 import { prisma } from '@/lib/db'
-import { requireSession } from '@/lib/auth'
+import { requireAdult } from '@/lib/auth'
 import { calcAfterTax } from '@/lib/tax'
 import { toMonthly } from '@/lib/formatting'
 import { CATS, PPL_MONTHLY, PPL_MONTHS } from '@/lib/constants'
@@ -10,7 +10,7 @@ import CashflowLineChart from '@/components/cashflow/CashflowLineChart'
 import IncVsExpChart from '@/components/cashflow/IncVsExpChart'
 
 export default async function CashflowPage() {
-  await requireSession()
+  await requireAdult()
   const [income, expenses, person2Phases, assets, hs, projSettings, annualExpenses] = await Promise.all([
     prisma.incomeSettings.findUniqueOrThrow({ where: { id: 1 } }),
     prisma.expense.findMany(),

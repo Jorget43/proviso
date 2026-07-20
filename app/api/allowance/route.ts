@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db'
+import { withErrors } from '@/lib/apiHandler'
 import { getSession } from '@/lib/auth'
 import { authorize } from '@/lib/rbac'
 
@@ -18,7 +19,7 @@ export async function GET(req: Request) {
   return Response.json({ schedule })
 }
 
-export async function PUT(req: Request) {
+export const PUT = withErrors(async (req: Request) => {
   const gate = await authorize('budget:write')
   if (!gate.ok) return gate.res
 
@@ -31,4 +32,4 @@ export async function PUT(req: Request) {
     update: { amount: Number(amount), dayOfWeek: Number(dayOfWeek ?? 5) },
   })
   return Response.json({ schedule })
-}
+})

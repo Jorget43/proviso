@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic'
 import Link from 'next/link'
 import { prisma } from '@/lib/db'
-import { requireSession } from '@/lib/auth'
+import { requireAdult } from '@/lib/auth'
 import Panel from '@/components/ui/Panel'
 import { fmt } from '@/lib/formatting'
 import {
@@ -22,7 +22,7 @@ interface EofyMember {
 }
 
 export default async function EofyPage() {
-  await requireSession()
+  await requireAdult()
   const fyEnding = currentFinancialYearEnding()
   const fyLabel  = `FY${fyEnding - 1}–${String(fyEnding).slice(2)}`
 

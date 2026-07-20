@@ -1,26 +1,49 @@
 'use client'
 import { useEffect, useState } from 'react'
 
-const STORAGE_KEY = 'proviso_seen_version'
+// Two independent notices, at most one shown at a time:
+//   - "available"  an newer GitHub release exists (CFO-only, driven by the
+//                  VersionCheck scheduler). Takes priority.
+//   - "updated"    this deployment's version changed since last seen — a
+//                  one-time post-update acknowledgement for any role.
+const SEEN_KEY = 'proviso_seen_version'
+const DISMISSED_UPDATE_KEY = 'proviso_dismissed_update'
 
-export default function UpdateBanner({ currentVersion }: { currentVersion: string }) {
-  const [show, setShow] = useState(false)
+type Mode = 'none' | 'available' | 'updated'
+
+export default function UpdateBanner({
+  currentVersion,
+  latestVersion = null,
+}: {
+  currentVersion: string
+  latestVersion?: string | null
+}) {
+  const [mode, setMode] = useState<Mode>('none')
 
   useEffect(() => {
     if (currentVersion === 'dev') return
-    if (localStorage.getItem(STORAGE_KEY) !== currentVersion) setShow(true)
-  }, [currentVersion])
+    if (latestVersion) {
+      if (localStorage.getItem(DISMISSED_UPDATE_KEY) !== latestVersion) {
+        setMode('available')
+        return
+      }
+    }
+    if (localStorage.getItem(SEEN_KEY) !== currentVersion) setMode('updated')
+  }, [currentVersion, latestVersion])
 
   function dismiss() {
-    localStorage.setItem(STORAGE_KEY, currentVersion)
-    setShow(false)
+    if (mode === 'available' && latestVersion) localStorage.setItem(DISMISSED_UPDATE_KEY, latestVersion)
+    if (mode === 'updated') localStorage.setItem(SEEN_KEY, currentVersion)
+    setMode('none')
   }
 
-  if (!show) return null
+  if (mode === 'none') return null
+
+  const available = mode === 'available'
 
   return (
     <div style={{
-      background: 'var(--blue-lt)',
+      background: available ? 'var(--amber-lt)' : 'var(--blue-lt)',
       borderBottom: '1px solid var(--border)',
       padding: '7px 16px',
       display: 'flex',
@@ -28,8 +51,10 @@ export default function UpdateBanner({ currentVersion }: { currentVersion: strin
       gap: 10,
       fontSize: '0.8rem',
     }}>
-      <span style={{ color: 'var(--blue)', fontWeight: 600 }}>
-        Proviso updated to {currentVersion}
+      <span style={{ color: available ? 'var(--amber)' : 'var(--blue)', fontWeight: 600 }}>
+        {available
+          ? `Proviso ${latestVersion} is available — you're on ${currentVersion}`
+          : `Proviso updated to ${currentVersion}`}
       </span>
       <button
         onClick={dismiss}

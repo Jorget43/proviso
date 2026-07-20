@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db'
+import { withErrors } from '@/lib/apiHandler'
 import { authorize } from '@/lib/rbac'
 import { hashPassword } from '@/lib/auth'
 
@@ -13,7 +14,7 @@ async function wouldRemoveLastCfo(targetId: number, newRole?: string): Promise<b
   return cfoCount <= 1
 }
 
-export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
+export const PUT = withErrors(async (req: Request, { params }: { params: Promise<{ id: string }> }) => {
   const gate = await authorize('users:write')
   if (!gate.ok) return gate.res
   const id = parseInt((await params).id)
@@ -45,9 +46,9 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     select: { id: true, name: true, username: true, role: true, email: true },
   })
   return Response.json(user)
-}
+})
 
-export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+export const DELETE = withErrors(async (_req: Request, { params }: { params: Promise<{ id: string }> }) => {
   const gate = await authorize('users:write')
   if (!gate.ok) return gate.res
   const id = parseInt((await params).id)
@@ -61,4 +62,4 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
 
   await prisma.user.delete({ where: { id } }) // sessions cascade
   return new Response(null, { status: 204 })
-}
+})

@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db'
+import { withErrors } from '@/lib/apiHandler'
 import { authorize } from '@/lib/rbac'
 import { hashPassword } from '@/lib/auth'
 
@@ -17,7 +18,7 @@ export async function GET() {
   return Response.json(users)
 }
 
-export async function POST(req: Request) {
+export const POST = withErrors(async (req: Request) => {
   const gate = await authorize('users:write')
   if (!gate.ok) return gate.res
 
@@ -47,4 +48,4 @@ export async function POST(req: Request) {
     select: { id: true, name: true, username: true, role: true },
   })
   return Response.json(user, { status: 201 })
-}
+})

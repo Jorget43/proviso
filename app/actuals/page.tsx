@@ -1,10 +1,10 @@
 export const dynamic = 'force-dynamic'
 import { prisma } from '@/lib/db'
-import { requireSession } from '@/lib/auth'
+import { requireAdult } from '@/lib/auth'
 import ActualsClient from '@/components/actuals/ActualsClient'
 
 export default async function ActualsPage() {
-  await requireSession()
+  await requireAdult()
   const [txns, rules, suggStates, expenses, actualsSettings] = await Promise.all([
     prisma.transaction.findMany({ orderBy: { importedAt: 'asc' } }),
     prisma.categoriationRule.findMany({ orderBy: { id: 'asc' } }),

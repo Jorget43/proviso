@@ -1,13 +1,16 @@
 import { NextRequest } from 'next/server'
+import { withErrors } from '@/lib/apiHandler'
 import { prisma } from '@/lib/db'
-import { authorize } from '@/lib/rbac'
+import { authorize, requireAdultRead } from '@/lib/rbac'
 
 export async function GET() {
+  const gate = await requireAdultRead()
+  if (!gate.ok) return gate.res
   const row = await (prisma.rentSettings as any).findUnique({ where: { id: 1 } })
   return Response.json(row ?? {})
 }
 
-export async function PUT(req: NextRequest) {
+export const PUT = withErrors(async (req: NextRequest) => {
   const gate = await authorize('budget:write')
   if (!gate.ok) return gate.res
   const body = await req.json()
@@ -42,4 +45,4 @@ export async function PUT(req: NextRequest) {
     },
   })
   return Response.json(row)
-}
+})

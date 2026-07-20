@@ -1,9 +1,10 @@
 import { prisma } from '@/lib/db'
+import { withErrors } from '@/lib/apiHandler'
 import { authorize } from '@/lib/rbac'
 import { computeMonthlyRepayment, monthsUntil } from '@/lib/mortgage'
 import { NextResponse } from 'next/server'
 
-export async function POST(req: Request) {
+export const POST = withErrors(async (req: Request) => {
   const gate = await authorize('budget:write')
   if (!gate.ok) return gate.res
   const {
@@ -148,4 +149,4 @@ export async function POST(req: Request) {
   })
 
   return NextResponse.json({ ok: true })
-}
+})
