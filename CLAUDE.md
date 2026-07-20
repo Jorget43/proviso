@@ -217,12 +217,30 @@ Items 1–4 shipped. Item 5 not yet built.
 - **`components/projections/NetWorthChart.tsx`**: gained an "Actual net worth" overlay series (`historyLabels`/`historyData` props) — bucketed to one point per calendar year in `ProjectionsClient.tsx`, anchored to the live baseline (`initNW`) for the current year until the first auto-snapshot lands, so it's always continuous with where the projected line starts
 - **`components/projections/NetWorthHistoryPanel.tsx`**: snapshot list + manual add/delete, in a new "Projection accuracy" panel on `/projections`
 
+### Phase 14 — API hardening: read-path authz, input validation, engine tests (shipped 2026-07-20, tag `v1.5.0`)
+
+- **Deployment**: CI (`test` → `build-and-push`) green on `master` @ `6df49a3`; image `ghcr.io/jorget43/proviso:v1.5.0` + `:latest` pushed. **Watchtower rolls it out to the NAS at 3am AEST tonight (2026-07-21)** — no manual action.
+- **Read-path authz** (closed the biggest gap): `requireAdult()` (`lib/auth.ts`) on all 9 adult pages redirects CHILD to `/child`; `app/page.tsx` too. `requireAdultRead()` (`lib/rbac.ts`) — 401 unauth / 403 CHILD — guards the ~21 household-data GET routes. `/api/version` stays public by design.
+- **Uniform errors + validation**: `lib/apiHandler.ts` (`withErrors` HOF wraps ~47 mutating handlers; `parseBody` + `ApiError`; Prisma P2025→404 / P2002→409 / P2003→400; opaque 500 with server-side log — no internals leaked). `lib/schemas.ts` — per-model zod schemas, `.partial()` so unknown keys are stripped before Prisma, `.finite()` rejects NaN/Infinity.
+- **Engine tests**: `vitest` + `vitest.config.ts` (`@/` alias, `test`/`test:watch` scripts). 42 tests across `tax`/`cgt`/`childcare`/`help`/`netWorth` pin ATO 2024-25 outputs. CI `test` job now gates `build-and-push` — a broken FY calculation blocks release.
+- **FY-constant dedup**: `DIV293_THRESHOLD` exported once from `lib/super.ts`; `lib/eofy.ts` `BRACKET_THRESHOLDS` and `IncomePanel.tsx` display brackets both derive from canonical `TAX_THRESHOLDS_2425`.
+- **Auto-update banner wired end-to-end**: `startVersionCheckScheduler()` registered in `instrumentation.ts`; `app/layout.tsx` + `UpdateBanner.tsx` now show an amber "vX available — you're on vY" notice (CFO-only, dismissible per tag).
+- **Security review (2026-07-20)**: focused review of the v1.5.0 diff found no new HIGH/MEDIUM vulnerabilities — the changeset reduces attack surface.
+
+#### Backlog (deferred from Phase 14)
+
+- **`super.ts` / `projections.ts` tests** — the flagship engines remain untested; they take large input fixtures, so a follow-up should add scenario fixtures rather than inline assertions.
+- **`Transaction(date)` index** — the one table that grows; add `@@index` when import volume warrants it.
+- **SQLite `busy_timeout` / write-retry wrapper** — only if concurrent-write errors ever surface.
+- **`import type` for client-bundled engines** — `tax.ts`/`super.ts`/`cgt.ts` ship to the browser as real calls; trim to type-only imports where a component needs only the types.
+- **Concessional-cap reconciliation** — `super.ts` projection formula vs `superHistory.ts` legislated lookup remain two models (watchdog flags them as a paired sync point); reconciling changes behaviour, so out of scope for a dedup pass.
+
 ## Security checklist for new features
 
 > When designing features that handle user data, add new routes, or touch auth — read [`docs/security-privacy-legal.md`](docs/security-privacy-legal.md) for the full legal, privacy, and cybersecurity context first.
 
-- [ ] Writes to DB → has `authorize()` guard; update the 51-handler count
-- [ ] Reads sensitive data → behind `requireSession()`
-- [ ] Accepts user input → validated/sanitised before use
+- [ ] Writes to DB → has `authorize()` guard; wrap the handler in `withErrors` (`lib/apiHandler.ts`)
+- [ ] Reads household/sensitive data → GET behind `requireAdultRead()` (`lib/rbac.ts`); adult pages use `requireAdult()`
+- [ ] Accepts user input → `parseBody(req, schema)` with a zod schema in `lib/schemas.ts` (`.partial()` for updates, `.finite()` on numbers)
 - [ ] Renders user-supplied text → no `dangerouslySetInnerHTML`; use React's escaping
 - [ ] Sends data off-device → explicit user consent; document in privacy policy
