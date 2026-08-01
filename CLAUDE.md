@@ -101,7 +101,8 @@ Key classes: `.page`, `.banner` + `.b-item/.b-label/.b-value`, `.metrics`, `.mc`
 
 ## Docker & deployment
 
-- **`Dockerfile`** — 3-stage build: `deps` (npm ci) → `builder` (prisma generate + next build) → `runner` (node:20-alpine, standalone)
+- **`Dockerfile`** — 4-stage build: `deps` (npm ci) → `builder` (prisma generate + next build) → `pruner` (`npm prune --omit=dev`) → `runner` (node:20-slim, standalone). The runner takes `node_modules` from `pruner`, not `builder`, so devDependencies (vitest/vite/esbuild-as-test-runner, typescript, eslint, tailwind, `@types/*`) never ship to production. **The prune must stay a prune of the builder's tree, not a fresh `npm ci --omit=dev`** — the generated Prisma client lives in `node_modules/.prisma` and a clean install wouldn't contain it (npm leaves dot-dirs like `.prisma`/`.bin` alone).
+- **`tsx` is a runtime dependency, not a devDependency** — `docker-entrypoint.sh` runs `prisma db seed` (`tsx prisma/seed.ts`) on first boot, so pruning it would break first-run seeding. Same for `prisma` (CLI, used by `migrate deploy` on every start). Don't "tidy" either back into devDependencies.
 - **`docker-entrypoint.sh`** — backs up `/data/proviso.db` (3 rolling `.bak` files), then `prisma migrate deploy` on every start; `prisma db seed` only on first run. Does NOT `set -e`: migrate failure logs a warning and the app starts anyway (hardened 2026-06-13 after a P3009 failed-migration record wedged every boot). Restore: `docker exec proviso cp /data/proviso.YYYYMMDD_HHMMSS.bak /data/proviso.db && docker restart proviso`
 - **`docker-compose.yml`** — service/container `proviso`; volume `proviso-db` at `/data`; `DATABASE_URL=file:/data/proviso.db`
 - **`next.config.ts`** — `output: 'standalone'`

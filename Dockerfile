@@ -16,7 +16,17 @@ ENV DATABASE_URL="file:/data/proviso.db"
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
 
-# ── Stage 3: runner ────────────────────────────────────────────────────────
+# ── Stage 3: prune ─────────────────────────────────────────────────────────
+# Strip devDependencies (vitest/vite/esbuild, typescript, eslint, tailwind,
+# @types/*) so they never reach the runtime image. This prunes the builder's
+# tree in place rather than doing a fresh `npm ci --omit=dev`, because the
+# Prisma client generated above lives in node_modules/.prisma and a clean
+# install would not contain it. npm leaves dot-directories alone, so .prisma
+# and .bin survive the prune.
+FROM builder AS pruner
+RUN npm prune --omit=dev
+
+# ── Stage 4: runner ────────────────────────────────────────────────────────
 FROM node:20-slim AS runner
 WORKDIR /app
 
@@ -37,9 +47,11 @@ COPY --from=builder /app/.next/standalone            ./
 COPY --from=builder /app/.next/static                ./.next/static
 COPY --from=builder /app/public                      ./public
 
-# Full node_modules copied AFTER standalone so prisma CLI, tsx, and
-# their deps overwrite the standalone's trimmed subset
-COPY --from=builder /app/node_modules               ./node_modules
+# Production node_modules copied AFTER standalone so the prisma CLI, tsx, and
+# their deps overwrite the standalone's trimmed subset. Both are runtime deps
+# here: docker-entrypoint.sh runs `prisma migrate deploy` on every start and
+# `prisma db seed` (tsx prisma/seed.ts) on first run.
+COPY --from=pruner /app/node_modules                ./node_modules
 COPY --from=builder /app/prisma                     ./prisma
 COPY --from=builder /app/package.json               ./package.json
 COPY --from=builder /app/tsconfig.json              ./tsconfig.json
