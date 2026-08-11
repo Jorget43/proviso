@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import Panel from '@/components/ui/Panel'
 import { fmt } from '@/lib/formatting'
 import {
@@ -9,6 +9,7 @@ import {
   CARRY_FORWARD_YEARS,
   CARRY_FORWARD_TSB_LIMIT,
   type SuperHistoryRow,
+  type CarryForwardResult,
 } from '@/lib/superHistory'
 
 export interface SuperHistoryItem extends SuperHistoryRow {
@@ -18,9 +19,13 @@ export interface SuperHistoryItem extends SuperHistoryRow {
 interface Props {
   members:     string[]
   initialRows: SuperHistoryItem[]
+  // Reports each member's computed carry-forward outcome whenever it
+  // changes, so a parent (SuperClient) can feed usable headroom into the
+  // super projection engine instead of computing it a second time.
+  onCarryForward?: (result: Record<string, CarryForwardResult>) => void
 }
 
-export default function ConcessionalCarryForward({ members, initialRows }: Props) {
+export default function ConcessionalCarryForward({ members, initialRows, onCarryForward }: Props) {
   const [rowsByMember, setRowsByMember] = useState<Record<string, SuperHistoryItem[]>>(() => {
     const grouped: Record<string, SuperHistoryItem[]> = Object.fromEntries(members.map(m => [m, []]))
     for (const r of initialRows) (grouped[r.member] ??= []).push(r)
@@ -28,6 +33,12 @@ export default function ConcessionalCarryForward({ members, initialRows }: Props
   })
 
   const currentFy = currentFinancialYearEnding()
+
+  const cfByMember = useMemo(
+    () => Object.fromEntries(members.map(m => [m, computeCarryForward(m, rowsByMember[m] ?? [])])),
+    [members, rowsByMember],
+  )
+  useEffect(() => { onCarryForward?.(cfByMember) }, [cfByMember, onCarryForward])
 
   const upsert = async (member: string, body: SuperHistoryRow) => {
     const res = await fetch('/api/super-history', {
@@ -94,7 +105,7 @@ export default function ConcessionalCarryForward({ members, initialRows }: Props
 
       {members.map((member, i) => {
         const rows = rowsByMember[member] ?? []
-        const cf   = computeCarryForward(member, rows)
+        const cf   = cfByMember[member]
         const windowFull = rows.filter(r =>
           r.financialYearEnding >= currentFy - CARRY_FORWARD_YEARS && r.financialYearEnding < currentFy
         ).length >= CARRY_FORWARD_YEARS

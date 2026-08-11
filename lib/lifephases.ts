@@ -3,6 +3,8 @@
 // endYear >= 2090 is treated as "ongoing indefinitely" (displayed as ∞ in UI, stored as 2100 in DB)
 // oneoff phases: monthlyAmt is the total lump sum (not monthly × 12)
 
+import { MODEL_BASE_YEAR } from './constants';
+
 export interface LifePhase {
   id:          number;
   name:        string;
@@ -51,6 +53,7 @@ export function lifePhaseCostForYear(
   phases:            LifePhase[],
   inflRate:          number,
   childcareInflRate: number = inflRate,
+  baseYear:          number = MODEL_BASE_YEAR,
 ): number {
   let total = 0;
 
@@ -65,7 +68,9 @@ export function lifePhaseCostForYear(
        p.name.toLowerCase().includes('school care'));
 
     const rate = isChildcare ? childcareInflRate : inflRate;
-    const mult = Math.pow(1 + rate / 100, yr - 2026);
+    // DEFAULT_LIFE_PHASES amounts are denominated as of MODEL_BASE_YEAR — see
+    // its doc comment in lib/constants.ts.
+    const mult = Math.pow(1 + rate / 100, yr - baseYear);
 
     if (p.type === 'oneoff') {
       total += p.monthlyAmt * mult;

@@ -9,7 +9,7 @@ import { simulateMortgageYear, computeMonthlyRepayment } from './mortgage';
 import { schoolFeesForYear, type FeeSchedule } from './schoolFees';
 import { lifePhaseCostForYear } from './lifephases';
 import type { LifePhase }       from './lifephases';
-import { PARTNER_FTE, PPL_MONTHLY, PPL_MONTHS } from './constants';
+import { PARTNER_FTE, PPL_MONTHLY, PPL_MONTHS, NEAR_TERM_INFLATION_HORIZON } from './constants';
 
 export interface WorkPhase {
   year: number;
@@ -162,7 +162,7 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
 
   const cy          = currentYear;
   const labels      = Array.from({ length: projYears }, (_, i) => String(cy + i + 1));
-  const sorted      = getSortedPhases(person2Phases);
+  const sorted      = getSortedPhases(person2Phases.length > 0 ? person2Phases : [{ year: cy, days: 5 }]);
   const sortedPerson1 = getSortedPhases(person1Phases.length > 0 ? person1Phases : [{ year: cy, days: 5 }]);
   const leaveSt     = new Set(sorted.filter(p => p.days === 0).map(p => p.year));
 
@@ -177,7 +177,7 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
   const mRate  = mortRate     / 100;
 
   function inflRateForYear(yr: number): number {
-    return yr <= 2028 ? eINear : eI;
+    return yr <= NEAR_TERM_INFLATION_HORIZON ? eINear : eI;
   }
 
   // Gross base salaries for projection

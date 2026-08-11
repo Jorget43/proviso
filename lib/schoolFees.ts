@@ -1,3 +1,5 @@
+import { MODEL_BASE_YEAR } from './constants';
+
 export interface FeeLevel {
   tuition: number;
   fixed:   number;
@@ -44,9 +46,12 @@ export function schoolFeesForYear(
   c2ExitIdx:  number,
   inflRate:   number,
   schedule:   FeeSchedule = SF_BASE,
+  baseYear:   number = MODEL_BASE_YEAR,
 ): SchoolFeeYear {
   const levels = Object.keys(schedule);
-  const mult   = Math.pow(1 + inflRate / 100, yr - new Date().getFullYear());
+  // Inflation compounds from the schedule's data vintage (MODEL_BASE_YEAR), not
+  // the wall clock — see MODEL_BASE_YEAR's doc comment in lib/constants.ts.
+  const mult   = Math.pow(1 + inflRate / 100, yr - baseYear);
   const c1Idx  = yr - c1Start;
   const c2Idx  = yr - c2Start;
   const c1Active = c1Idx >= 0 && c1Idx < levels.length && c1Idx <= c1ExitIdx;

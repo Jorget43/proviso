@@ -130,11 +130,14 @@ export const ASSUMPTIONS: Assumption[] = [
     id: 'concessional-cap',
     label: 'Concessional contributions cap',
     category: 'Super',
-    authority: 'ABS',
+    authority: 'ATO',
     authorityUrl: 'https://www.ato.gov.au/individuals-and-families/super/growing-and-keeping-track-of-your-super/caps-on-super-contributions/concessional-contributions-cap',
-    location: 'lib/super.ts → CONCESSIONAL_CAP_BASE; lib/superHistory.ts → LEGISLATIVE_CONCESSIONAL_CAP',
-    currentValue: '$30,000 (FY24-25 & FY25-26)',
-    calibratedFyEnding: 2026,
+    // Single source of truth as of Phase 15 (2026-08-11) — lib/super.ts's
+    // formerly-separate AWOTE estimate was removed; it now imports
+    // legislativeCap() from here instead of maintaining its own.
+    location: 'lib/superHistory.ts → LEGISLATIVE_CONCESSIONAL_CAP',
+    currentValue: '$32,500 (FY26-27), verified ato.gov.au 2026-08-11',
+    calibratedFyEnding: 2027,
     reviewTrigger: 'Indexed to AWOTE in $2,500 steps; AWOTE released ~Feb; change effective 1 July',
     indexed: true,
     notes: 'When AWOTE confirms a step, add the next FY to LEGISLATIVE_CONCESSIONAL_CAP.',

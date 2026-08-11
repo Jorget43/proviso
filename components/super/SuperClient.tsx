@@ -6,6 +6,7 @@ import {
   type HouseholdSuperInputs,
   type ProjectionContext,
 } from '@/lib/super'
+import type { CarryForwardResult } from '@/lib/superHistory'
 import SuperBanner from './SuperBanner'
 import SuperBalanceChart from './SuperBalanceChart'
 import SuperProjectionTable from './SuperProjectionTable'
@@ -36,12 +37,33 @@ type Field = keyof HouseholdSuperInputs
 export default function SuperClient({ canEdit, initial, context, mortgage, budgetAnnualSpend, person1Name, person2Name, superHistory, isRenting, rentMonthly }: Props) {
   const [inputs, setInputs] = useState<HouseholdSuperInputs>(initial)
   const [saving, setSaving]  = useState(false)
+  // Reported by ConcessionalCarryForward as the user edits their history —
+  // NOT persisted (carry-forward is derived from SuperHistory rows, not a
+  // saved setting), only used to feed usable headroom into the projection.
+  const [cfByMember, setCfByMember] = useState<Record<string, CarryForwardResult>>({})
 
   const set = useCallback((field: Field, value: number | boolean) => {
     setInputs(prev => ({ ...prev, [field]: value }))
   }, [])
 
-  const result = useMemo(() => runHouseholdProjection(inputs, context), [inputs, context])
+  // Fold each person's usable (TSB-eligible) carry-forward headroom into the
+  // projection inputs. Without this, the projection could flag capHit on a
+  // contribution the carry-forward panel says is within reach — see
+  // CLAUDE.md's Phase 15 notes on the concessional-cap reconciliation.
+  const inputsWithCarryForward = useMemo<HouseholdSuperInputs>(() => {
+    const p1cf = cfByMember[person1Name]
+    const p2cf = cfByMember[person2Name]
+    return {
+      ...inputs,
+      person1CapCarryForward: p1cf?.eligible ? p1cf.availableCarryForward : 0,
+      person2CapCarryForward: p2cf?.eligible ? p2cf.availableCarryForward : 0,
+    }
+  }, [inputs, cfByMember, person1Name, person2Name])
+
+  const result = useMemo(
+    () => runHouseholdProjection(inputsWithCarryForward, context),
+    [inputsWithCarryForward, context],
+  )
 
   async function save() {
     setSaving(true)
@@ -366,6 +388,7 @@ export default function SuperClient({ canEdit, initial, context, mortgage, budge
           <ConcessionalCarryForward
             members={inputs.partnerEnabled ? [person1Name, person2Name] : [person1Name]}
             initialRows={superHistory}
+            onCarryForward={setCfByMember}
           />
         </ReadOnlyFence>
       </div>

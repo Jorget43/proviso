@@ -16,6 +16,37 @@ export const PARTNER_FTE = 100000;
 export const PPL_MONTHLY = 1373;
 export const PPL_MONTHS = 4;
 
+/**
+ * Calendar year in which all default cost figures are denominated — the
+ * school fee schedule (lib/schoolFees.ts SF_BASE / lib/educationCosts.ts
+ * presets) and life-phase monthly amounts (lib/lifephases.ts). Inflation
+ * multipliers compound FROM this year, not from the wall clock: a projection
+ * run in 2030 must produce the same 2035 fee as a run in 2026 — the fee is a
+ * property of the data's vintage, not of when the simulation happens to run.
+ *
+ * Note lib/educationCosts.ts cites 2025 source figures; 2026 is the
+ * deliberate, conservative choice here (understates by one year of
+ * compounding rather than overstating) — and it keeps this constant a
+ * verified no-op against the wall clock as of the date it was introduced
+ * (Phase 15, 2026-08-11).
+ *
+ * This is a DATA-VINTAGE anchor, distinct from a RUN-START anchor (e.g.
+ * lib/super.ts's `startYear`, which genuinely is "today" and must be
+ * injected per-call rather than hardcoded here).
+ */
+export const MODEL_BASE_YEAR = 2026;
+
+/**
+ * Calendar year beyond which lib/projections.ts's near-term expense
+ * inflation rate (`expInflNear`) stops applying and the long-run rate
+ * (`expInfl`) takes over. Currently a hardcoded horizon, not derived from
+ * `currentYear` — lifted to a named constant so the boundary is visible and
+ * testable (see tests/projections.test.ts S2), NOT to change behaviour.
+ * Once `currentYear >= this`, `expInflNear` becomes a dead UI control; that
+ * is a separate, visible decision for a future phase.
+ */
+export const NEAR_TERM_INFLATION_HORIZON = 2028;
+
 
 export const LUMPY_KW = [
   'council', 'rates', 'rego', 'registration', 'holiday', 'annual insurance', 'car insur',

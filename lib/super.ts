@@ -1,5 +1,5 @@
-const CURRENT_YEAR = new Date().getFullYear()
-const CONCESSIONAL_CAP_BASE = 30_000   // FY25
+import { legislativeCap, currentFinancialYearEnding } from './superHistory'
+
 // Canonical home for the Div 293 threshold (tracked by lib/watchdog.ts). Other
 // modules (e.g. lib/eofy.ts) import this rather than re-declaring it.
 export const DIV293_THRESHOLD = 250_000
@@ -16,6 +16,23 @@ export interface SuperInputs {
   inflationRate:           number
   salaryGrowthRate:        number
   desiredRetirementIncome: number
+  // Run-start calendar year, for SuperRow.year. Genuinely "now" — unlike
+  // MODEL_BASE_YEAR (lib/constants.ts), this must be injected per-call, not
+  // hardcoded. Defaults to the wall clock when omitted so existing callers
+  // (there is exactly one: lib/super.ts's own runHouseholdProjection) are
+  // unaffected.
+  startYear?:              number
+  // Run-start financial-year-ending (e.g. 2027 for FY2026-27), used for the
+  // concessional cap lookup — see lib/superHistory.ts's legislativeCap.
+  // Distinct from startYear: FY-ending and calendar year are frequently NOT
+  // the same number for "now" (e.g. August 2026 is calendar year 2026 but
+  // FY-ending 2027). Defaults to currentFinancialYearEnding() when omitted.
+  startFyEnding?:          number
+  // First-year concessional cap top-up from carry-forward headroom (unused
+  // cap from the last 5 FYs, when eligible — see computeCarryForward in
+  // lib/superHistory.ts). Applied only in the run's first accumulation year;
+  // 0/omitted preserves prior behaviour.
+  firstYearCapBonus?:      number
 }
 
 export interface SuperRow {
@@ -34,6 +51,10 @@ export interface SuperRow {
   presentValue:    number
   capHit:          boolean
   div293:          boolean
+  // Financial-year-ending this row's concessional cap was looked up against
+  // — see SuperInputs.startFyEnding. Always populated (accumulation and
+  // drawdown), even though only accumulation rows use it for the cap.
+  fyEnding:        number
 }
 
 export interface SuperResult {
@@ -65,6 +86,13 @@ export interface HouseholdSuperInputs {
   person2Balance:             number
   person2RetirementAge:       number
   person2AdditionalContribs:  number
+
+  // Concessional cap carry-forward headroom (unused cap from the last 5 FYs,
+  // usable only when TSB-eligible — see computeCarryForward in
+  // lib/superHistory.ts). Applied to each person's first projection year
+  // only. 0/omitted preserves prior behaviour (no carry-forward applied).
+  person1CapCarryForward?:    number
+  person2CapCarryForward?:    number
 }
 
 export interface ProjectionContext {
@@ -74,6 +102,12 @@ export interface ProjectionContext {
   person2Age:          number
   person2Salary:       number
   person2SalaryGrowth: number
+  // Run-start calendar year — see SuperInputs.startYear. Threaded through to
+  // both persons' SuperInputs so they share one run-start rather than each
+  // independently defaulting to the wall clock.
+  startYear?:          number
+  // Run-start financial-year-ending — see SuperInputs.startFyEnding.
+  startFyEnding?:      number
 }
 
 export interface CombinedRow {
@@ -96,12 +130,6 @@ export interface HouseholdSuperResult {
   monthlyIncomeGoal:         number
 }
 
-// Concessional cap grows with AWOTE (~3.5 %), rounded to nearest $2,500
-function concessionalCap(yearsFromNow: number): number {
-  const raw = CONCESSIONAL_CAP_BASE * Math.pow(1.035, yearsFromNow)
-  return Math.round(raw / 2500) * 2500
-}
-
 export function runSuperProjection(inputs: SuperInputs): SuperResult {
   const {
     currentBalance, currentAge, retirementAge,
@@ -109,6 +137,10 @@ export function runSuperProjection(inputs: SuperInputs): SuperResult {
     additionalContribs, fundFeePercent,
     inflationRate, salaryGrowthRate, desiredRetirementIncome,
   } = inputs
+
+  const startYear     = inputs.startYear ?? new Date().getFullYear()
+  const startFyEnding  = inputs.startFyEnding ?? currentFinancialYearEnding()
+  const firstYearCapBonus = inputs.firstYearCapBonus ?? 0
 
   const rows: SuperRow[] = []
   let balance = currentBalance
@@ -118,13 +150,16 @@ export function runSuperProjection(inputs: SuperInputs): SuperResult {
   // ── Accumulation phase ────────────────────────────────────────────────────
   for (let age = currentAge; age < retirementAge; age++) {
     const yearsFromNow = age - currentAge
-    const year = CURRENT_YEAR + yearsFromNow
+    const year     = startYear + yearsFromNow
+    const fyEnding = startFyEnding + yearsFromNow
 
     const earnings    = balance * investmentReturn
     const earningsTax = earnings * 0.15
 
     const gross        = salary * sgRate + additionalContribs
-    const cap          = concessionalCap(yearsFromNow)
+    // Carry-forward headroom (unused cap from the last 5 FYs) applies only
+    // in the run's first year — see computeCarryForward in lib/superHistory.ts.
+    const cap          = legislativeCap(fyEnding) + (yearsFromNow === 0 ? firstYearCapBonus : 0)
     const contribution = Math.min(gross, cap)
     const capHit       = gross > cap
 
@@ -140,7 +175,7 @@ export function runSuperProjection(inputs: SuperInputs): SuperResult {
       balance, earnings, earningsTax,
       contribution, contributionTax,
       fees, drawdown: 0,
-      salary, presentValue, capHit, div293,
+      salary, presentValue, capHit, div293, fyEnding,
     })
 
     salary *= (1 + salaryGrowthRate)
@@ -157,7 +192,8 @@ export function runSuperProjection(inputs: SuperInputs): SuperResult {
   // ── Drawdown (pension) phase — earnings completely tax-free ───────────────
   for (let age = retirementAge; age < 100; age++) {
     const yearsFromNow = age - currentAge
-    const year         = CURRENT_YEAR + yearsFromNow
+    const year         = startYear + yearsFromNow
+    const fyEnding     = startFyEnding + yearsFromNow
 
     const earnings  = balance * investmentReturn
     const fees      = balance * fundFeePercent
@@ -171,7 +207,7 @@ export function runSuperProjection(inputs: SuperInputs): SuperResult {
       earnings, earningsTax: 0,
       contribution: 0, contributionTax: 0,
       fees, drawdown,
-      salary: 0, presentValue,
+      salary: 0, presentValue, fyEnding,
       capHit: false, div293: false,
     })
 
@@ -202,6 +238,11 @@ export function runHouseholdProjection(
   // Each person funds half the household income goal
   const perPersonIncome = inputs.desiredRetirementIncome / (inputs.partnerEnabled ? 2 : 1)
 
+  // Resolve once and thread through both persons, so they share a single
+  // run-start rather than each independently reading the wall clock.
+  const startYear     = ctx.startYear ?? new Date().getFullYear()
+  const startFyEnding  = ctx.startFyEnding ?? currentFinancialYearEnding()
+
   const p1Inputs: SuperInputs = {
     currentBalance:          inputs.person1Balance,
     currentAge:              ctx.person1Age,
@@ -214,6 +255,8 @@ export function runHouseholdProjection(
     inflationRate:           inputs.inflationRate,
     salaryGrowthRate:        ctx.person1SalaryGrowth,
     desiredRetirementIncome: perPersonIncome,
+    startYear, startFyEnding,
+    firstYearCapBonus:       inputs.person1CapCarryForward ?? 0,
   }
   const p1Result = runSuperProjection(p1Inputs)
 
@@ -221,7 +264,7 @@ export function runHouseholdProjection(
     const combined: CombinedRow[] = p1Result.rows.map(r => ({
       year:           r.year,
       person1Age:     r.age,
-      person2Age:     ctx.person2Age + (r.year - CURRENT_YEAR),
+      person2Age:     ctx.person2Age + (r.year - startYear),
       person1Balance: r.balance,
       person2Balance: 0,
       total:          r.balance,
@@ -250,6 +293,8 @@ export function runHouseholdProjection(
     inflationRate:           inputs.inflationRate,
     salaryGrowthRate:        ctx.person2SalaryGrowth,
     desiredRetirementIncome: perPersonIncome,
+    startYear, startFyEnding,
+    firstYearCapBonus:       inputs.person2CapCarryForward ?? 0,
   }
   const p2Result = runSuperProjection(p2Inputs)
 
@@ -265,7 +310,7 @@ export function runHouseholdProjection(
   ])).sort((a, b) => a - b)
 
   const combined: CombinedRow[] = allYears.map(year => {
-    const yearsFromNow = year - CURRENT_YEAR
+    const yearsFromNow = year - startYear
     const b1  = p1ByYear[year]?.balance ?? 0
     const b2  = p2ByYear[year]?.balance ?? 0
     const total = b1 + b2
@@ -284,12 +329,12 @@ export function runHouseholdProjection(
   // Depletion: first year total balance hits zero
   const depletionRow         = combined.find(c => c.total <= 0)
   const combinedDepletionAge = depletionRow
-    ? ctx.person1Age + (depletionRow.year - CURRENT_YEAR)
+    ? ctx.person1Age + (depletionRow.year - startYear)
     : null
 
   // Combined balance at the later retirement year
-  const p1RetYear  = CURRENT_YEAR + (inputs.person1RetirementAge - ctx.person1Age)
-  const p2RetYear  = CURRENT_YEAR + (inputs.person2RetirementAge - ctx.person2Age)
+  const p1RetYear  = startYear + (inputs.person1RetirementAge - ctx.person1Age)
+  const p2RetYear  = startYear + (inputs.person2RetirementAge - ctx.person2Age)
   const laterRetYear = Math.max(p1RetYear, p2RetYear)
   const atRetirement = combined.find(c => c.year === laterRetYear) ?? combined[combined.length - 1]
 
