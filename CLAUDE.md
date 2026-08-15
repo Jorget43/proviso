@@ -129,7 +129,8 @@ All migrations must be **additive only** — Watchtower applies them automatical
 - `parsed.y` in Chart.js tooltip callbacks is typed as `number | null` — always null-coalesce it.
 - `.github/workflows/docker.yml` was found missing while still tracked in git (cause unknown). If CI says no workflow exists, run `git checkout HEAD -- .github/workflows/docker.yml`.
 - After adding a dependency, run `npm install` and commit the updated lockfile — `npm ci` fails if `package.json` and `package-lock.json` diverge.
-- The workflow runs on `master` AND `v*` tags — do not change to tags-only or routine pushes will stop deploying.
+- The workflow runs on `master` AND `v*` tags — do not change to tags-only or routine pushes will stop deploying. Both triggers push `:latest`, so every release runs `build-and-push` twice and whichever finishes last wins `:latest` — this is intentional (rolling `:latest` between releases), not a bug to "fix" by removing a trigger.
+- `PROVISO_VERSION` derivation (`Determine version` step): a tag push bakes the tag name verbatim; a `master` push bakes `git describe --tags --always` instead of the literal branch name — it resolves to the release tag itself when `master` and the tag share a commit, or `<tag>-<n>-g<sha>` for untagged commits ahead of the last release. Never let this fall back to `GITHUB_REF_NAME` directly — a bare `master`/`main` is not a version and breaks the update banner's "you're on X" text.
 
 ## Auth & RBAC
 
@@ -162,7 +163,7 @@ All migrations must be **additive only** — Watchtower applies them automatical
 - `components/ui/UpdateBanner.tsx` — dismissible CFO-only amber banner with copy-paste update command
 - `GET /api/version` — public, no auth
 - `instrumentation.ts` — version check runs on startup for all deployments
-- Every release must be tagged — untagged images build as `dev` and the banner never fires for users
+- Every release must be tagged — the `dev` fallback in `PROVISO_VERSION` only applies to a local (non-CI) `docker build` with no `--build-arg`; CI-built images always carry a real version string (see Common pitfalls, `PROVISO_VERSION` derivation)
 
 ### Phase 9 — Auth enhancements (items 1–3 shipped 2026-06-13; item 4 shipped 2026-06-14)
 
