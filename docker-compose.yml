@@ -11,10 +11,8 @@ services:
         PROVISO_VERSION: ${PROVISO_VERSION:-dev}
     container_name: proviso
     restart: unless-stopped
-    labels:
-      - "com.centurylinklabs.watchtower.enable=true"
     ports:
-      - "3000:3000"
+      - "${PROVISO_PORT:-3000}:3000"   # override in .env if 3000 is taken on your host
     volumes:
       - proviso-db:/data
     environment:
@@ -32,18 +30,9 @@ services:
       # - RESEND_API_KEY=re_...
       # - RESEND_FROM_EMAIL=onboarding@resend.dev
 
-  # ── Watchtower — automatic image updates ─────────────────────────────────
-  # Checks GHCR daily at 3 am (TZ). When a new proviso image lands, pulls and
-  # restarts the container automatically. No user action required.
-  watchtower:
-    image: containrrr/watchtower
-    container_name: watchtower
-    restart: unless-stopped
-    environment:
-      - TZ=Australia/Sydney   # change to your local timezone if needed
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-    command: --schedule "0 0 3 * * *" proviso
+# Auto-updates: run ./update.sh on a schedule (cron / systemd timer / Unraid
+# User Scripts) rather than a Watchtower sidecar — see README.md "Updates"
+# for why, and docker-compose.watchtower.yml for the optional alternative.
 
 volumes:
   proviso-db:

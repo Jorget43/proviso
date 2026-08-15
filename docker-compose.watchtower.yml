@@ -1,0 +1,24 @@
+# Optional, advanced: event-driven updates via Watchtower instead of the
+# scheduled `update.sh` script. Layer this on top of the base compose file:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.watchtower.yml up -d
+#
+# GHCR rejects Watchtower's anonymous update check (403 on an anonymous HEAD
+# request, even for a public image), so this requires authenticating the
+# host to GHCR first — see README.md "Updates" for why and for the
+# `docker login` step. Skip this file entirely unless you specifically want
+# near-instant updates and don't mind managing a (read-only) PAT.
+services:
+  watchtower:
+    image: containrrr/watchtower
+    container_name: watchtower
+    restart: unless-stopped
+    environment:
+      - TZ=Australia/Sydney   # change to your local timezone
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Requires `docker login ghcr.io -u <user> -p <read:packages PAT>` on
+      # the host first. Override DOCKER_CONFIG_PATH in .env if your
+      # docker config.json lives somewhere other than the default below.
+      - ${DOCKER_CONFIG_PATH:-/root/.docker/config.json}:/config.json:ro
+    command: --schedule "0 0 3 * * *" proviso

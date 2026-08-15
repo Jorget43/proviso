@@ -31,48 +31,42 @@ No source code required. The latest image is published to GHCR on every push to 
 docker run -d \
   --name proviso \
   --restart unless-stopped \
-  -v proviso-data:/data \
+  -v proviso-db:/data \
   -p 3000:3000 \
   ghcr.io/jorget43/proviso:latest
 ```
 
-Or with Docker Compose — save this as `docker-compose.yml` and run `docker compose up -d`:
-
-```yaml
-services:
-  proviso:
-    image: ghcr.io/jorget43/proviso:latest
-    container_name: proviso
-    restart: unless-stopped
-    labels:
-      - "com.centurylinklabs.watchtower.enable=true"
-    ports:
-      - "3000:3000"
-    volumes:
-      - proviso-data:/data
-    environment:
-      - DATABASE_URL=file:/data/proviso.db
-      - NODE_ENV=production
-      # Optional — set COOKIE_SECURE=true when running behind HTTPS (e.g. Tailscale Serve)
-      # - COOKIE_SECURE=true
-
-  watchtower:
-    image: containrrr/watchtower
-    container_name: watchtower
-    restart: unless-stopped
-    environment:
-      - TZ=Australia/Sydney   # change to your local timezone if needed
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-    command: --schedule "0 0 3 * * *" proviso   # 3 am daily
-
-volumes:
-  proviso-data:
-```
-
-Updates are automatic — Watchtower checks for a new image at 3 am and restarts Proviso in place. Users see a dismissible in-app banner on their next visit.
+Or use the `docker-compose.yml` in this repo — `docker compose up -d` (no build needed, it pulls the image by default).
 
 First visit creates the initial **CFO** account at `/setup`; thereafter the app requires login.
+
+## Updates
+
+Run `./update.sh` on a schedule instead of a Watchtower sidecar. It's two lines — `docker compose pull proviso && docker compose up -d proviso` — and `up -d` only recreates the container when the image actually changed, so a no-op night is silent, not a restart.
+
+We tried Watchtower first and don't recommend it here: it checks for updates with an anonymous `HEAD` request, and GHCR returns `403 Forbidden` on that specific request even for a fully public image (`GET` works fine — that's exactly what `docker compose pull` uses). Watchtower then fails silently, with nothing surfaced except its own debug logs — this ran undetected for two months on our own deployment before anyone noticed the version banner was stale. `update.sh` doesn't hit that code path at all, so it has no equivalent failure mode, and it needs no registry credentials.
+
+Schedule it however your platform prefers:
+
+```cron
+# crontab -e — 3am daily
+0 3 * * * /path/to/proviso/update.sh >> /var/log/proviso-update.log 2>&1
+```
+
+**Unraid**: install the *User Scripts* plugin (Community Applications), add a new script pointing at `update.sh`, set its schedule to daily.
+
+**systemd**: a timer unit calling `update.sh` works too if you'd rather not use cron.
+
+### Advanced: instant updates via Watchtower
+
+If you'd rather have updates land the moment they're published instead of on a schedule, and don't mind managing a credential:
+
+```bash
+docker login ghcr.io -u <your-github-username> -p <PAT-with-read:packages-scope>   # once, on the host
+docker compose -f docker-compose.yml -f docker-compose.watchtower.yml up -d
+```
+
+The PAT isn't for *access* — the image is already public — it's a workaround for GHCR rejecting Watchtower's anonymous HEAD check specifically; an authenticated request doesn't hit the same wall. See `docker-compose.watchtower.yml` for details. If you ever suspect it's not working, `docker logs watchtower` will show `auth: "not present"` / `403 Forbidden` on every failed check.
 
 ## Deployment (Docker — build from source)
 

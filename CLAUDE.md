@@ -110,7 +110,7 @@ Key classes: `.page`, `.banner` + `.b-item/.b-label/.b-value`, `.metrics`, `.mc`
 
 ### Migration policy
 
-All migrations must be **additive only** — Watchtower applies them automatically on restart, so a bad migration lands on every user's DB simultaneously:
+All migrations must be **additive only** — `update.sh` (or Watchtower, if opted in) restarts the container automatically on a new image, so a bad migration lands on every user's DB simultaneously:
 - ✅ Add new columns (`ALTER TABLE ... ADD COLUMN ... DEFAULT ...`)
 - ✅ Add new tables, indexes, foreign keys
 - ❌ Never drop columns or tables
@@ -123,7 +123,7 @@ All migrations must be **additive only** — Watchtower applies them automatical
 1. Run `node_modules/next/dist/bin/next build` locally to catch TS errors before CI.
 2. Commit and push to `master` — CI builds and pushes `ghcr.io/jorget43/proviso:latest`.
 3. Tag significant releases: `git tag -a v1.x.0 -m "..."` then `git push origin v1.x.0` — also pushes `ghcr.io/jorget43/proviso:<tag>`.
-4. **No manual NAS update needed.** Watchtower is configured with `--schedule "0 0 3 * * *" --tz Australia/Sydney` and pulls + restarts the container automatically at 3am AEST each night. Do NOT tell the user to run `docker compose pull && docker compose up -d` — that's Watchtower's job.
+4. **No manual NAS update needed *if `update.sh` is scheduled* (see Phase 16).** Do not default to recommending Watchtower — GHCR returns `403 Forbidden` on Watchtower's anonymous `HEAD`-based digest check even for a public image, so it fails silently forever (logs `Failed=0` on every no-op run) unless authenticated with a PAT. **Confirmed live 2026-08-15**: this NAS ran a June-15 build for two months undetected before anyone noticed the version banner was stale. `update.sh` (`docker compose pull proviso && docker compose up -d proviso`, scheduled via cron/systemd timer/Unraid User Scripts) has no equivalent failure mode — `pull` is a plain anonymous `GET`, which always works — and needs no credentials. Watchtower + PAT remains available as an opt-in for instant-vs-scheduled updates (`docker-compose.watchtower.yml`, README.md § Advanced).
 
 **Common pitfalls:**
 - `parsed.y` in Chart.js tooltip callbacks is typed as `number | null` — always null-coalesce it.
@@ -152,7 +152,7 @@ All migrations must be **additive only** — Watchtower applies them automatical
 
 ### Phase 7 — Hosting accessibility
 
-- **Tier 1 (shipped 2026-06-14):** Docker one-liner — `docker run -d --name proviso --restart unless-stopped -v proviso-data:/data -p 3000:3000 ghcr.io/jorget43/proviso:latest`. `docker-compose.yml` uses `image: ghcr.io/jorget43/proviso:latest` so no source code is needed on the NAS. Subsequent updates are automatic via Watchtower (see Release workflow). Documented in `README.md`.
+- **Tier 1 (shipped 2026-06-14):** Docker one-liner — `docker run -d --name proviso --restart unless-stopped -v proviso-db:/data -p 3000:3000 ghcr.io/jorget43/proviso:latest`. `docker-compose.yml` uses `image: ghcr.io/jorget43/proviso:latest` so no source code is needed on the NAS. Subsequent updates: `update.sh` on a schedule by default since Phase 16 (Watchtower is an opt-in alternative, not the default — see Release workflow and Phase 16). Documented in `README.md`.
 - **Tier 2:** Tauri desktop app — `.dmg`/`.exe`, SQLite in OS app-support dir, cross-compile via GitHub Actions
 - **Tier 3:** Managed SaaS — $60/yr, isolated SQLite per household, "export and leave" guarantee
 - See [`docs/security-privacy-legal.md`](docs/security-privacy-legal.md) for data sovereignty constraints that shape Tier 3 design
@@ -246,6 +246,16 @@ Items 1–4 shipped. Item 5 not yet built.
 - **SQLite `busy_timeout` / write-retry wrapper** — only if concurrent-write errors ever surface.
 - **`Transaction` index — corrected scope**: the model has no `date` column (`dateStr`/`ym`/`importedAt` only). The only filtered queries are FY-window scans on `ym` (`app/api/work-expenses/scan/route.ts`, `app/api/donations/scan/route.ts`); a candidate would be `@@index([ym])`, not `date`. The two hottest reads (`app/actuals/page.tsx`, `actuals/commit/route.ts`) are unfiltered full-table loads ordered by `importedAt` that no index on `ym` would help. Premature at household scale — revisit only if import volume actually warrants it.
 - ~~`import type` for client-bundled engines~~ — audited: already satisfied. Every type-only consumer of `tax.ts`/`super.ts`/`cgt.ts` uses `import type`; the components that import values genuinely call them at render time. No action needed.
+
+### Phase 16 — Auto-update: `update.sh` replaces Watchtower as the default (shipped 2026-08-15)
+
+- **Root cause found**: the household NAS was running a build from `master` two months stale (silently — the version banner showed a bare `master`, not even a version string) despite Watchtower running nightly the whole time. Two independent bugs compounded: (1) the release workflow baked `PROVISO_VERSION` from `GITHUB_REF_NAME` directly, so the `master`-branch-triggered build (both `master` pushes and `v*` tag pushes fire `build-and-push`, see Common pitfalls) baked the literal string `master` instead of a version; (2) Watchtower's update check does an anonymous `HEAD` request against the manifest, which GHCR rejects with `403 Forbidden` **even for a fully public image** — Watchtower's fallback full pull then *also* fails "unauthorized" via the same anonymous path, and it logs `Failed=0` on every one of these no-op runs, so nothing ever signalled the failure.
+- **Bug 1 fixed** (`.github/workflows/docker.yml`, `Determine version` step): non-tag pushes now bake `git describe --tags --always` instead of the bare ref name — resolves to the release tag itself when `master` and the tag share a commit, or `<tag>-<n>-g<sha>` for untagged commits ahead of the last release. Needs `fetch-depth: 0` on checkout so `git describe` can see tags.
+- **Bug 2 — Watchtower demoted from default to opt-in.** Root-caused via Watchtower's own debug logs (`auth: "not present"`, `403 Forbidden` on the HEAD request) and confirmed by testing a plain `docker pull` anonymously from the NAS, which succeeded — proving the image's public visibility was never the issue, only Watchtower's specific check mechanism. Authenticating Watchtower to GHCR (`docker login` + mounting `~/.docker/config.json`) does fix it, but a PAT-per-self-hoster is real onboarding friction and a slightly worse trust story for a "your data never leaves your hardware" product — not something to default every future user into.
+- **New default**: `update.sh` (repo root, executable) — `docker compose pull proviso && docker compose up -d proviso`, scheduled via cron/systemd timer/Unraid User Scripts. No registry credentials (plain anonymous `GET`, always works against a public image); `up -d` only recreates the container when the pulled image actually changed, so an unchanged night is a silent no-op, not a restart — reproduces Watchtower's "only restart when needed" behaviour via Compose's own reconciliation, no custom diffing logic required.
+- **`docker-compose.yml`** no longer includes a `watchtower` service. It moved to **`docker-compose.watchtower.yml`**, an optional overlay (`docker compose -f docker-compose.yml -f docker-compose.watchtower.yml up -d`) documented as "Advanced: instant updates" in `README.md`, for self-hosters who want event-driven updates and don't mind managing a `read:packages`-scoped PAT.
+- **NAS recovery notes** (this deployment specifically, not general product guidance): the running `proviso` container had been hand-created via a bare `docker run` (not the repo's compose file — no compose file existed anywhere on the NAS's persistent storage, `find` across `/mnt/user`, `/mnt/cache`, `/boot/config`, `/root`, `/home` came up empty), so Unraid's Docker UI showed it as "3rd Party" with no Edit/Force-Update option. Recreated directly from `docker inspect proviso`'s captured config (network, port, named volume `root_proviso-db`, env) via `docker stop`/`rm`/`run` — `docker rm` without `-v` never touches named volumes, so this is safe to repeat. Migrations `0028`→`0029` applied cleanly against the two-months-old DB on first boot of the recreated container, confirming the volume reattached correctly rather than starting fresh.
+- **Zero migrations.**
 
 ## Security checklist for new features
 
