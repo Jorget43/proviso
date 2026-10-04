@@ -51,8 +51,8 @@ describe('runProjections — S1 homeowner baseline (all dials at 0)', () => {
     expect(withFees).toBeNull()
   })
 
-  it('income is flat: 2 × calcAfterTax(120000) = 2 × 90812 (pinned in tests/tax.test.ts:74)', () => {
-    expect(base.incArr).toEqual([181624, 181624, 181624, 181624, 181624])
+  it('income is flat: 2 × calcAfterTax(120000) = 2 × 91080 (pinned in tests/tax.test.ts)', () => {
+    expect(base.incArr).toEqual([182160, 182160, 182160, 182160, 182160])
   })
 
   it('expenses are flat with no inflation: 8000 × 12', () => {
@@ -60,7 +60,7 @@ describe('runProjections — S1 homeowner baseline (all dials at 0)', () => {
   })
 
   it('deficit is income minus expense, flat', () => {
-    expect(base.deficitArr).toEqual([85624, 85624, 85624, 85624, 85624])
+    expect(base.deficitArr).toEqual([86160, 86160, 86160, 86160, 86160])
   })
 
   it('mortgage stress: 3000 × 12 / 240000 × 100 = 15%, flat (no growth)', () => {
@@ -85,10 +85,10 @@ describe('runProjections — S1 homeowner baseline (all dials at 0)', () => {
   })
 
   it('CHARACTERIZED: mortgage/cash trajectory from the monthly offset loop', () => {
-    expect(base.mortArr).toEqual([382186, 357993, 327026, 291177, 255177])
-    expect(base.cashArr).toEqual([135624, 221248, 306872, 392496, 478120])
+    expect(base.mortArr).toEqual([382171, 357929, 326877, 291010, 255010])
+    expect(base.cashArr).toEqual([136160, 222320, 308480, 394640, 480800])
     expect(base.investArr).toEqual([0, 0, 0, 0, 0])
-    expect(base.nwArr).toEqual([563438, 673255, 789846, 911319, 1032943])
+    expect(base.nwArr).toEqual([563989, 674391, 791603, 913630, 1035790])
   })
 })
 
@@ -160,9 +160,9 @@ describe('runProjections — S4 renter transitioning to owner at year 3 (2029)',
   })
 
   it('CHARACTERIZED: post-purchase mortgage/cash/nw trajectory', () => {
-    expect(base.mortArr).toEqual([0, 0, 621090, 598573, 572225])
-    expect(base.cashArr).toEqual([105624, 161248, 200828, 240408, 279988])
-    expect(base.nwArr).toEqual([115624, 171248, 389738, 451835, 517763])
+    expect(base.mortArr).toEqual([0, 0, 621009, 598372, 571865])
+    expect(base.cashArr).toEqual([106160, 162320, 202436, 242552, 282668])
+    expect(base.nwArr).toEqual([116160, 172320, 391427, 454180, 520803])
   })
 })
 
@@ -173,22 +173,22 @@ describe('runProjections — S4b purchase deposit funded from investments (12% C
 
   it('deducts the deposit plus a 12% haircut from accumulated investments, then resumes investing', () => {
     // Pre-purchase, 100% of surplus is invested each year at 0% return:
-    // investArr[0] = surplus_2027 = 55624; investArr[1] = 55624×2 = 111248
-    expect(base.investArr[0]).toBe(55624)
-    expect(base.investArr[1]).toBe(111248)
-    // At purchase: 111248 − 50000 (deposit) − 6000 (12% haircut on 50000) = 55248,
-    // then this year's own surplus (39580, since sR=100%) is invested on top:
-    // 55248 + 39580 = 94828
-    expect(base.investArr[2]).toBe(94828)
+    // investArr[0] = surplus_2027 = 56160; investArr[1] = 56160×2 = 112320
+    expect(base.investArr[0]).toBe(56160)
+    expect(base.investArr[1]).toBe(112320)
+    // At purchase: 112320 − 50000 (deposit) − 6000 (12% haircut on 50000) = 56320,
+    // then this year's own surplus (40116, since sR=100%) is invested on top:
+    // 56320 + 40116 = 96436
+    expect(base.investArr[2]).toBe(96436)
   })
 
   it('never goes negative even when the deposit exceeds accumulated investments', () => {
     const clamped = runProjections(
       renterBuyingIn(3, { savingsRate: 100, investReturn: 0, depositFromInvestments: 200_000 }),
     ).base
-    // Accumulated (111248) is entirely consumed by the oversized deposit + haircut,
-    // clamped to 0 (never negative), then the same year's surplus (39580) is added.
-    expect(clamped.investArr[2]).toBe(39580)
+    // Accumulated (112320) is entirely consumed by the oversized deposit + haircut,
+    // clamped to 0 (never negative), then the same year's surplus (40116) is added.
+    expect(clamped.investArr[2]).toBe(40116)
     expect(clamped.investArr.every(v => v >= 0)).toBe(true)
   })
 })
@@ -208,10 +208,10 @@ describe('runProjections — S5 parental leave', () => {
     expect(off.leaveYrs).toEqual([2028]) // still recorded as a leave year, just unpaid
   })
 
-  it('return year is taxed at the pro-rated (3/5) gross: calcAfterTax(72000) = 58172', () => {
-    // (45000-18200)*0.16 + (72000-45000)*0.30 = 4288 + 8100 = 12388 tax; LITO 0 above 66667
-    // medicare 72000*0.02 = 1440; afterTax = 72000 - 12388 - 1440 = 58172
-    expect(base.person2Arr[2]).toBe(58172)
+  it('return year is taxed at the pro-rated (3/5) gross: calcAfterTax(72000) = 58440', () => {
+    // (45000-18200)*0.15 + (72000-45000)*0.30 = 4020 + 8100 = 12120 tax; LITO 0 above 66667
+    // medicare 72000*0.02 = 1440; afterTax = 72000 - 12120 - 1440 = 58440
+    expect(base.person2Arr[2]).toBe(58440)
   })
 
   it('mortgage stress rises in the leave year (household gross income falls)', () => {
@@ -233,7 +233,7 @@ describe('runProjections — S5b two consecutive leave years (PPL edge case)', (
     expect(base.leaveYrs).toEqual([2027, 2028])
     expect(base.person2Arr[0]).toBe(Math.round(calcAfterTax(PPL_TOTAL))) // 2027 — first leave year, PPL paid
     expect(base.person2Arr[1]).toBe(0)    // 2028 — still on leave, no PPL
-    expect(base.person2Arr[2]).toBe(90812) // 2029 — back full-time
+    expect(base.person2Arr[2]).toBe(91080) // 2029 — back full-time
   })
 })
 
@@ -265,7 +265,7 @@ describe('runProjections — S6 school fees on, sfInfl=0 (schedule figures appea
 
   it('CHARACTERIZED: fee-adjusted expense/mortgage/cash trajectory', () => {
     expect(withFees!.expArr).toEqual([101850, 105350, 111100, 114150, 116000])
-    expect(withFees!.nwArr).toEqual([557424, 657259, 757342, 859858, 961482])
+    expect(withFees!.nwArr).toEqual([557975, 658395, 759099, 862217, 964377])
   })
 })
 
@@ -295,12 +295,12 @@ describe('runProjections — S7 HELP clearing', () => {
     expect(base.person1HelpClearedYr).toBeNull()
   })
 
-  it('deducts the full statutory repayment in year 1: calcAfterTax(120000,true) = 90812 - 8400', () => {
-    expect(base.person2Arr[0]).toBe(82412)
+  it('deducts the full statutory repayment in year 1: calcAfterTax(120000,true) = 91080 - 7571', () => {
+    expect(base.person2Arr[0]).toBe(83509)
   })
 
-  it('the clearing year deducts only the residual owed (600), not the full repayment', () => {
-    expect(base.person2Arr[1]).toBe(90212) // 90812 − 600
+  it('the clearing year deducts only the residual owed (1429), not the full repayment', () => {
+    expect(base.person2Arr[1]).toBe(89651) // 91080 − 1429
   })
 
   it('counts the outstanding HELP balance as a debt in net worth', () => {
@@ -308,12 +308,12 @@ describe('runProjections — S7 HELP clearing', () => {
     const noLoan = { mortBalance: 0, mortPayment: 0 }
     const noHelp = runProjections(makeProjectionInputs(noLoan)).base
     const withHelp = runProjections(makeProjectionInputs({ ...noLoan, person2HasHELP: true, person2HELPBalance: 9_000 })).base
-    // End of year 1: 600 still owed, and 8400 less take-home than without HELP.
-    expect(noHelp.nwArr[0] - withHelp.nwArr[0]).toBe(600 + 8400)
+    // End of year 1: 1429 still owed, and 7571 less take-home than without HELP.
+    expect(noHelp.nwArr[0] - withHelp.nwArr[0]).toBe(1429 + 7571)
   })
 
   it('once cleared, income returns to the no-HELP figure', () => {
-    expect(base.person2Arr[2]).toBe(90812)
+    expect(base.person2Arr[2]).toBe(91080)
   })
 })
 
@@ -321,8 +321,8 @@ describe('runProjections — S8 deficit year', () => {
   // 17k + the 3k mortgage repayment = 20k/month = 240k/yr of expenses.
   const { base } = runProjections(makeProjectionInputs({ baseMonthlyExpenses: 17_000 }))
 
-  it('runs a flat deficit: 181624 - 240000 = -58376', () => {
-    expect(base.deficitArr).toEqual([-58376, -58376, -58376, -58376, -58376])
+  it('runs a flat deficit: 182160 - 240000 = -57840', () => {
+    expect(base.deficitArr).toEqual([-57840, -57840, -57840, -57840, -57840])
   })
 
   it('cash floors at zero and never goes negative', () => {
@@ -358,13 +358,13 @@ describe('runProjections — S10 empty phase arrays (crash regression)', () => {
   it('does not throw with an empty person2Phases (falls back to 5 days/week, matching the person1 fallback)', () => {
     expect(() => runProjections(makeProjectionInputs({ person2Phases: [] }))).not.toThrow()
     const { base } = runProjections(makeProjectionInputs({ person2Phases: [] }))
-    expect(base.person2Arr).toEqual([90812, 90812, 90812, 90812, 90812])
+    expect(base.person2Arr).toEqual([91080, 91080, 91080, 91080, 91080])
     expect(base.leaveYrs).toEqual([])
   })
 
   it('does not throw with an empty person1Phases either (symmetry)', () => {
     expect(() => runProjections(makeProjectionInputs({ person1Phases: [] }))).not.toThrow()
     const { base } = runProjections(makeProjectionInputs({ person1Phases: [] }))
-    expect(base.person1Arr).toEqual([90812, 90812, 90812, 90812, 90812])
+    expect(base.person1Arr).toEqual([91080, 91080, 91080, 91080, 91080])
   })
 })

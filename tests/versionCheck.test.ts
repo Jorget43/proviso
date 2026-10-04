@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { isUpdateAvailable } from '@/lib/versionCheck'
+import { isUpdateAvailable, latestReleaseTag } from '@/lib/versionCheck'
 
 describe('isUpdateAvailable', () => {
   it('flags a strictly newer release', () => {
@@ -29,5 +29,20 @@ describe('isUpdateAvailable', () => {
     expect(isUpdateAvailable('dev', 'v1.6.0')).toBe(false)
     expect(isUpdateAvailable('abc1234', 'v1.6.0')).toBe(false)
     expect(isUpdateAvailable('v1.6.0', '')).toBe(false)
+  })
+})
+
+describe('latestReleaseTag', () => {
+  it('picks the highest version numerically, whatever order the API returns', () => {
+    expect(latestReleaseTag(['v1.7.1', 'v1.10.0', 'v1.8.0', 'v1.9.2'])).toBe('v1.10.0')
+  })
+
+  it('ignores suffixed and non-version tags', () => {
+    expect(latestReleaseTag(['v2.0.0-rc1', 'nightly', 'v1.8.0'])).toBe('v1.8.0')
+  })
+
+  it('returns null when there is no release tag', () => {
+    expect(latestReleaseTag([])).toBeNull()
+    expect(latestReleaseTag(['latest'])).toBeNull()
   })
 })

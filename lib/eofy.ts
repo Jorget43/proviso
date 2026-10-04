@@ -5,7 +5,7 @@
 // sacrifice. This module owns the salary-sacrifice maths and the season gate;
 // HELP and carry-forward maths live in lib/help.ts and lib/superHistory.ts.
 
-import { marginalRate, TAX_THRESHOLDS_2425 } from './tax'
+import { marginalRate, TAX_THRESHOLDS } from './tax'
 import { DIV293_THRESHOLD } from './super'
 
 // EOFY run-up: May and June (HELP indexes 1 June, contributions close 30 June).
@@ -14,10 +14,10 @@ export function isEofySeason(now: Date = new Date()): boolean {
   return month === 5 || month === 6
 }
 
-// Bracket thresholds where the marginal rate steps up above the 16% band —
+// Bracket thresholds where the marginal rate steps up above the 15% band —
 // derived from the canonical ATO brackets in lib/tax.ts (drops the $0 and
 // $18,200 boundaries, which aren't realistic salary-sacrifice targets).
-const BRACKET_THRESHOLDS = TAX_THRESHOLDS_2425.slice(2)
+const BRACKET_THRESHOLDS = TAX_THRESHOLDS.slice(2)
 
 export interface SalarySacrificeInsight {
   grossSalary:          number

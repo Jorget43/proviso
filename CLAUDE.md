@@ -95,7 +95,7 @@ EOFY is seasonal — surfaced via May/June `◷ EOFY` pill in `TopNav`, reachabl
 - **`@/*` alias** maps to `./` (project root), not `./src/`
 - **Server vs client**: server components fetch from Prisma directly; `'use client'` for anything interactive or using Chart.js
 - **Optimistic updates**: all CRUD hits state first, then API — no loading spinners
-- **Tax engine** (`lib/tax.ts`): ATO 2024–25 Stage 3 brackets, LITO, Medicare, HELP repayments
+- **Tax engine** (`lib/tax.ts`): FY2026-27 (`TAX_FY = 2027`) — resident brackets with the 15% bottom rate, LITO, Medicare levy with the single low-income shade-in, marginal HELP repayments (15c/17c bands, 10% of total income at the top). All figures are watchdog-tracked; update them together and bump `TAX_FY`. Applied flat across all projection years (not indexed). The 15% rate drops to 14% from 1 Jul 2027.
 - **Projection engine** (`lib/projections.ts`): 20-year dual simulation (with/without school fees), stepped inflation, monthly mortgage loop with live offset; renter mode with compound rent growth and optional purchase plan (deposit from cash/investments with ~12% CGT haircut, then mortgage via `computeMonthlyRepayment`)
   - **Mortgage repayments are modelled, not budgeted**: `baseMonthlyExpenses` passed to the engine EXCLUDES the Budget's mortgage line(s) (`cat === 'Home'` and name matching /mortgage/i — `ProjectionsClient` subtracts `budgetMortgageMonthly` while a loan is modelled). `simulateMortgageYear` pays `mortPayment` out of cash each month, never inflated, and stops the month the loan clears (partial final payment); `annualPaid` is added back into reported `expArr`. Don't put repayments back into the inflating expense base — that was the "phantom mortgage after payoff" bug. If `mortPayment` is 0 the Budget line is used as the scheduled payment.
   - **HELP for both people**, from real balances on the Debts tab (`findHelpDebt`), indexed yearly, repayment capped at the residual, outstanding balance subtracted from net worth. Results: `person1HelpClearedYr` / `person2HelpClearedYr`.
@@ -211,7 +211,7 @@ All migrations must be **additive only** — `update.sh` (or Watchtower, if opte
 
 ### Phase 8 — Update delivery (shipped 2026-06-13)
 
-- `lib/versionCheck.ts` — polls GitHub Releases daily 09:00 AEST; caches in `VersionCheck` table (migration `0015_version_check`)
+- `lib/versionCheck.ts` — polls the repo's git tags daily 09:00 AEST (highest plain `vX.Y.Z`; the repo publishes tags, not GitHub Releases); caches in `VersionCheck` table (migration `0015_version_check`)
 - `components/ui/UpdateBanner.tsx` — dismissible CFO-only amber banner with copy-paste update command
 - `GET /api/version` — public, no auth
 - `instrumentation.ts` — version check runs on startup for all deployments
@@ -335,7 +335,14 @@ Items 1–4 shipped. Item 5 not yet built.
 - **Failed saves are no longer silent**: `components/ui/SaveErrorToast.tsx` (mounted in the root layout) wraps `window.fetch` once and shows a plain-language notice + Reload for any failed same-origin mutation to `/api/*` except `/api/auth/*`. A screen that shows its own inline error sends `X-Handles-Errors: 1`. Create flows must check `res.ok` before appending a response to state.
 - **Validation everywhere**: every mutating route parses its body with a zod schema in `lib/schemas.ts` (ranges, ISO dates, length caps, unknown keys stripped; no raw body ever reaches Prisma — settings singletons used to accept arbitrary columns). `parseBody` turns failures into plain-language messages ("Amount must be at least 0"), shown to users by SaveErrorToast. Public auth routes are wrapped in `withErrors` so malformed input is a 400, not a 500.
 - **Lint is clean** (`npx eslint .` → 0 problems; was 44 errors). Notably the Projections `Slider` was declared inside the component (remounted on every change); it's now module-level.
-- **Not done here (known)**: the tax engine is still calibrated to FY2024-25 (incl. a simplified $26k Medicare cut-off) — watchdog flags it; the update banner reads GitHub *Releases* but the repo publishes tags only.
+- **Not done here (known)**: the tax engine was still calibrated to FY2024-25, and the update banner read GitHub *Releases* — both fixed in Phase 20.
+
+### Phase 20 — FY2026-27 tax engine, update banner (2026-10-05)
+
+- **Tax engine moved to FY2026-27** (`lib/tax.ts`): bottom rate 16% → 15%; Medicare low-income threshold $28,011 with the real 10c shade-in to $35,013 (was a $26k cliff); HELP now uses the marginal system — 15c per $1 over $69,528, $9,028 + 17c over $129,717, 10% of total income over $186,050 (was the old whole-income percentage table). Constants renamed `TAX_THRESHOLDS` / `TAX_RATES` (no year suffix); `TAX_FY` records the calibration year. Watchdog entries re-stamped to 2027. Medicare thresholds for FY2026-27 weren't announced yet, so the FY2025-26 (legislated) figures are used — the watchdog note says so.
+- Tests re-pinned deliberately (`tests/tax.test.ts`, projection fixtures): every hand-computed value is recomputed in its comment; characterised trajectories shift by exactly the tax saving.
+- **Update banner works again**: `lib/versionCheck.ts` reads `/repos/…/tags` and picks the highest plain `vX.Y.Z` (`latestReleaseTag`); `/releases/latest` always 404'd because the repo has no Releases.
+- **Still FY2024-25 (known)**: the CCS childcare parameters (`lib/childcare.ts`, `CCS_PARAMS_FY`).
 
 ## Security checklist for new features
 

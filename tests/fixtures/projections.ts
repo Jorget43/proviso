@@ -18,7 +18,7 @@ export const FX_YEAR = 2026
 
 export function makeProjectionInputs(overrides: Partial<ProjectionInputs> = {}): ProjectionInputs {
   return {
-    // ── Income: both on $120k so calcAfterTax(120000)=90812 (tests/tax.test.ts:74) is reused ──
+    // ── Income: both on $120k so calcAfterTax(120000)=91080 (tests/tax.test.ts) is reused ──
     person1FTE: 120_000,
     person2FTE: 120_000,
     taxMode: true,

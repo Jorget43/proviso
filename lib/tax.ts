@@ -1,21 +1,35 @@
-// 2024-25 Stage 3 tax brackets (effective 1 Jul 2024)
-// Source: ATO 2024-25, verified against paycalculator.com.au
+// Australian resident individual tax — FY2026-27 (1 Jul 2026 – 30 Jun 2027).
+// Every constant here is tracked by the assumptions watchdog (lib/watchdog.ts);
+// when a new FY's figures land, update them together and bump TAX_FY.
 
-export const TAX_THRESHOLDS_2425 = [0, 18200, 45000, 135000, 190000];
-export const TAX_RATES_2425      = [0, 0.16,  0.30,  0.37,   0.45];
-export const MEDICARE_RATE       = 0.02;
-export const MEDICARE_LOW_THRESH = 26000;
+// Financial year (ending) these figures are calibrated for.
+export const TAX_FY = 2027;
 
-// HELP repayment thresholds 2024-25 (ATO Schedule 1)
-export const HELP_THRESHOLDS: [number, number][] = [
-  [54435,  0.010], [62851,  0.020], [66621,  0.025], [70619,  0.030],
-  [74856,  0.035], [79347,  0.040], [84737,  0.045], [90143,  0.050],
-  [95674,  0.055], [101900, 0.060], [107000, 0.065], [114232, 0.070],
-  [121570, 0.075], [129813, 0.080], [138450, 0.085], [147175, 0.090],
-  [156631, 0.095], [167206, 0.100],
-];
+// Stage 3 scale with the 16% → 15% cut from 1 Jul 2026 (14% from 1 Jul 2027).
+export const TAX_THRESHOLDS = [0, 18200, 45000, 135000, 190000];
+export const TAX_RATES      = [0, 0.15,  0.30,  0.37,   0.45];
 
-// LITO 2024-25: max $700, phases out $37,500–$45,000 then $45,000–$66,667
+// Medicare levy: 2%, with the low-income reduction (single). No levy at or
+// below the lower threshold; between it and the upper threshold the levy is
+// 10c per $1 over the lower threshold (shade-in), which meets 2% at the upper
+// one. Family/senior thresholds and the surcharge aren't modelled.
+export const MEDICARE_RATE        = 0.02;
+export const MEDICARE_LOW_THRESH  = 28011;
+export const MEDICARE_SHADE_RATE  = 0.10;
+export const MEDICARE_UPPER_THRESH = 35013;
+
+// HELP compulsory repayments — marginal system (since FY2025-26). Nothing up
+// to the threshold; 15c per $1 above it; 17c per $1 above the second band;
+// above the top threshold, 10% of total repayment income.
+export const HELP_REPAY_THRESHOLD = 69528;
+export const HELP_BAND2_THRESHOLD = 129717;
+export const HELP_TOP_THRESHOLD   = 186050;
+export const HELP_BAND1_RATE      = 0.15;
+export const HELP_BAND2_RATE      = 0.17;
+export const HELP_TOP_RATE        = 0.10;
+
+// LITO: max $700, phases out $37,500–$45,000 (5c) then $45,000–$66,667 (1.5c).
+// Unchanged since 2020-21.
 export function calcLITO(gross: number): number {
   if (gross <= 37500) return 700;
   if (gross <= 45000) return 700 - (gross - 37500) * 0.05;
@@ -26,26 +40,27 @@ export function calcLITO(gross: number): number {
 // LMITO abolished from 2022-23 — not included
 
 export function calcHELPRepayment(gross: number): number {
-  for (let i = HELP_THRESHOLDS.length - 1; i >= 0; i--) {
-    if (gross >= HELP_THRESHOLDS[i][0]) return Math.round(gross * HELP_THRESHOLDS[i][1]);
-  }
-  return 0;
+  if (gross <= HELP_REPAY_THRESHOLD) return 0;
+  if (gross > HELP_TOP_THRESHOLD) return Math.round(gross * HELP_TOP_RATE);
+  const band1 = (Math.min(gross, HELP_BAND2_THRESHOLD) - HELP_REPAY_THRESHOLD) * HELP_BAND1_RATE;
+  const band2 = Math.max(0, gross - HELP_BAND2_THRESHOLD) * HELP_BAND2_RATE;
+  return Math.round(band1 + band2);
 }
 
 export function calcIncomeTax(gross: number): number {
   if (gross <= 0) return 0;
   let tax = 0;
-  for (let i = 0; i < TAX_THRESHOLDS_2425.length; i++) {
-    const lo = TAX_THRESHOLDS_2425[i];
-    const hi = i < TAX_THRESHOLDS_2425.length - 1 ? TAX_THRESHOLDS_2425[i + 1] : Infinity;
-    if (gross > lo) tax += (Math.min(gross, hi) - lo) * TAX_RATES_2425[i];
+  for (let i = 0; i < TAX_THRESHOLDS.length; i++) {
+    const lo = TAX_THRESHOLDS[i];
+    const hi = i < TAX_THRESHOLDS.length - 1 ? TAX_THRESHOLDS[i + 1] : Infinity;
+    if (gross > lo) tax += (Math.min(gross, hi) - lo) * TAX_RATES[i];
   }
   return Math.max(0, tax - calcLITO(gross));
 }
 
 export function calcMedicare(gross: number): number {
   if (gross <= MEDICARE_LOW_THRESH) return 0;
-  return gross * MEDICARE_RATE;
+  return Math.min(gross * MEDICARE_RATE, (gross - MEDICARE_LOW_THRESH) * MEDICARE_SHADE_RATE);
 }
 
 export function calcAfterTax(gross: number, hasHELP = false): number {
@@ -60,12 +75,12 @@ export function effectiveRate(gross: number, hasHELP = false): number {
   return (gross - calcAfterTax(gross, hasHELP)) / gross;
 }
 
-// Returns marginal rate including Medicare levy
+// Returns the bracket's marginal rate plus the full Medicare levy. Ignores the
+// LITO taper and the Medicare shade-in band — used for salary-sacrifice and
+// "pre-tax equivalent return" guidance, where the headline rate is what matters.
 export function marginalRate(gross: number): number {
-  const thresholds = [18200, 45000, 135000, 190000];
-  const rates      = [0.16,  0.30,  0.37,   0.45];
-  for (let i = thresholds.length - 1; i >= 0; i--) {
-    if (gross > thresholds[i]) return rates[i] + MEDICARE_RATE;
+  for (let i = TAX_THRESHOLDS.length - 1; i >= 1; i--) {
+    if (gross > TAX_THRESHOLDS[i]) return TAX_RATES[i] + MEDICARE_RATE;
   }
   return MEDICARE_RATE;
 }

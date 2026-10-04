@@ -57,26 +57,26 @@ describe('HELP for Person 1', () => {
 
   it('deducts the compulsory repayment from Person 1 take-home', () => {
     expect(base.person1Arr[0]).toBe(Math.round(calcAfterTax(120_000) - calcHELPRepayment(120_000)))
-    expect(base.person2Arr[0]).toBe(90_812) // Person 2 unaffected
+    expect(base.person2Arr[0]).toBe(91_080) // Person 2 unaffected
   })
 
   it('clears and reports the year for Person 1 only', () => {
     expect(base.person1HelpClearedYr).toBe(2028)
     expect(base.person2HelpClearedYr).toBeNull()
-    expect(base.person1Arr[2]).toBe(90_812)
+    expect(base.person1Arr[2]).toBe(91_080)
   })
 
   it('ignores a balance when HELP is off for that person', () => {
     const off = runProjections(makeProjectionInputs({ person1HasHELP: false, person1HELPBalance: 9_000 })).base
-    expect(off.person1Arr[0]).toBe(90_812)
+    expect(off.person1Arr[0]).toBe(91_080)
   })
 })
 
 describe('HELP indexation', () => {
   it('grows the balance with inflation before repayments, delaying clearance', () => {
-    const flat = runProjections(makeProjectionInputs({ person2HasHELP: true, person2HELPBalance: 16_000 })).base
+    const flat = runProjections(makeProjectionInputs({ person2HasHELP: true, person2HELPBalance: 15_000 })).base
     const indexed = runProjections(makeProjectionInputs({
-      person2HasHELP: true, person2HELPBalance: 16_000, expInflNear: 10, expInfl: 10,
+      person2HasHELP: true, person2HELPBalance: 15_000, expInflNear: 10, expInfl: 10,
     })).base
     expect(flat.person2HelpClearedYr).toBe(2028)
     expect(indexed.person2HelpClearedYr).toBe(2029)

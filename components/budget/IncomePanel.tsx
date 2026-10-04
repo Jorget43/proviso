@@ -4,8 +4,8 @@ import {
   calcMedicare,
   calcHELPRepayment,
   marginalRate,
-  TAX_THRESHOLDS_2425,
-  TAX_RATES_2425,
+  TAX_THRESHOLDS,
+  TAX_RATES,
 } from '@/lib/tax'
 import { fmt } from '@/lib/formatting'
 import Panel from '@/components/ui/Panel'
@@ -36,10 +36,10 @@ const DISPLAY_MAX = 250000
 const BRACKET_COLORS = ['var(--green)', '#C8A830', 'var(--amber)', '#C05C35', 'var(--red)']
 // Derived from the canonical ATO brackets in lib/tax.ts (tracked by the
 // assumptions watchdog) so the display never drifts from the tax engine.
-const BRACKETS = TAX_THRESHOLDS_2425.map((lo, i) => ({
+const BRACKETS = TAX_THRESHOLDS.map((lo, i) => ({
   lo,
-  hi: TAX_THRESHOLDS_2425[i + 1] ?? DISPLAY_MAX,
-  label: TAX_RATES_2425[i] === 0 ? 'Nil' : `${Math.round(TAX_RATES_2425[i] * 100)}%`,
+  hi: TAX_THRESHOLDS[i + 1] ?? DISPLAY_MAX,
+  label: TAX_RATES[i] === 0 ? 'Nil' : `${Math.round(TAX_RATES[i] * 100)}%`,
   color: BRACKET_COLORS[i],
 }))
 
