@@ -342,7 +342,7 @@ Items 1–4 shipped. Item 5 not yet built.
 - **Tax engine moved to FY2026-27** (`lib/tax.ts`): bottom rate 16% → 15%; Medicare low-income threshold $28,011 with the real 10c shade-in to $35,013 (was a $26k cliff); HELP now uses the marginal system — 15c per $1 over $69,528, $9,028 + 17c over $129,717, 10% of total income over $186,050 (was the old whole-income percentage table). Constants renamed `TAX_THRESHOLDS` / `TAX_RATES` (no year suffix); `TAX_FY` records the calibration year. Watchdog entries re-stamped to 2027. Medicare thresholds for FY2026-27 weren't announced yet, so the FY2025-26 (legislated) figures are used — the watchdog note says so.
 - Tests re-pinned deliberately (`tests/tax.test.ts`, projection fixtures): every hand-computed value is recomputed in its comment; characterised trajectories shift by exactly the tax saving.
 - **Update banner works again**: `lib/versionCheck.ts` reads `/repos/…/tags` and picks the highest plain `vX.Y.Z` (`latestReleaseTag`); `/releases/latest` always 404'd because the repo has no Releases.
-- **Still FY2024-25 (known)**: the CCS childcare parameters (`lib/childcare.ts`, `CCS_PARAMS_FY`).
+- **CCS childcare moved to FY2026-27** (`lib/childcare.ts`, `CCS_PARAMS_FY = 2027`): 90% to $88,520, 0% at $538,520, CBDC cap $15.19/hr. The higher rate for younger children now follows its real income test (95% to $146,437, tapering 1pt/$3k to 80%, then from $270,727 to 50%, cut off at $370,727). It was a flat "+30 points, max 95%", which overstated the subsidy for incomes over ~$150k. New watchdog entry `ccs-parameters`.
 
 ## Security checklist for new features
 

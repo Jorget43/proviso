@@ -1,4 +1,5 @@
-// Child Care Subsidy (CCS) engine — ATO/Services Australia 2024–25 parameters.
+// Child Care Subsidy (CCS) engine — Services Australia FY2026-27 parameters
+// (in effect from 6 July 2026).
 //
 // CCS is income-tested on COMBINED family income and paid as a percentage of the
 // fee, up to an hourly rate cap. Families with more than one child aged 5 or
@@ -9,22 +10,30 @@
 // Verify these against Services Australia each financial year (see lib/watchdog.ts):
 //   https://www.servicesaustralia.gov.au/how-much-child-care-subsidy-you-can-get
 
-export const CCS_PARAMS_FY = 2025 // FY24-25
+export const CCS_PARAMS_FY = 2027 // FY26-27
 
 // Standard rate taper.
-const CCS_LOWER_INCOME = 83_280   // ≤ this → 90%
+const CCS_LOWER_INCOME = 88_520   // ≤ this → 90%
 const CCS_MAX_RATE     = 90       // percent
 const CCS_TAPER_STEP   = 5_000    // −1 percentage point per $5,000 over the lower threshold
-const CCS_ZERO_INCOME  = 533_280  // ≥ this → 0%
+const CCS_ZERO_INCOME  = 538_520  // ≥ this → 0%
 
-// Higher CCS for the second and younger children aged 5 or under.
-const CCS_HIGHER_MAX        = 95       // percent ceiling for younger children
-const CCS_HIGHER_UPLIFT     = 30       // +30 percentage points over the standard rate
-const CCS_HIGHER_INCOME_CAP = 362_408  // higher rate only available below this combined income
+// Higher CCS for the second and younger children aged 5 or under: its own
+// income test with two tapers (1 point per $3,000), not a fixed uplift.
+//   ≤ 146,437 → 95%; tapers to 80% by 191,437; 80% to 270,727;
+//   tapers to 50% by 360,727; 50% below 370,727; then the standard rate.
+const CCS_HIGHER_MAX         = 95
+const CCS_HIGHER_BAND1_START = 146_437
+const CCS_HIGHER_MID         = 80
+const CCS_HIGHER_BAND2_START = 270_727
+const CCS_HIGHER_MIN         = 50
+const CCS_HIGHER_TAPER_STEP  = 3_000
+const CCS_HIGHER_INCOME_CAP  = 370_727  // higher rate only available below this combined income
 
-// Hourly rate cap for Centre Based Day Care (FY24-25). Fees above the cap are
-// not subsidised. A standard daily session is assumed to be CCS_SESSION_HOURS long.
-export const CCS_HOURLY_CAP    = 14.29
+// Hourly rate cap for Centre Based Day Care, children below school age
+// (FY26-27). Fees above the cap are not subsidised. A standard daily session
+// is assumed to be CCS_SESSION_HOURS long.
+export const CCS_HOURLY_CAP    = 15.19
 export const CCS_SESSION_HOURS = 10
 
 /** Standard CCS percentage for a given combined family income (0–90). */
@@ -39,7 +48,12 @@ export function standardCcsRate(familyIncome: number): number {
 export function higherCcsRate(familyIncome: number): number {
   const standard = standardCcsRate(familyIncome)
   if (familyIncome >= CCS_HIGHER_INCOME_CAP) return standard
-  return Math.min(CCS_HIGHER_MAX, standard + CCS_HIGHER_UPLIFT)
+  const steps = (start: number) => Math.floor((familyIncome - start) / CCS_HIGHER_TAPER_STEP)
+  let higher: number
+  if (familyIncome <= CCS_HIGHER_BAND1_START)      higher = CCS_HIGHER_MAX
+  else if (familyIncome < CCS_HIGHER_BAND2_START)  higher = Math.max(CCS_HIGHER_MID, CCS_HIGHER_MAX - steps(CCS_HIGHER_BAND1_START))
+  else                                             higher = Math.max(CCS_HIGHER_MIN, CCS_HIGHER_MID - steps(CCS_HIGHER_BAND2_START))
+  return Math.max(standard, higher)
 }
 
 export interface ChildcareInputs {

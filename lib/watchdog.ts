@@ -66,6 +66,18 @@ export const ASSUMPTIONS: Assumption[] = [
     notes: 'Rate tracks the national minimum wage. 26 weeks applies to births from 1 July 2026.',
   },
   {
+    id: 'ccs-parameters',
+    label: 'Child Care Subsidy — income thresholds & hourly rate cap',
+    category: 'Family payments',
+    authority: 'Services Australia',
+    authorityUrl: 'https://www.servicesaustralia.gov.au/how-much-child-care-subsidy-you-can-get',
+    location: 'lib/childcare.ts → CCS_* constants (and CCS_PARAMS_FY)',
+    currentValue: '90% to $88,520, −1pt/$5k to 0% at $538,520; higher rate 95%→80%→50% (−1pt/$3k), cut-off $370,727; CBDC cap $15.19/hr',
+    calibratedFyEnding: 2027,
+    reviewTrigger: 'CPI-indexed each year; new figures apply from the first Monday in July',
+    indexed: true,
+  },
+  {
     id: 'income-tax-brackets',
     label: 'Income tax brackets & rates (Stage 3)',
     category: 'Income tax',
