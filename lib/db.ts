@@ -53,24 +53,39 @@ function createPrismaClient() {
   })
 
   // busy_timeout is per-connection state, not persisted in the DB file, so it
-  // must be set on every live connection. Fire-and-forget is safe here:
-  // connection_limit=1 guarantees exactly one physical connection, and
-  // Prisma serializes statements on it in submission order, so this always
-  // lands before any later application query.
+  // must be set on the live connection (connection_limit=1 means exactly one)
+  // before the first application query.
+  //
+  // Set lazily on first use, NOT at import: `next build` imports this module
+  // while collecting page data, and an import-time query makes the build load
+  // Prisma's engine and open the database — which fails in the Docker build
+  // stage (no OpenSSL, no /data). Runs on the base client, so the retry
+  // extension below doesn't intercept it. On failure it's retried on the next
+  // query rather than cached.
   //
   // Must be $queryRawUnsafe, not $executeRawUnsafe: `PRAGMA busy_timeout = N`
   // returns the new value as a result row, and Prisma's SQLite connector
   // rejects `execute()`-style calls that return rows (P2010 "Execute
-  // returned results, which is not allowed in SQLite") — confirmed against
-  // a real local DB while verifying this change.
-  client.$queryRawUnsafe(`PRAGMA busy_timeout = ${BUSY_TIMEOUT_MS}`).catch((err) => {
-    console.error('[db] failed to set busy_timeout pragma:', err)
-  })
+  // returned results, which is not allowed in SQLite").
+  let pragmaReady: Promise<void> | null = null
+  function ensureBusyTimeout(): Promise<void> {
+    pragmaReady ??= client.$queryRawUnsafe(`PRAGMA busy_timeout = ${BUSY_TIMEOUT_MS}`).then(
+      () => undefined,
+      (err) => {
+        console.error('[db] failed to set busy_timeout pragma:', err)
+        pragmaReady = null
+      },
+    )
+    return pragmaReady
+  }
 
   return client.$extends({
     name: 'retry-on-busy',
     query: {
-      $allOperations: ({ operation, args, query }) => withBusyRetry(operation, () => query(args)),
+      $allOperations: async ({ operation, args, query }) => {
+        await ensureBusyTimeout()
+        return withBusyRetry(operation, () => query(args))
+      },
     },
   })
 }

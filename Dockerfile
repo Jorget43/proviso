@@ -10,6 +10,11 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
+# Prisma's query engine needs OpenSSL to load. Nothing should query the DB at
+# build time (lib/db.ts sets its pragma lazily), but if anything ever does,
+# this keeps it a logged error instead of a failed build.
+RUN apt-get update -y && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
+
 RUN npx prisma generate
 
 ENV DATABASE_URL="file:/data/proviso.db"
