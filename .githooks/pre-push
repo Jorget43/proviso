@@ -1,0 +1,4 @@
+#!/bin/sh
+# Privacy gate — last line of defence: scans every file in every commit being
+# pushed, plus messages, tag messages and author/committer emails.
+exec node "$(git rev-parse --show-toplevel)/scripts/privacy-scan.mjs" --push

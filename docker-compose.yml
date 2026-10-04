@@ -1,0 +1,39 @@
+services:
+  proviso:
+    image: ghcr.io/jorget43/proviso:${PROVISO_VERSION:-latest}
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # Pass the git tag at build time so the in-app update banner can detect newer releases.
+        # In CI: --build-arg PROVISO_VERSION=$(git describe --tags --abbrev=0)
+        # Locally:  docker compose build (omit = "dev", banner never shown)
+        PROVISO_VERSION: ${PROVISO_VERSION:-dev}
+    container_name: proviso
+    restart: unless-stopped
+    ports:
+      - "${PROVISO_PORT:-3000}:3000"   # override in .env if 3000 is taken on your host
+    volumes:
+      - proviso-db:/data
+    environment:
+      - DATABASE_URL=file:/data/proviso.db
+      - NODE_ENV=production
+      # Watchdog notification — set these to enable weekly email alerts
+      # WATCHDOG_ENABLED=true activates the scheduler and the /admin/watchdog page
+      # NOTIFICATION_EMAIL=you@example.com — where alerts are sent
+      # RESEND_API_KEY=re_... — get a free key at resend.com (3k emails/month free)
+      # RESEND_FROM_EMAIL=onboarding@resend.dev — use Resend's default sender for personal use
+      #   (requires your NOTIFICATION_EMAIL to be verified in the Resend dashboard)
+      #   or set to noreply@example.com after verifying a domain in Resend
+      # - WATCHDOG_ENABLED=true
+      # - NOTIFICATION_EMAIL=you@example.com
+      # - RESEND_API_KEY=re_...
+      # - RESEND_FROM_EMAIL=onboarding@resend.dev
+
+# Auto-updates: run ./update.sh on a schedule (cron / systemd timer / Unraid
+# User Scripts) rather than a Watchtower sidecar — see README.md "Updates"
+# for why, and docker-compose.watchtower.yml for the optional alternative.
+
+volumes:
+  proviso-db:
+    driver: local

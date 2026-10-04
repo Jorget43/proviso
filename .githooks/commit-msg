@@ -1,0 +1,3 @@
+#!/bin/sh
+# Privacy gate — commit messages are public too.
+exec node "$(git rev-parse --show-toplevel)/scripts/privacy-scan.mjs" --message "$1"

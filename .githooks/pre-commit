@@ -1,0 +1,4 @@
+#!/bin/sh
+# Privacy gate — this repo is public. See CLAUDE.md § "Privacy guardrails".
+# Never bypass with --no-verify; fix the finding instead.
+exec node "$(git rev-parse --show-toplevel)/scripts/privacy-scan.mjs" --staged
