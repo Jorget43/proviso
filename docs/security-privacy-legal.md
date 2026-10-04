@@ -68,27 +68,30 @@ The Australian Privacy Principles (APPs) become binding on the developer once th
 
 ## Cybersecurity — current state
 
+*Last reviewed 2026-10-05.*
+
 **Already in place:**
 - Passwords: scrypt hashing via `node:crypto`
-- Sessions: DB-backed opaque tokens in httpOnly, SameSite=Lax cookies
+- Sessions: DB-backed opaque tokens in httpOnly, SameSite=Lax cookies; `Secure` flag via `COOKIE_SECURE=true` behind HTTPS (documented in README)
+- Brute force: in-memory per-IP limit on `/api/auth/login` (20 req/min) plus DB account lockout after 10 failures (Phase 9)
+- Second factor: TOTP with recovery codes (Phase 9) and passkeys / WebAuthn (Phase 12)
 - SQL injection: Prisma parameterised queries (immune by design)
 - XSS: React JSX escaping (`dangerouslySetInnerHTML` is unused)
+- Input validation: every mutating route parses its body with a zod schema (`lib/schemas.ts`) — unknown fields stripped, ranges enforced (Phase 19)
 - Transport: TLS via Tailscale Serve or external reverse proxy
-- Auth gating: `requireSession()` on all data pages; `authorize()` on all mutating API routes
+- Auth gating: `requireSession()` on all data pages; `authorize()` on all mutating API routes; read-path checks via `requireAdultRead()` (Phase 14)
+- Repo hygiene: the repository is public, so a privacy scanner runs in git hooks and CI to keep personal data out (see `CLAUDE.md` § Privacy guardrails)
 
-**Gaps to address before public beta:**
+**Gaps still open:**
 
 | Gap | Risk | Fix |
 |---|---|---|
-| No rate limiting on `/api/auth/login` | Brute-force password attack | Rate-limit middleware or in-memory counter at route level |
-| No account lockout | Persistent brute force | Lock for 15 min after N failures; add `failedAttempts` + `lockedUntil` to `User` |
-| No TOTP/2FA | Account takeover if password leaked | TOTP second factor via `otplib` (Phase 9) |
 | Session tokens long-lived (30 days) | Stolen session cookie | Consider 7-day default TTL + "remember me" for 30 days |
 | No audit log | Can't detect/investigate unauthorised access | `AuditLog` table: userId, action, target, ip, timestamp on write operations |
 | No Content Security Policy | XSS amplification | Add CSP header in `next.config.ts` (starter below) |
 | SQLite not encrypted at rest | Physical volume access exposes all data | Document that volume-level encryption is the user's responsibility; future: SQLCipher |
-| No HTTPS enforcement at app level | Accidental HTTP use | Document `COOKIE_SECURE=true` requirement; consider `Strict-Transport-Security` header |
-| `npm audit` vulnerabilities | Dependency chain attack | Run `npm audit fix` on next dep update; consider Dependabot |
+| No HSTS header | Accidental HTTP use | `COOKIE_SECURE=true` is documented; add `Strict-Transport-Security` alongside the CSP headers |
+| No automated dependency updates | Dependency chain attack | Add Dependabot, or `npm audit` in CI; run `npm audit fix` on each dependency update |
 
 **Content Security Policy starter (add to `next.config.ts`):**
 ```ts

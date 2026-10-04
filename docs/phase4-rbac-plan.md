@@ -2,6 +2,8 @@
 
 **Planned 2026-06-08.** Locked decisions: minimal self-hosted auth, RBAC for a single household per deployment, Child role deferred.
 
+> **Status: shipped (June 2026).** The Child role followed as Phase 4.3 (2026-06-14); passkeys, TOTP and lockout came later (Phases 9 and 12). Kept as the design record — the current model is in `CLAUDE.md` § Auth & RBAC, and some details here (route and model counts, migration numbers) are historical: migrations were squashed into `0001_baseline` in Phase 18.
+
 ## Starting state
 - **No auth** — no `middleware.ts`, no auth dependencies.
 - **20 Prisma models, all global** — settings are `id=1` singletons; no `userId`/`householdId` anywhere.

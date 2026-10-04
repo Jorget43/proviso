@@ -174,7 +174,7 @@ All migrations must be **additive only** — `update.sh` (or Watchtower, if opte
 
 1. Run `node_modules/next/dist/bin/next build` locally to catch TS errors before CI.
 2. Commit and push to `master` — CI builds and pushes `ghcr.io/jorget43/proviso:latest`.
-3. Tag significant releases: `git tag -a v1.x.0 -m "..."` then `git push origin v1.x.0` — also pushes `ghcr.io/jorget43/proviso:<tag>`.
+3. Tag significant releases: `git tag -a v1.x.0 -m "..."` then `git push origin v1.x.0` — also pushes `ghcr.io/jorget43/proviso:<tag>`. Use plain `vX.Y.Z` tags: the in-app update banner reads the repo's tags (not GitHub Releases) and ignores anything with a suffix, so an untagged or `-rc` build never announces itself.
 4. **No manual server update needed *if `update.sh` is scheduled* (see Phase 16).** Do not default to recommending Watchtower — GHCR returns `403 Forbidden` on Watchtower's anonymous `HEAD`-based digest check even for a public image, so it fails silently forever (logs `Failed=0` on every no-op run) unless authenticated with a PAT. This failure mode was confirmed in production: a deployment silently ran a two-month-old build before the stale version banner was noticed. `update.sh` (`docker compose pull proviso && docker compose up -d proviso`, scheduled via cron/systemd timer/Unraid User Scripts) has no equivalent failure mode — `pull` is a plain anonymous `GET`, which always works — and needs no credentials. Watchtower + PAT remains available as an opt-in for instant-vs-scheduled updates (`docker-compose.watchtower.yml`, README.md § Advanced).
 
 **Common pitfalls:**
@@ -293,7 +293,9 @@ Items 1–4 shipped. Item 5 not yet built.
 - **Watchdog re-stamped**: the `concessional-cap` entry's `location` collapses to the single file (`lib/superHistory.ts`), `calibratedFyEnding` bumped to 2027, `authority` corrected `ABS`→`ATO` (the cited URL was always ato.gov.au).
 - **Zero migrations, zero Prisma changes** — all new fields are optional with wall-clock-preserving defaults; the only DB-adjacent change is what `ConcessionalCarryForward` computes client-side.
 
-#### Backlog (remaining)
+#### Backlog (at the time)
+
+Moved to the consolidated [Backlog](#backlog) below.
 
 - **`Transaction` index — corrected scope**: the model has no `date` column (`dateStr`/`ym`/`importedAt` only). The only filtered queries are FY-window scans on `ym` (`app/api/work-expenses/scan/route.ts`, `app/api/donations/scan/route.ts`); a candidate would be `@@index([ym])`, not `date`. The two hottest reads (`app/actuals/page.tsx`, `actuals/commit/route.ts`) are unfiltered full-table loads ordered by `importedAt` that no index on `ym` would help. Premature at household scale — revisit only if import volume actually warrants it.
 - ~~`import type` for client-bundled engines~~ — audited: already satisfied. Every type-only consumer of `tax.ts`/`super.ts`/`cgt.ts` uses `import type`; the components that import values genuinely call them at render time. No action needed.
@@ -319,7 +321,7 @@ Items 1–4 shipped. Item 5 not yet built.
 - **Tests**: `tests/dbErrors.test.ts` (6 tests, the busy-message predicate) and `tests/dbRetry.test.ts` (4 tests, mocked retry/backoff/give-up behaviour — chosen over a real cross-process lock repro because reliably holding an OS-level SQLite lock from a second process didn't reproduce in the dev sandbox used to build this; the mocked version deterministically exercises the same code path). Suite: 150 tests.
 - **Zero migrations, zero schema changes.**
 
-### Phase 18 — Privacy purge: baseline migration + history rewrite (2026-10-04)
+### Phase 18 — Privacy purge: baseline migration + history rewrite (2026-10-04, `v1.7.0`; build fix `v1.7.1`)
 
 - **Why**: the public history contained the developer's real household data — a committed SQLite database, the first seed versions (real budget, debts, assets, planned purchases), personal-name columns/tables in migrations `0001`–`0028`, real figures as schema defaults, a real school fee schedule, a family-plan life-phase table, and bank-statement sample data naming local merchants.
 - **Migrations squashed** into `prisma/migrations/0001_baseline` generated from `schema.prisma` (which also fixed drift: the hand-written legacy chain had diverged from the schema on defaults, autoincrement and index names). Schema defaults neutralised.
@@ -327,7 +329,7 @@ Items 1–4 shipped. Item 5 not yet built.
 - **Generic replacements**: `SF_BASE`/seed school levels (standard Year 1–6 naming), `INDEPENDENT_WEIGHTS`, Actuals sample CSV; `DEFAULT_LIFE_PHASES` deleted (dead code).
 - **Git history rewritten** to a fresh root; old tags removed. Old GHCR image versions contain the old migrations and must be deleted from the package settings.
 
-### Phase 19 — Renaming, projection accuracy, save feedback, validation, lint (2026-10-05)
+### Phase 19 — Renaming, projection accuracy, save feedback, validation, lint (2026-10-05, `v1.8.0`)
 
 - **Renaming people** (`lib/members.ts`): SuperHistory, HelpDebtDetail, InvestmentParcel and the "<name> HELP debt" Debt are keyed by display name, so every rename goes through `renameMembers()` (cascade, via temporary names so swaps can't collide). `PUT /api/household` renames from Settings (CFO); onboarding re-runs cascade too. Names must be non-empty, ≤40 chars and distinct. HELP debts are matched with `findHelpDebt()` — exact name or whole-word prefix, never substring.
 - **Projection engine**: mortgage payoff, Person 1 HELP, real HELP balances (was a hard-coded $50k), PPL rates — see "Projection engine" above. Simple-mode Person 2 income now uses their own net pay and growth (was a hard-coded $100k on Person 1's growth).
@@ -337,12 +339,36 @@ Items 1–4 shipped. Item 5 not yet built.
 - **Lint is clean** (`npx eslint .` → 0 problems; was 44 errors). Notably the Projections `Slider` was declared inside the component (remounted on every change); it's now module-level.
 - **Not done here (known)**: the tax engine was still calibrated to FY2024-25, and the update banner read GitHub *Releases* — both fixed in Phase 20.
 
-### Phase 20 — FY2026-27 tax engine, update banner (2026-10-05)
+### Phase 20 — FY2026-27 tax engine, childcare subsidy, update banner (2026-10-05, `v1.9.0` tax + banner; `v1.9.1` childcare)
 
 - **Tax engine moved to FY2026-27** (`lib/tax.ts`): bottom rate 16% → 15%; Medicare low-income threshold $28,011 with the real 10c shade-in to $35,013 (was a $26k cliff); HELP now uses the marginal system — 15c per $1 over $69,528, $9,028 + 17c over $129,717, 10% of total income over $186,050 (was the old whole-income percentage table). Constants renamed `TAX_THRESHOLDS` / `TAX_RATES` (no year suffix); `TAX_FY` records the calibration year. Watchdog entries re-stamped to 2027. Medicare thresholds for FY2026-27 weren't announced yet, so the FY2025-26 (legislated) figures are used — the watchdog note says so.
 - Tests re-pinned deliberately (`tests/tax.test.ts`, projection fixtures): every hand-computed value is recomputed in its comment; characterised trajectories shift by exactly the tax saving.
 - **Update banner works again**: `lib/versionCheck.ts` reads `/repos/…/tags` and picks the highest plain `vX.Y.Z` (`latestReleaseTag`); `/releases/latest` always 404'd because the repo has no Releases.
 - **CCS childcare moved to FY2026-27** (`lib/childcare.ts`, `CCS_PARAMS_FY = 2027`): 90% to $88,520, 0% at $538,520, CBDC cap $15.19/hr. The higher rate for younger children now follows its real income test (95% to $146,437, tapering 1pt/$3k to 80%, then from $270,727 to 50%, cut off at $370,727). It was a flat "+30 points, max 95%", which overstated the subsidy for incomes over ~$150k. New watchdog entry `ccs-parameters`.
+
+## Backlog
+
+The single list of what's left. Each phase above records what it shipped; anything it deferred lands here. Update this list when you finish or defer something.
+
+### Every July — recalibrate government figures
+The assumptions watchdog (`/admin/watchdog` for the CFO when `WATCHDOG_ENABLED=true`; `lib/watchdog.ts`; weekly email check) flags each figure once a new financial year starts. Verify against the cited authority, update the constants, re-pin the tests (expected values are hand-computed in comments), re-stamp `calibratedFyEnding`. Known upcoming changes:
+- **1 Jul 2027**: the 15% income tax rate becomes 14% (legislated) — `lib/tax.ts`.
+- **Medicare levy low-income thresholds for FY2026-27** weren't announced at the time of Phase 20; the FY2025-26 figures are in use. Update when legislated (often retrospectively).
+- Annual indexation: HELP thresholds (1 Jul) and HELP CPI (1 Jun — the most time-sensitive), CCS thresholds and caps (first Monday of July), PPL (minimum wage, 1 Jul), concessional cap (AWOTE steps).
+
+### Known model simplifications (by design, not bugs)
+- Projections apply today's tax rates and thresholds to every future year (no bracket indexation), so far-out years overstate tax slightly.
+- Medicare: single low-income threshold only; family/senior thresholds and the Medicare levy surcharge aren't modelled.
+- CCS: assumes Centre Based Day Care for a below-school-age child, a 10-hour session, and that the family's activity level covers the days booked; no withholding.
+- `marginalRate()` ignores the LITO taper and the Medicare shade-in band (headline rate only — used for guidance figures).
+
+### Security hardening still open
+Tracked in [`docs/security-privacy-legal.md`](docs/security-privacy-legal.md) § Cybersecurity: security headers/CSP, an audit log of writes, shorter default session lifetime, HSTS, and automated dependency updates (Dependabot / `npm audit` in CI).
+
+### Deferred (revisit only if needed)
+- `Transaction` `@@index([ym])` — premature at household scale (see Phase 15).
+- **Phase 3 — CDR bank feeds**: researched, not built; CSV import stays the core. See [`docs/phase3-cdr-research.md`](docs/phase3-cdr-research.md).
+- **Phase 7 Tier 2 (desktop app) and Tier 3 (managed hosting)**: not started.
 
 ## Security checklist for new features
 

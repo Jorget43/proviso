@@ -1,5 +1,7 @@
 # Phase 3 — CDR Bank Feeds: Cost & Vendor Map
 
+> **Status (2026-10-05): deferred — no code written.** CSV import remains the only transaction source. Re-verify the vendor and regulatory picture before picking this up; it was researched in June 2026.
+
 **Researched June 2026.** Deep-research synthesis (5 parallel source sweeps, cross-verified). Informs the Phase 3 roadmap item: replacing/augmenting CSV import with automated bank feeds via the Consumer Data Right (CDR / Open Banking).
 
 > **Confidence caveat:** During research, `WebFetch` was HTTP-403 blocked on vendor/regulator pages, so figures derive from search-result summaries of those primary pages, not full reads. **Every vendor gates pricing behind "contact sales"** — all dollar figures are ballpark (low–medium confidence). Structural/legal facts are cross-corroborated (high confidence). Re-verify exact figures with vendor sales + an assurance firm before committing.
