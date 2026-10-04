@@ -1,3 +1,5 @@
+import { withErrors, parseBody } from '@/lib/apiHandler'
+import { credentialsSchema } from '@/lib/schemas'
 import { prisma } from '@/lib/db'
 import { verifyPassword, createSession } from '@/lib/auth'
 import { isRateLimited } from '@/lib/loginRateLimit'
@@ -5,18 +7,15 @@ import { isRateLimited } from '@/lib/loginRateLimit'
 const LOCKOUT_THRESHOLD = 10
 const LOCKOUT_MS = 15 * 60 * 1000 // 15 minutes
 
-export async function POST(req: Request) {
+export const POST = withErrors(async (req: Request) => {
   const ip = req.headers.get('x-forwarded-for') ?? req.headers.get('x-real-ip') ?? 'unknown'
   if (isRateLimited(ip)) {
     return Response.json({ error: 'Too many requests. Try again in a minute.' }, { status: 429 })
   }
 
-  const { username, password } = await req.json()
-  if (!username || !password) {
-    return Response.json({ error: 'Username and password required' }, { status: 400 })
-  }
+  const { username, password } = await parseBody(req, credentialsSchema, 'Username and password required')
 
-  const user = await prisma.user.findUnique({ where: { username: String(username).trim() } })
+  const user = await prisma.user.findUnique({ where: { username } })
 
   if (user?.lockedUntil && user.lockedUntil > new Date()) {
     const retryAfterSecs = Math.ceil((user.lockedUntil.getTime() - Date.now()) / 1000)
@@ -61,4 +60,4 @@ export async function POST(req: Request) {
 
   await createSession(user.id)
   return Response.json({ ok: true })
-}
+})

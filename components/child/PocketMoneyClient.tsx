@@ -34,7 +34,7 @@ export default function PocketMoneyClient({ name, balance, schedule, txs: initia
     const amount = -Math.abs(Number(amt))
     const res = await fetch('/api/pocket-money', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-Handles-Errors': '1' },
       body: JSON.stringify({ amount, description: desc, date }),
     })
     if (!res.ok) {

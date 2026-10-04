@@ -53,7 +53,7 @@ export default function MembersPanel({ users, currentUserId }: { users: Member[]
     e.preventDefault()
     const res = await fetch('/api/users', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-Handles-Errors': '1' },
       body: JSON.stringify({ name, username, password, role }),
     })
     if (!res.ok) {
@@ -65,7 +65,7 @@ export default function MembersPanel({ users, currentUserId }: { users: Member[]
     if (role === 'CHILD' && newAllowanceAmt) {
       await fetch('/api/allowance', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-Handles-Errors': '1' },
         body: JSON.stringify({ userId: newUser.id, amount: Number(newAllowanceAmt), dayOfWeek: 5 }),
       })
     }

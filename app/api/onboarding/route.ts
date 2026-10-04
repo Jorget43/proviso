@@ -1,5 +1,7 @@
 import { prisma } from '@/lib/db'
-import { withErrors } from '@/lib/apiHandler'
+import { withErrors, parseBody, ApiError } from '@/lib/apiHandler'
+import { onboardingSchema } from '@/lib/schemas'
+import { renameMembers, validateMemberNames, helpDebtName } from '@/lib/members'
 import { authorize } from '@/lib/rbac'
 import { computeMonthlyRepayment, monthsUntil } from '@/lib/mortgage'
 import { NextResponse } from 'next/server'
@@ -18,11 +20,25 @@ export const POST = withErrors(async (req: Request) => {
     cashBalance,
     hasMortgage, mortgageBalance, mortgageRate, mortgageEndDate,
     hasParentalLeave,
-  } = await req.json()
+  } = await parseBody(req, onboardingSchema)
+
+  const invalid = validateMemberNames(person1Name, person2Name, hasPartner)
+  if (invalid) throw new ApiError(400, invalid)
+
+  // Re-running the wizard with new names must carry each person's history
+  // (super history, HELP details, investments, HELP debt) across.
+  const previous = await prisma.householdSettings.findUnique({ where: { id: 1 } })
 
   const currentYear = new Date().getFullYear()
 
   await prisma.$transaction(async tx => {
+    if (previous) {
+      await renameMembers(tx, [
+        { from: previous.person1Name, to: person1Name },
+        { from: previous.person2Name, to: person2Name },
+      ])
+    }
+
     await tx.householdSettings.upsert({
       where:  { id: 1 },
       update: { person1Name, person2Name, partnerEnabled: hasPartner, onboardingDone: true },
@@ -74,24 +90,24 @@ export const POST = withErrors(async (req: Request) => {
     }
 
     // Person 1 HELP debt
-    const p1HelpDebt = await tx.debt.findFirst({ where: { name: `${person1Name} HELP debt` } })
+    const p1HelpDebt = await tx.debt.findFirst({ where: { name: helpDebtName(person1Name) } })
     if (person1HasHELP && person1HELPBalance > 0) {
       if (p1HelpDebt) {
         await tx.debt.update({ where: { id: p1HelpDebt.id }, data: { amt: person1HELPBalance } })
       } else {
-        await tx.debt.create({ data: { name: `${person1Name} HELP debt`, amt: person1HELPBalance } })
+        await tx.debt.create({ data: { name: helpDebtName(person1Name), amt: person1HELPBalance } })
       }
     } else if (p1HelpDebt) {
       await tx.debt.delete({ where: { id: p1HelpDebt.id } })
     }
 
     // Person 2 HELP debt
-    const p2HelpDebt = await tx.debt.findFirst({ where: { name: `${person2Name} HELP debt` } })
+    const p2HelpDebt = await tx.debt.findFirst({ where: { name: helpDebtName(person2Name) } })
     if (hasPartner && person2HasHELP && person2HELPBalance > 0) {
       if (p2HelpDebt) {
         await tx.debt.update({ where: { id: p2HelpDebt.id }, data: { amt: person2HELPBalance } })
       } else {
-        await tx.debt.create({ data: { name: `${person2Name} HELP debt`, amt: person2HELPBalance } })
+        await tx.debt.create({ data: { name: helpDebtName(person2Name), amt: person2HELPBalance } })
       }
     } else if (p2HelpDebt) {
       await tx.debt.delete({ where: { id: p2HelpDebt.id } })

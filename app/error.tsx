@@ -7,7 +7,7 @@ export default function Error({ reset }: { error: Error; reset: () => void }) {
       <div style={{ maxWidth: 440, textAlign: 'center', padding: '2rem' }}>
         <div style={{ fontSize: '2rem', marginBottom: '0.75rem' }}>⚠</div>
         <h2 style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--t1, #f1f5f9)' }}>
-          This page couldn't load
+          This page couldn’t load
         </h2>
         <p style={{ color: 'var(--t3, #94a3b8)', fontSize: '0.875rem', lineHeight: 1.6, marginBottom: '1.25rem' }}>
           If this keeps happening, the database may be unavailable.

@@ -27,7 +27,7 @@ function PersonTable({ rows, name }: { rows: SuperRow[]; name: string }) {
             <th className="super-col-sec">Contrib. Tax</th>
             <th className="super-col-sec">Fees</th>
             <th className="super-col-sec">Salary</th>
-            <th>PV (today's $)</th>
+            <th>PV (today’s $)</th>
             <th>Notes</th>
           </tr>
         </thead>
@@ -67,7 +67,7 @@ function PersonTable({ rows, name }: { rows: SuperRow[]; name: string }) {
                 <th>Drawdown</th>
                 <th className="super-col-sec" colSpan={2}>Fees</th>
                 <th className="super-col-sec"></th>
-                <th>PV (today's $)</th>
+                <th>PV (today’s $)</th>
                 <th></th>
               </tr>
             </thead>

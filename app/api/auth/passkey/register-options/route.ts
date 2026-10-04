@@ -1,3 +1,4 @@
+import type { AuthenticatorTransportFuture } from '@simplewebauthn/server'
 import { getSession } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { generateRegistrationOptions } from '@simplewebauthn/server'
@@ -29,7 +30,7 @@ export async function POST(req: Request) {
     attestationType: 'none',
     excludeCredentials: existingPasskeys.map(pk => ({
       id: pk.credentialId,
-      transports: pk.transports ? (pk.transports.split(',').filter(Boolean) as any[]) : [],
+      transports: pk.transports ? (pk.transports.split(',').filter(Boolean) as AuthenticatorTransportFuture[]) : [],
     })),
   })
 

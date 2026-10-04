@@ -3,6 +3,7 @@ import { prisma } from '@/lib/db'
 import { requireAdult } from '@/lib/auth'
 import DebtsClient from '@/components/debts/DebtsClient'
 import { workDaysForYear } from '@/lib/projections'
+import { findHelpDebt } from '@/lib/members'
 
 function currentFyEnding(): number {
   const now   = new Date()
@@ -50,18 +51,23 @@ export default async function DebtsPage() {
     [person2Name]: person2Income,
   }
 
+  // Each person's HELP debt is matched by name as a whole word (see
+  // lib/members.ts), never by substring.
+  const person1HelpDebt = findHelpDebt(debts, person1Name)
+  const person2HelpDebt = hs?.partnerEnabled ? findHelpDebt(debts, person2Name) : undefined
+
   const helpPersons = hasHelp ? [
-    ...(income.person1HasHELP || debts.some(d => d.name.toLowerCase().includes(person1Name.toLowerCase()) && /help|hecs/i.test(d.name)) ? [{
-      name:       person1Name,
-      income:     person1Income,
-      growthRate: projSettings.person1Growth,
-      helpBalance: debts.find(d => d.name.toLowerCase().includes(person1Name.toLowerCase()) && /help|hecs/i.test(d.name))?.amt ?? 0,
+    ...(income.person1HasHELP || person1HelpDebt ? [{
+      name:        person1Name,
+      income:      person1Income,
+      growthRate:  projSettings.person1Growth,
+      helpBalance: person1HelpDebt?.amt ?? 0,
     }] : []),
-    ...(hs?.partnerEnabled && (income.person2HasHELP || debts.some(d => d.name.toLowerCase().includes(person2Name.toLowerCase()) && /help|hecs/i.test(d.name))) ? [{
-      name:       person2Name,
-      income:     person2Income,
-      growthRate: projSettings.person2Growth,
-      helpBalance: debts.find(d => d.name.toLowerCase().includes(person2Name.toLowerCase()) && /help|hecs/i.test(d.name))?.amt ?? 0,
+    ...(hs?.partnerEnabled && (income.person2HasHELP || person2HelpDebt) ? [{
+      name:        person2Name,
+      income:      person2Income,
+      growthRate:  projSettings.person2Growth,
+      helpBalance: person2HelpDebt?.amt ?? 0,
     }] : []),
   ] : []
 

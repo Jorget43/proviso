@@ -179,17 +179,17 @@ export default function OnboardingClient() {
     try {
       const res = await fetch('/api/onboarding', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-Handles-Errors': '1' },
         body: JSON.stringify({
           person1Name:        form.person1Name.trim(),
-          person1Age:         parseFloat(form.person1Age)         || 0,
+          person1Age:         Math.round(parseFloat(form.person1Age) || 0),
           person1Income:      parseFloat(form.person1Income)      || 0,
           person1HasHELP:     form.person1HasHELP,
           person1HELPBalance: parseFloat(form.person1HELPBalance) || 0,
           person1Days:        form.person1Days,
           hasPartner:         form.hasPartner,
           person2Name:        form.person2Name.trim() || 'Partner',
-          person2Age:         parseFloat(form.person2Age)         || 0,
+          person2Age:         Math.round(parseFloat(form.person2Age) || 0),
           person2Income:      parseFloat(form.person2Income)      || 0,
           person2HasHELP:     form.person2HasHELP,
           person2HELPBalance: parseFloat(form.person2HELPBalance) || 0,
@@ -207,11 +207,16 @@ export default function OnboardingClient() {
           hasParentalLeave:   form.hasParentalLeave,
         }),
       })
-      if (!res.ok) throw new Error('Save failed')
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(typeof data.error === 'string' && data.error !== 'Validation failed'
+          ? data.error
+          : 'Some details look invalid — please check each step.')
+      }
       setStep(6)
       setTimeout(() => router.push('/budget'), 1800)
-    } catch {
-      setError('Something went wrong — please try again.')
+    } catch (err) {
+      setError(err instanceof Error && err.message ? err.message : 'Something went wrong — please try again.')
       setSubmitting(false)
     }
   }

@@ -31,17 +31,21 @@ export interface MortgageYearResult {
   endCash:         number;
   annualInterest:  number;
   annualPrincipal: number;
+  annualPaid:      number;  // repayments actually made (0 once the loan is cleared)
 }
 
 /**
  * Simulate one year of mortgage payments with live offset.
  *
+ * Repayments come out of `cash` here, month by month, and stop the month the
+ * loan is cleared (the final payment is only what's still owed). So callers
+ * must NOT also count the repayment in their expenses.
+ *
  * @param mb              Mortgage balance at start of year
  * @param cash            Cash/offset balance at start of year
- * @param rate            Annual interest rate as decimal (e.g. 0.0599)
- * @param payment         Fixed monthly repayment amount
- * @param monthlyNetFlow  Net cash in/out per month (income minus all expenses
- *                        including the mortgage repayment line item)
+ * @param rate            Annual interest rate as decimal (e.g. 0.0625)
+ * @param payment         Scheduled monthly repayment
+ * @param monthlyNetFlow  Net cash in/out per month EXCLUDING mortgage repayments
  */
 export function simulateMortgageYear(
   mb:              number,
@@ -52,17 +56,23 @@ export function simulateMortgageYear(
 ): MortgageYearResult {
   let annualInterest  = 0;
   let annualPrincipal = 0;
+  let annualPaid      = 0;
 
   for (let mo = 0; mo < 12; mo++) {
-    const effectiveBal   = Math.max(0, mb - cash);
-    const monthInterest  = effectiveBal * (rate / 12);
-    annualInterest      += monthInterest;
-    const principal      = Math.max(0, payment - monthInterest);
-    annualPrincipal     += principal;
-    mb                   = Math.max(0, mb - principal);
-    cash                += monthlyNetFlow;
-    cash                 = Math.max(0, cash);
+    let paid = 0;
+    if (mb > 0) {
+      const effectiveBal  = Math.max(0, mb - cash);
+      const monthInterest = effectiveBal * (rate / 12);
+      paid                = Math.min(payment, mb + monthInterest);
+      const principal     = Math.max(0, paid - monthInterest);
+      annualInterest     += monthInterest;
+      annualPrincipal    += principal;
+      mb                  = Math.max(0, mb - principal);
+    }
+    annualPaid += paid;
+    cash       += monthlyNetFlow - paid;
+    cash        = Math.max(0, cash);
   }
 
-  return { endBalance: mb, endCash: cash, annualInterest, annualPrincipal };
+  return { endBalance: mb, endCash: cash, annualInterest, annualPrincipal, annualPaid };
 }

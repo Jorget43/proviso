@@ -16,8 +16,8 @@ export type WatchStatus = 'current' | 'review' | 'overdue'
 export interface Assumption {
   id:                 string
   label:              string
-  category:           'Income tax' | 'HELP' | 'Medicare' | 'Super'
-  authority:          'ATO' | 'ABS' | 'Legislation'
+  category:           'Income tax' | 'HELP' | 'Medicare' | 'Super' | 'Family payments'
+  authority:          'ATO' | 'ABS' | 'Legislation' | 'Services Australia'
   authorityUrl?:      string   // canonical URL to verify the current value
   location:           string   // file → symbol the developer edits
   currentValue:       string   // human-readable summary of what's in the code now
@@ -52,6 +52,19 @@ export function fyLabel(ending: number): string {
 
 // The registry. Stamp `calibratedFyEnding` to the FY a value is correct for.
 export const ASSUMPTIONS: Assumption[] = [
+  {
+    id: 'ppl-rate',
+    label: 'Paid Parental Leave — weekly rate & number of weeks',
+    category: 'Family payments',
+    authority: 'Services Australia',
+    authorityUrl: 'https://www.servicesaustralia.gov.au/how-much-parental-leave-pay-you-can-get',
+    location: 'lib/constants.ts → PPL_WEEKLY, PPL_WEEKS',
+    currentValue: '$1,004.70/week (national minimum wage $26.44/hr x 7.6h x 5), 26 weeks',
+    calibratedFyEnding: 2027,
+    reviewTrigger: 'Minimum wage rises each 1 July (Fair Work annual wage review, decided ~June); weeks set by legislation',
+    indexed: true,
+    notes: 'Rate tracks the national minimum wage. 26 weeks applies to births from 1 July 2026.',
+  },
   {
     id: 'income-tax-brackets',
     label: 'Income tax brackets & rates (Stage 3)',

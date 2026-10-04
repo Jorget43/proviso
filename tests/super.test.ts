@@ -183,6 +183,7 @@ describe('runHouseholdProjection — Sp8 startYear injection', () => {
   })
 
   it('falls back to the wall-clock year when omitted', () => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- dropping startYear is the point
     const { startYear: _drop, ...ctxWithoutStartYear } = makeContext()
     const r = runHouseholdProjection(makeHouseholdInputs({ partnerEnabled: false }), ctxWithoutStartYear)
     expect(r.person1.rows[0].year).toBe(new Date().getFullYear())

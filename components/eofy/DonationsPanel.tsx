@@ -91,6 +91,7 @@ export default function DonationsPanel({ initialDonations, fyEnding, fyLabel }: 
       setEditId(null)
     } else {
       const res = await fetch('/api/donations', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...body, source: 'manual' }) })
+      if (!res.ok) return  // failure is reported by SaveErrorToast
       const created: Donation = await res.json()
       setDonations(prev => [created, ...prev])
       setAdding(false)
@@ -118,7 +119,8 @@ export default function DonationsPanel({ initialDonations, fyEnding, fyLabel }: 
   function toggleSelect(id: number) {
     setSelected(prev => {
       const next = new Set(prev)
-      next.has(id) ? next.delete(id) : next.add(id)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
       return next
     })
   }

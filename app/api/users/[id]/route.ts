@@ -1,9 +1,8 @@
 import { prisma } from '@/lib/db'
-import { withErrors } from '@/lib/apiHandler'
+import { userUpdateSchema } from '@/lib/schemas'
+import { parseBody, withErrors } from '@/lib/apiHandler'
 import { authorize } from '@/lib/rbac'
 import { hashPassword } from '@/lib/auth'
-
-const ROLES = ['CFO', 'PARTNER', 'CHILD']
 
 // Guard: never let the household lose its last CFO.
 async function wouldRemoveLastCfo(targetId: number, newRole?: string): Promise<boolean> {
@@ -19,23 +18,17 @@ export const PUT = withErrors(async (req: Request, { params }: { params: Promise
   if (!gate.ok) return gate.res
   const id = parseInt((await params).id)
 
-  const { role, password, email } = await req.json()
+  const { role, password, email } = await parseBody(req, userUpdateSchema)
   const data: { role?: string; passwordHash?: string; email?: string | null } = {}
 
   if (role !== undefined) {
-    if (!ROLES.includes(role)) return Response.json({ error: 'Invalid role' }, { status: 400 })
     if (await wouldRemoveLastCfo(id, role)) {
       return Response.json({ error: 'Cannot demote the last CFO' }, { status: 400 })
     }
     data.role = role
   }
-  if (password !== undefined) {
-    if (String(password).length < 8) return Response.json({ error: 'Password must be at least 8 characters' }, { status: 400 })
-    data.passwordHash = await hashPassword(password)
-  }
-  if (email !== undefined) {
-    data.email = email ? String(email).trim() || null : null
-  }
+  if (password !== undefined) data.passwordHash = await hashPassword(password)
+  if (email !== undefined) data.email = email || null
   if (Object.keys(data).length === 0) {
     return Response.json({ error: 'Nothing to update' }, { status: 400 })
   }

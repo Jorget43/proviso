@@ -12,10 +12,6 @@ export interface AnnualExpense {
   month: number
 }
 
-const MONTH_NAMES = [
-  'January','February','March','April','May','June',
-  'July','August','September','October','November','December',
-]
 const MONTH_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 
 function nextExpected(month: number): string {
@@ -50,7 +46,7 @@ export default function AnnualExpensesPanel({ initialItems, canEdit }: Props) {
 
     if (editId !== null) {
       const res = await fetch(`/api/annual-expenses/${editId}`, {
-        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+        method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-Handles-Errors': '1' }, body: JSON.stringify(body),
       })
       if (!res.ok) { setError((await res.json()).error ?? 'Failed to save'); return }
       const updated = await res.json()
@@ -58,7 +54,7 @@ export default function AnnualExpensesPanel({ initialItems, canEdit }: Props) {
       setEditId(null)
     } else {
       const res = await fetch('/api/annual-expenses', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Handles-Errors': '1' }, body: JSON.stringify(body),
       })
       if (!res.ok) { setError((await res.json()).error ?? 'Failed to save'); return }
       const created = await res.json()
@@ -70,7 +66,7 @@ export default function AnnualExpensesPanel({ initialItems, canEdit }: Props) {
 
   async function remove(id: number) {
     setError(null)
-    const res = await fetch(`/api/annual-expenses/${id}`, { method: 'DELETE' })
+    const res = await fetch(`/api/annual-expenses/${id}`, { method: 'DELETE', headers: { 'X-Handles-Errors': '1' } })
     if (!res.ok) { setError('Failed to delete'); return }
     setItems(prev => prev.filter(i => i.id !== id))
   }
@@ -167,9 +163,11 @@ export default function AnnualExpensesPanel({ initialItems, canEdit }: Props) {
   )
 }
 
+type InlineFormState = { name: string; cat: string; amt: string; month: number }
+
 function InlineForm({ form, patch, onSubmit, onCancel }: {
-  form: { name: string; cat: string; amt: string; month: number }
-  patch: <K extends 'name' | 'cat' | 'amt' | 'month'>(k: K, v: any) => void
+  form: InlineFormState
+  patch: <K extends keyof InlineFormState>(k: K, v: InlineFormState[K]) => void
   onSubmit: (e: React.FormEvent) => void
   onCancel: () => void
 }) {

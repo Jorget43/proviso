@@ -3,6 +3,7 @@ import { prisma } from '@/lib/db'
 import { requireAdult } from '@/lib/auth'
 import { toMonthly } from '@/lib/formatting'
 import { computeCurrentNetWorth } from '@/lib/netWorth'
+import { findHelpDebt } from '@/lib/members'
 import type { LifePhase } from '@/lib/lifephases'
 import ProjectionsClient from '@/components/projections/ProjectionsClient'
 
@@ -21,11 +22,22 @@ export default async function ProjectionsPage() {
     prisma.mortgageSettings.findUniqueOrThrow({ where: { id: 1 } }),
     prisma.householdSettings.findUnique({ where: { id: 1 } }),
     prisma.schoolFeeLevel.findMany({ orderBy: { id: 'asc' } }),
-    (prisma.rentSettings as any).findUnique({ where: { id: 1 } }),
+    prisma.rentSettings.findUnique({ where: { id: 1 } }),
     prisma.netWorthSnapshot.findMany({ orderBy: { takenAt: 'asc' } }),
   ])
 
   const baseMonthlyExpenses = expenses.reduce((s, e) => s + toMonthly(e.amt, e.freq), 0)
+  // The Budget's mortgage repayment line(s). The engine models repayments
+  // itself (un-inflated, stopping at payoff), so the client takes this back out
+  // of the expense base while a mortgage is being modelled.
+  const budgetMortgageMonthly = expenses
+    .filter(e => e.cat === 'Home' && /mortgage/i.test(e.name))
+    .reduce((s, e) => s + toMonthly(e.amt, e.freq), 0)
+
+  const person1Name = hs?.person1Name ?? 'Person 1'
+  const person2Name = hs?.person2Name ?? 'Person 2'
+  const person1HELPBalance = findHelpDebt(debts, person1Name)?.amt ?? 0
+  const person2HELPBalance = hs?.partnerEnabled ? (findHelpDebt(debts, person2Name)?.amt ?? 0) : 0
 
   const { mortDebt, propValue, cryptoValue, cashOnHand } = computeCurrentNetWorth(debts, assets, mortgage)
 
@@ -42,6 +54,9 @@ export default async function ProjectionsPage() {
       initialLifePhases={lifePhases}
       income={income}
       baseMonthlyExpenses={baseMonthlyExpenses}
+      budgetMortgageMonthly={budgetMortgageMonthly}
+      person1HELPBalance={person1HELPBalance}
+      person2HELPBalance={person2HELPBalance}
       mortBalance={mortDebt}
       mortRate={mortgage.rate}
       mortPayment={mortgage.payment}
@@ -50,8 +65,8 @@ export default async function ProjectionsPage() {
       propValue={propValue}
       cryptoValue={cryptoValue}
       currentYear={currentYear}
-      person1Name={hs?.person1Name ?? 'Person 1'}
-      person2Name={hs?.person2Name ?? 'Person 2'}
+      person1Name={person1Name}
+      person2Name={person2Name}
       initialRentSettings={rentSettings ?? null}
       initialSnapshots={snapshots.map(s => ({ ...s, takenAt: s.takenAt.toISOString() }))}
     />

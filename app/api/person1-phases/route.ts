@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
-import { withErrors } from '@/lib/apiHandler'
+import { phaseCreateSchema } from '@/lib/schemas'
+import { parseBody, withErrors } from '@/lib/apiHandler'
 import { authorize, requireAdultRead } from '@/lib/rbac'
 import { prisma } from '@/lib/db'
 
@@ -13,7 +14,7 @@ export async function GET() {
 export const POST = withErrors(async (request: NextRequest) => {
   const gate = await authorize('budget:write')
   if (!gate.ok) return gate.res
-  const body = await request.json()
+  const body = await parseBody(request, phaseCreateSchema)
   const phase = await prisma.person1Phase.create({ data: { year: body.year, days: body.days ?? 5 } })
   return Response.json(phase, { status: 201 })
 })

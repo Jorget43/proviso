@@ -38,7 +38,7 @@ export default function SuperBanner({ result, person1CurrentAge, person1Retireme
       </div>
       <div className="b-div" />
       <div className="b-item">
-        <div className="b-label">In today's dollars</div>
+        <div className="b-label">In today’s dollars</div>
         <div className="b-value" style={{ color: 'var(--teal)' }}>{fmt(combinedRetirementTotalPV)}</div>
       </div>
       <div className="b-div" />

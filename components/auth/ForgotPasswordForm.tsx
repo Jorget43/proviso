@@ -29,7 +29,7 @@ export default function ForgotPasswordForm() {
                 <h1 style={{ fontFamily: 'var(--font-dm-serif)', fontSize: '1.4rem', margin: '0 0 2px' }}>Check your email</h1>
                 <p style={{ fontSize: '0.8rem', color: 'var(--t2)', margin: 0, lineHeight: 1.6 }}>
                   If that account has an email address on file, a reset link has been sent.
-                  If you don't have email set up, ask your CFO to relay the reset link.
+                  If you don’t have email set up, ask your CFO to relay the reset link.
                 </p>
               </div>
               <Link href="/login" style={{ fontSize: '0.78rem', color: 'var(--blue)', textDecoration: 'none' }}>
@@ -41,7 +41,7 @@ export default function ForgotPasswordForm() {
               <div>
                 <h1 style={{ fontFamily: 'var(--font-dm-serif)', fontSize: '1.4rem', margin: '0 0 2px' }}>Forgot password</h1>
                 <p style={{ fontSize: '0.76rem', color: 'var(--t3)', margin: 0 }}>
-                  Enter your username and we'll send a reset link.
+                  Enter your username and we’ll send a reset link.
                 </p>
               </div>
               <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>

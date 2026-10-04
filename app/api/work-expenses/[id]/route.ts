@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
-import { withErrors } from '@/lib/apiHandler'
+import { workExpenseSchema } from '@/lib/schemas'
+import { parseBody, withErrors } from '@/lib/apiHandler'
 import { prisma } from '@/lib/db'
 import { authorize } from '@/lib/rbac'
 
@@ -10,18 +11,11 @@ export const PUT = withErrors(async (req: NextRequest, { params }: { params: Pro
   if (!gate.ok) return gate.res
 
   const { id } = await params
-  const { description, amount, date, category, financialYr, receiptRef, notes } = await req.json()
+  // source/txnId are fixed at creation, so they're dropped from updates.
+  const { description, amount, date, category, financialYr, receiptRef, notes } = await parseBody(req, workExpenseSchema.partial())
   const row = await prisma.workExpense.update({
     where: { id: Number(id) },
-    data: {
-      description: String(description),
-      amount: Number(amount),
-      date: String(date),
-      category: category ?? 'Other',
-      financialYr: Number(financialYr),
-      receiptRef: receiptRef ? String(receiptRef) : '',
-      notes: notes ? String(notes) : '',
-    },
+    data:  { description, amount, date, category, financialYr, receiptRef, notes },
   })
   return Response.json(row)
 })

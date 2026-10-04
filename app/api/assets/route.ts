@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/db'
-import { withErrors } from '@/lib/apiHandler'
+import { assetSchema } from '@/lib/schemas'
+import { parseBody, withErrors } from '@/lib/apiHandler'
 import { authorize, requireAdultRead } from '@/lib/rbac'
 import { NextRequest } from 'next/server'
 
@@ -13,9 +14,9 @@ export async function GET() {
 export const POST = withErrors(async (request: NextRequest) => {
   const gate = await authorize('budget:write')
   if (!gate.ok) return gate.res
-  const body = await request.json()
+  const body = await parseBody(request, assetSchema)
   const asset = await prisma.asset.create({
-    data: { name: body.name ?? 'New asset', amt: body.amt ?? 0 },
+    data: { name: body.name ?? 'New asset', amt: body.amt ?? 0, isOffset: body.isOffset ?? false },
   })
   return Response.json(asset, { status: 201 })
 })

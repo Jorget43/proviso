@@ -39,6 +39,29 @@ export default function SettingsClient({
   const router   = useRouter()
   const [busy, setBusy] = useState(false)
   const [done, setDone] = useState(false)
+  const [names, setNames] = useState({ person1Name, person2Name })
+  const [nameMsg, setNameMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  const [savingNames, setSavingNames] = useState(false)
+  const namesChanged = names.person1Name.trim() !== person1Name || (partnerEnabled && names.person2Name.trim() !== person2Name)
+
+  async function saveNames(e: React.FormEvent) {
+    e.preventDefault()
+    setSavingNames(true)
+    setNameMsg(null)
+    const res = await fetch('/api/household', {
+      method:  'PUT',
+      headers: { 'Content-Type': 'application/json', 'X-Handles-Errors': '1' },
+      body:    JSON.stringify(partnerEnabled ? names : { person1Name: names.person1Name }),
+    })
+    const data = await res.json().catch(() => ({}))
+    setSavingNames(false)
+    if (!res.ok) {
+      setNameMsg({ ok: false, text: typeof data.error === 'string' && data.error !== 'Validation failed' ? data.error : 'Names must be 1–40 characters' })
+      return
+    }
+    setNameMsg({ ok: true, text: 'Names updated — history, HELP and investments follow automatically.' })
+    router.refresh()
+  }
 
   async function rerunWizard() {
     setBusy(true)
@@ -55,8 +78,33 @@ export default function SettingsClient({
 
       <Panel title="Household">
         <div className="da-grid" style={{ gap: '0.6rem' }}>
-          <div className="da-row"><span className="da-label">Person 1</span><span>{person1Name}</span></div>
-          <div className="da-row"><span className="da-label">Person 2</span><span>{partnerEnabled ? person2Name : '—'}</span></div>
+          {isCfo ? (
+            <form onSubmit={saveNames} style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+              <div className="da-row">
+                <label className="da-label" htmlFor="person1Name">Person 1</label>
+                <input id="person1Name" className="da-input" maxLength={40} value={names.person1Name}
+                  onChange={e => setNames(n => ({ ...n, person1Name: e.target.value }))} />
+              </div>
+              {partnerEnabled && (
+                <div className="da-row">
+                  <label className="da-label" htmlFor="person2Name">Person 2</label>
+                  <input id="person2Name" className="da-input" maxLength={40} value={names.person2Name}
+                    onChange={e => setNames(n => ({ ...n, person2Name: e.target.value }))} />
+                </div>
+              )}
+              {(namesChanged || nameMsg) && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: '0.74rem' }}>
+                  {namesChanged && <button type="submit" className="add-btn" disabled={savingNames}>{savingNames ? 'Saving…' : 'Save names'}</button>}
+                  {nameMsg && <span style={{ color: nameMsg.ok ? 'var(--green)' : 'var(--red)' }}>{nameMsg.text}</span>}
+                </div>
+              )}
+            </form>
+          ) : (
+            <>
+              <div className="da-row"><span className="da-label">Person 1</span><span>{person1Name}</span></div>
+              <div className="da-row"><span className="da-label">Person 2</span><span>{partnerEnabled ? person2Name : '—'}</span></div>
+            </>
+          )}
           <div className="da-row"><span className="da-label">{person1Name} income</span><span>{fmt(person1FTE)}/yr</span></div>
           {partnerEnabled && <div className="da-row"><span className="da-label">{person2Name} income</span><span>{fmt(person2FTE)}/yr</span></div>}
           <div className="da-row"><span className="da-label">Mortgage balance</span><span>{mortgageBalance > 0 ? fmt(mortgageBalance) : '—'}</span></div>

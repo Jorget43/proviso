@@ -1,17 +1,13 @@
+import { withErrors, parseBody } from '@/lib/apiHandler'
+import { resetPasswordSchema } from '@/lib/schemas'
 import { prisma } from '@/lib/db'
 import { hashPassword } from '@/lib/auth'
 
-export async function POST(req: Request) {
-  const { token, password } = await req.json()
-  if (!token || !password) {
-    return Response.json({ error: 'Token and password required' }, { status: 400 })
-  }
-  if (password.length < 8) {
-    return Response.json({ error: 'Password must be at least 8 characters' }, { status: 400 })
-  }
+export const POST = withErrors(async (req: Request) => {
+  const { token, password } = await parseBody(req, resetPasswordSchema)
 
   const reset = await prisma.passwordReset.findUnique({
-    where: { token: String(token) },
+    where: { token },
     include: { user: true },
   })
 
@@ -33,4 +29,4 @@ export async function POST(req: Request) {
   ])
 
   return Response.json({ ok: true })
-}
+})

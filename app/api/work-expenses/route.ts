@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
-import { withErrors } from '@/lib/apiHandler'
+import { workExpenseSchema } from '@/lib/schemas'
+import { parseBody, withErrors } from '@/lib/apiHandler'
 import { prisma } from '@/lib/db'
 import { authorize, requireAdultRead } from '@/lib/rbac'
 
@@ -20,21 +21,11 @@ export const POST = withErrors(async (req: NextRequest) => {
   const gate = await authorize('budget:write')
   if (!gate.ok) return gate.res
 
-  const { description, amount, date, category, financialYr, source, txnId, receiptRef, notes } = await req.json()
-  if (!description || amount == null || !date || !financialYr) {
-    return Response.json({ error: 'description, amount, date and financialYr are required' }, { status: 400 })
-  }
+  const { description, amount, date, category, financialYr, source, txnId, receiptRef, notes } = await parseBody(req, workExpenseSchema)
   const row = await prisma.workExpense.create({
     data: {
-      description: String(description),
-      amount: Number(amount),
-      date: String(date),
-      category: category ?? 'Other',
-      financialYr: Number(financialYr),
-      source: source ?? 'manual',
-      txnId: txnId ? Number(txnId) : null,
-      receiptRef: receiptRef ? String(receiptRef) : '',
-      notes: notes ? String(notes) : '',
+      description, amount, date, category: category ?? 'Other', financialYr,
+      source: source ?? 'manual', txnId: txnId ?? null, receiptRef: receiptRef ?? '', notes: notes ?? '',
     },
   })
   return Response.json(row, { status: 201 })

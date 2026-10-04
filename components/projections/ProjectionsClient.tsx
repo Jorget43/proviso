@@ -1,6 +1,6 @@
 'use client'
 import { useState, useMemo, useCallback } from 'react'
-import { toMonthly, fmtK } from '@/lib/formatting'
+import { fmtK } from '@/lib/formatting'
 import { runProjections, type ProjectionInputs } from '@/lib/projections'
 import { type FeeSchedule } from '@/lib/schoolFees'
 import { LOCATION_OPTIONS, presetScheduleFor, presetTotalFor } from '@/lib/educationCosts'
@@ -76,6 +76,9 @@ interface ProjectionsClientProps {
   initialFeeSchedule:   FeeRow[]
   income:               IncSettings
   baseMonthlyExpenses:  number
+  budgetMortgageMonthly: number
+  person1HELPBalance:   number
+  person2HELPBalance:   number
   mortBalance:          number
   mortRate:             number
   mortPayment:          number
@@ -98,10 +101,37 @@ const DEFAULT_RENT: RentSettingsType = {
   newMortgageRate: 6.0, newMortgageTermYrs: 30,
 }
 
+// Declared at module level: defined inside ProjectionsClient it was a new
+// component type on every render, so React remounted each slider whenever a
+// value changed — which can drop an in-progress drag or keyboard focus.
+function Slider({ label, min, max, step, value, cls, fmt: fmtFn = (v: number) => v + '%', onChange }: {
+  label: string; id?: string; min: number; max: number; step: number; value: number; cls: string
+  fmt?: (v: number) => string; onChange: (v: number) => void
+}) {
+  const dec = (v: number) => onChange(Math.max(min, parseFloat((v - step).toFixed(4))))
+  const inc = (v: number) => onChange(Math.min(max, parseFloat((v + step).toFixed(4))))
+  return (
+    <div className="slider-group">
+      <div className="slider-label">
+        {label} <span>{fmtFn(value)}</span>
+      </div>
+      <div className="slider-row">
+        <button className="slider-btn" type="button" onClick={() => dec(value)}>−</button>
+        <input
+          type="range" className={cls} min={min} max={max} step={step}
+          value={value}
+          onChange={e => onChange(parseFloat(e.target.value))}
+        />
+        <button className="slider-btn" type="button" onClick={() => inc(value)}>+</button>
+      </div>
+    </div>
+  )
+}
+
 export default function ProjectionsClient({
   canEdit,
   initialSettings, initialPerson1Phases, initialPerson2Phases, initialOneoffs, initialLifePhases, initialFeeSchedule,
-  income, baseMonthlyExpenses,
+  income, baseMonthlyExpenses, budgetMortgageMonthly, person1HELPBalance, person2HELPBalance,
   mortBalance, mortRate, mortPayment, mortEndDate,
   cashOnHand, propValue, cryptoValue, currentYear,
   person1Name, person2Name, initialRentSettings, initialSnapshots,
@@ -131,12 +161,25 @@ export default function ProjectionsClient({
     })
   }, [feeRows])
 
+  // While a mortgage is modelled, the engine pays it (un-inflated, stopping at
+  // payoff), so the Budget's mortgage line comes out of the inflating expense
+  // base. If no scheduled repayment is recorded, fall back to the Budget line.
+  const modelsMortgage   = !rentSt.enabled && mortBalance > 0
+  const effectivePayment = mortPayment > 0 ? mortPayment : budgetMortgageMonthly
+  const expensesExMortgage = modelsMortgage
+    ? Math.max(0, baseMonthlyExpenses - budgetMortgageMonthly)
+    : baseMonthlyExpenses
+
   const inputs = useMemo<ProjectionInputs>(() => ({
     person1FTE:           income.person1FTE,
     person2FTE:           income.person2FTE,
     taxMode:              income.taxMode,
-    person2HasHELP:       income.person2HasHELP,
-    person2HELPBalance:   income.person2HasHELP ? 50000 : 0,
+    // HELP is modelled whenever a balance is recorded on the Debts tab —
+    // repayments are compulsory, whatever the Budget toggle says.
+    person1HasHELP:       person1HELPBalance > 0,
+    person1HELPBalance,
+    person2HasHELP:       person2HELPBalance > 0,
+    person2HELPBalance,
     person1MonthlyNet:    income.person1MonthlyNet,
     person2MonthlyNet:    income.person2MonthlyNet,
     person1GrowthRate:    settings.person1Growth,
@@ -150,14 +193,13 @@ export default function ProjectionsClient({
     projYears:            settings.projYears,
     mortBalance,
     mortRate,
-    mortPayment,
+    mortPayment:          effectivePayment,
     cashOnHand,
     propValue,
     cryptoValue,
-    helpDebt:             income.person2HasHELP ? 50000 : 0,
     person1Phases,
     person2Phases,
-    baseMonthlyExpenses,
+    baseMonthlyExpenses:  expensesExMortgage,
     oneoffs,
     parentalLeaveEnabled: settings.parentalLeaveEnabled,
     schoolFeesOn:         settings.schoolFeesOn,
@@ -180,7 +222,7 @@ export default function ProjectionsClient({
     depositFromInvestments: rentSt.depositFromInvestments,
     newMortgageRate:       rentSt.newMortgageRate,
     newMortgageTermYrs:    rentSt.newMortgageTermYrs,
-  }), [settings, person1Phases, person2Phases, oneoffs, lifePhases, income, sfSchedule, baseMonthlyExpenses, mortBalance, mortRate, mortPayment, cashOnHand, propValue, cryptoValue, currentYear, rentSt])
+  }), [settings, person1Phases, person2Phases, oneoffs, lifePhases, income, sfSchedule, expensesExMortgage, mortBalance, mortRate, effectivePayment, person1HELPBalance, person2HELPBalance, cashOnHand, propValue, cryptoValue, currentYear, rentSt])
 
   const output = useMemo(() => runProjections(inputs), [inputs])
   const main   = output.withFees ?? output.base
@@ -239,6 +281,7 @@ export default function ProjectionsClient({
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ year: maxY + 2, days: 5 }),
     })
+    if (!res.ok) return  // failure is reported by SaveErrorToast
     const created: WorkPhaseRow = await res.json()
     setPerson1Phases(prev => [...prev, created])
   }, [person1Phases, currentYear])
@@ -265,6 +308,7 @@ export default function ProjectionsClient({
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ year: maxY + 2, days: 3 }),
     })
+    if (!res.ok) return  // failure is reported by SaveErrorToast
     const created: WorkPhaseRow = await res.json()
     setPerson2Phases(prev => [...prev, created])
   }, [person2Phases, currentYear])
@@ -290,6 +334,7 @@ export default function ProjectionsClient({
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: 'New expense', amt: 0, year: currentYear + 1 }),
     })
+    if (!res.ok) return  // failure is reported by SaveErrorToast
     const created: OneOffRow = await res.json()
     setOneoffs(prev => [...prev, created])
   }, [currentYear])
@@ -316,6 +361,7 @@ export default function ProjectionsClient({
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ takenAt, netWorth }),
     })
+    if (!res.ok) return  // failure is reported by SaveErrorToast
     const created: NetWorthSnapshotRow = await res.json()
     setSnapshots(prev => [...prev, created].sort((a, b) => new Date(a.takenAt).getTime() - new Date(b.takenAt).getTime()))
   }, [])
@@ -335,32 +381,6 @@ export default function ProjectionsClient({
     })
   }, [])
 
-  function Slider({ label, id, min, max, step, value, cls, fmt: fmtFn = (v: number) => v + '%', onChange }: {
-    label: string; id: string; min: number; max: number; step: number; value: number; cls: string; fmt?: (v: number) => string; onChange?: (v: number) => void
-  }) {
-    const apply = (v: number) => {
-      if (onChange) onChange(v)
-      else patchSettings({ [id]: v } as Partial<ProjSettings>)
-    }
-    const dec = (v: number) => apply(Math.max(min, parseFloat((v - step).toFixed(4))))
-    const inc = (v: number) => apply(Math.min(max, parseFloat((v + step).toFixed(4))))
-    return (
-      <div className="slider-group">
-        <div className="slider-label">
-          {label} <span>{fmtFn(value)}</span>
-        </div>
-        <div className="slider-row">
-          <button className="slider-btn" type="button" onClick={() => dec(value)}>−</button>
-          <input
-            type="range" className={cls} min={min} max={max} step={step}
-            value={value}
-            onChange={e => apply(parseFloat(e.target.value))}
-          />
-          <button className="slider-btn" type="button" onClick={() => inc(value)}>+</button>
-        </div>
-      </div>
-    )
-  }
 
   return (
     <div className="page">
@@ -499,20 +519,20 @@ export default function ProjectionsClient({
 
           <div style={{ marginTop: '1rem' }}>
             <Panel title="Income & wage growth" dotColor="var(--blue)">
-              <Slider label={`${person2Name} wage growth / yr`} id="person2Growth" min={0} max={15} step={0.5} value={settings.person2Growth} cls="green-t" />
-              <Slider label={`${person1Name} wage growth / yr`} id="person1Growth" min={0} max={15} step={0.5} value={settings.person1Growth} cls="blue-t"  />
+              <Slider label={`${person2Name} wage growth / yr`} id="person2Growth" min={0} max={15} step={0.5} value={settings.person2Growth} cls="green-t" onChange={v => patchSettings({ person2Growth: v })} />
+              <Slider label={`${person1Name} wage growth / yr`} id="person1Growth" min={0} max={15} step={0.5} value={settings.person1Growth} cls="blue-t" onChange={v => patchSettings({ person1Growth: v })} />
             </Panel>
           </div>
 
           <div style={{ marginTop: '1rem' }}>
             <Panel title="Economy & investments" dotColor="var(--amber)">
-              <Slider label="Near-term inflation 2026–28" id="expInflNear"   min={0} max={10}  step={0.5} value={settings.expInflNear}   cls="red-t"    />
-              <Slider label="Long-run inflation 2029+"    id="expInfl"       min={0} max={8}   step={0.5} value={settings.expInfl}       cls="red-t"    />
-              <Slider label="Childcare inflation / yr"    id="childcareInfl" min={0} max={15}  step={0.5} value={settings.childcareInfl} cls="pink-t"   />
-              <Slider label="Property growth / yr"        id="propGrowth"    min={0} max={12}  step={0.5} value={settings.propGrowth}    cls="amber-t"  />
-              <Slider label="Surplus invested %"          id="savingsRate"   min={0} max={100} step={5}   value={settings.savingsRate}   cls="purple-t" fmt={v => v + '%'} />
-              <Slider label="Investment return / yr"      id="investReturn"  min={0} max={15}  step={0.5} value={settings.investReturn}  cls="purple-t" />
-              <Slider label="Projection horizon"          id="projYears"     min={5} max={40}  step={1}   value={settings.projYears}     cls="amber-t"  fmt={v => v + ' yrs'} />
+              <Slider label="Near-term inflation 2026–28" id="expInflNear"   min={0} max={10}  step={0.5} value={settings.expInflNear}   cls="red-t" onChange={v => patchSettings({ expInflNear: v })} />
+              <Slider label="Long-run inflation 2029+"    id="expInfl"       min={0} max={8}   step={0.5} value={settings.expInfl}       cls="red-t" onChange={v => patchSettings({ expInfl: v })} />
+              <Slider label="Childcare inflation / yr"    id="childcareInfl" min={0} max={15}  step={0.5} value={settings.childcareInfl} cls="pink-t" onChange={v => patchSettings({ childcareInfl: v })} />
+              <Slider label="Property growth / yr"        id="propGrowth"    min={0} max={12}  step={0.5} value={settings.propGrowth}    cls="amber-t" onChange={v => patchSettings({ propGrowth: v })} />
+              <Slider label="Surplus invested %"          id="savingsRate"   min={0} max={100} step={5}   value={settings.savingsRate}   cls="purple-t" fmt={v => v + '%'} onChange={v => patchSettings({ savingsRate: v })} />
+              <Slider label="Investment return / yr"      id="investReturn"  min={0} max={15}  step={0.5} value={settings.investReturn}  cls="purple-t" onChange={v => patchSettings({ investReturn: v })} />
+              <Slider label="Projection horizon"          id="projYears"     min={5} max={40}  step={1}   value={settings.projYears}     cls="amber-t"  fmt={v => v + ' yrs'} onChange={v => patchSettings({ projYears: v })} />
             </Panel>
           </div>
 
@@ -764,7 +784,7 @@ export default function ProjectionsClient({
                     </select>
                   </div>
                   <div style={{ marginTop: '0.5rem' }}>
-                    <Slider label="Fee inflation / yr" id="sfInfl" min={0} max={10} step={0.5} value={settings.sfInfl} cls="teal-t" />
+                    <Slider label="Fee inflation / yr" id="sfInfl" min={0} max={10} step={0.5} value={settings.sfInfl} cls="teal-t" onChange={v => patchSettings({ sfInfl: v })} />
                   </div>
                   {/* Editable fee schedule — only in Custom mode */}
                   <details style={{ marginTop: 8, display: settings.sfPresetKey ? 'none' : undefined }}>
@@ -851,7 +871,8 @@ export default function ProjectionsClient({
                   { label: 'Final mortgage',  val: fmtK(main.mortArr[main.mortArr.length - 1]),     color: 'var(--red)' },
                   { label: 'Expense base',    val: '$' + Math.round(baseMonthlyExpenses).toLocaleString('en-AU') + '/mo', color: '' },
                   { label: 'Leave years',     val: main.leaveYrs.join(', ') || 'None',             color: main.leaveYrs.length ? 'var(--pink)' : '' },
-                  ...(income.person2HasHELP ? [{ label: 'Person2 HELP cleared', val: main.helpClearedYr ? String(main.helpClearedYr) : `Beyond ${settings.projYears}yr horizon`, color: main.helpClearedYr ? 'var(--teal)' : '' }] : []),
+                  ...(person1HELPBalance > 0 ? [{ label: `${person1Name} HELP cleared`, val: main.person1HelpClearedYr ? String(main.person1HelpClearedYr) : `Beyond ${settings.projYears}yr horizon`, color: main.person1HelpClearedYr ? 'var(--teal)' : '' }] : []),
+...(person2HELPBalance > 0 ? [{ label: `${person2Name} HELP cleared`, val: main.person2HelpClearedYr ? String(main.person2HelpClearedYr) : `Beyond ${settings.projYears}yr horizon`, color: main.person2HelpClearedYr ? 'var(--teal)' : '' }] : []),
                 ].map(({ label, val, color }) => (
                   <div key={label} style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ color: 'var(--t2)' }}>{label}</span>

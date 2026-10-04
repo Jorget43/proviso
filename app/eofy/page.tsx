@@ -190,7 +190,7 @@ export default async function EofyPage() {
       <div style={{ marginBottom: 20 }}>
         <Panel title="Charitable donations" dotColor="var(--green)">
           <DonationsPanel
-            initialDonations={donations as any}
+            initialDonations={donations}
             fyEnding={fyEnding}
             fyLabel={fyLabel}
           />
@@ -201,7 +201,7 @@ export default async function EofyPage() {
       <div style={{ marginBottom: 20 }}>
         <Panel title="Work expenses" dotColor="var(--blue)">
           <WorkExpensesPanel
-            initialExpenses={workExpenses as any}
+            initialExpenses={workExpenses}
             fyEnding={fyEnding}
             fyLabel={fyLabel}
           />

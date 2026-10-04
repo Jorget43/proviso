@@ -1,3 +1,5 @@
+import { withErrors, parseBody } from '@/lib/apiHandler'
+import { totpEnableSchema, totpDisableSchema } from '@/lib/schemas'
 import { verify as totpVerify, generateSecret, generateURI } from 'otplib'
 import QRCode from 'qrcode'
 import { randomBytes } from 'crypto'
@@ -19,12 +21,11 @@ export async function GET() {
 }
 
 // POST  — verify the code against the submitted secret and save to DB; return recovery codes
-export async function POST(req: Request) {
+export const POST = withErrors(async (req: Request) => {
   const session = await getSession()
   if (!session) return Response.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { secret, code } = await req.json()
-  if (!secret || !code) return Response.json({ error: 'Secret and code required' }, { status: 400 })
+  const { secret, code } = await parseBody(req, totpEnableSchema, 'Enter the 6-digit code')
 
   const result = await totpVerify({ token: String(code).replace(/\s/g, ''), secret: String(secret) })
   if (!result?.valid) return Response.json({ error: 'Invalid code — try again' }, { status: 400 })
@@ -38,15 +39,14 @@ export async function POST(req: Request) {
   })
 
   return Response.json({ recoveryCodes: plainCodes })
-}
+})
 
 // DELETE — disable TOTP (requires current password confirmation)
-export async function DELETE(req: Request) {
+export const DELETE = withErrors(async (req: Request) => {
   const session = await getSession()
   if (!session) return Response.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { password } = await req.json()
-  if (!password) return Response.json({ error: 'Password required to disable 2FA' }, { status: 400 })
+  const { password } = await parseBody(req, totpDisableSchema, 'Password required to disable 2FA')
 
   const user = await prisma.user.findUnique({ where: { id: session.userId } })
   if (!user) return Response.json({ error: 'User not found' }, { status: 404 })
@@ -60,4 +60,4 @@ export async function DELETE(req: Request) {
   })
 
   return Response.json({ ok: true })
-}
+})

@@ -1,3 +1,5 @@
+import type { AuthenticatorTransportFuture } from '@simplewebauthn/server'
+import { withErrors, ApiError } from '@/lib/apiHandler'
 import { prisma } from '@/lib/db'
 import { verifyAuthenticationResponse } from '@simplewebauthn/server'
 import { createSession } from '@/lib/auth'
@@ -9,13 +11,13 @@ function getRpParams(req: Request) {
   return { rpID, origin }
 }
 
-export async function POST(req: Request) {
+export const POST = withErrors(async (req: Request) => {
   const body = await req.json()
   const { rpID, origin } = getRpParams(req)
 
   // Decode challenge from clientDataJSON
-  const clientDataJSON = JSON.parse(
-    Buffer.from(body.response.clientDataJSON, 'base64').toString('utf8'),
+  const clientDataJSON = decodeClientData(
+    Buffer.from(String(body?.response?.clientDataJSON ?? ''), 'base64').toString('utf8'),
   )
   const challenge = clientDataJSON.challenge as string
 
@@ -45,7 +47,7 @@ export async function POST(req: Request) {
         publicKey:  new Uint8Array(passkey.publicKey as Buffer),
         counter:    Number(passkey.counter),
         transports: passkey.transports
-          ? (passkey.transports.split(',').filter(Boolean) as any[])
+          ? (passkey.transports.split(',').filter(Boolean) as AuthenticatorTransportFuture[])
           : undefined,
       },
     })
@@ -70,4 +72,15 @@ export async function POST(req: Request) {
 
   await createSession(passkey.userId)
   return Response.json({ ok: true })
+})
+
+// Decode WebAuthn clientDataJSON; a malformed payload is a 400, not a 500.
+function decodeClientData(json: string): { challenge: string } {
+  try {
+    const parsed = JSON.parse(json)
+    if (typeof parsed?.challenge !== 'string') throw new Error('no challenge')
+    return parsed
+  } catch {
+    throw new ApiError(400, 'Malformed passkey response')
+  }
 }

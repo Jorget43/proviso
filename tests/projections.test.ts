@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import { runProjections, type ProjectionResult } from '@/lib/projections'
 import { computeMonthlyRepayment } from '@/lib/mortgage'
+import { calcAfterTax } from '@/lib/tax'
+import { PPL_TOTAL } from '@/lib/constants'
 import {
   makeProjectionInputs, renter, renterBuyingIn, withLeave,
 } from './fixtures/projections'
@@ -18,9 +20,9 @@ import {
 
 function expectShape(r: ProjectionResult, years: number) {
   expect(Object.keys(r).sort()).toEqual([
-    'cashArr', 'cashRunningArr', 'deficitArr', 'expArr', 'helpClearedYr', 'incArr',
+    'cashArr', 'cashRunningArr', 'deficitArr', 'expArr', 'incArr',
     'investArr', 'leaveYrs', 'mortArr', 'mortStressArr', 'nwArr', 'person1Arr',
-    'person2Arr', 'phaseArr', 'purchaseYr', 'rentArr', 'sfC1Arr', 'sfC2Arr',
+    'person1HelpClearedYr', 'person2Arr', 'person2HelpClearedYr', 'phaseArr', 'purchaseYr', 'rentArr', 'sfC1Arr', 'sfC2Arr',
     'sfSibArr', 'sfTotalArr',
   ])
   for (const k of ['nwArr', 'incArr', 'expArr', 'mortArr', 'cashArr', 'investArr'] as const) {
@@ -69,7 +71,8 @@ describe('runProjections — S1 homeowner baseline (all dials at 0)', () => {
     expect(base.rentArr).toEqual([0, 0, 0, 0, 0])
     expect(base.sfTotalArr).toEqual([0, 0, 0, 0, 0])
     expect(base.leaveYrs).toEqual([])
-    expect(base.helpClearedYr).toBeNull()
+    expect(base.person1HelpClearedYr).toBeNull()
+    expect(base.person2HelpClearedYr).toBeNull()
     expect(base.purchaseYr).toBeNull()
   })
 
@@ -95,17 +98,17 @@ describe('runProjections — S2 stepped inflation (near-term 2026-28, long-run 2
   const { base } = runProjections(makeProjectionInputs({ expInflNear: 4, expInfl: 2.5 }))
 
   it('applies the near-term rate through 2028, then the long-run rate from 2029', () => {
-    // expBase compounds *before* being pushed each year (line 228), so year i's
-    // expArr reflects (i+1) applications of the rate(s) up to and including yr.
-    const e0 = 96000 * 1.04            // 2027
+    // expBase compounds *before* being pushed each year, so year i's expArr
+    // reflects (i+1) applications of the rate(s) up to and including yr. Only
+    // the non-mortgage base (60k) inflates; the 36k of repayments is fixed.
+    const e0 = 60000 * 1.04            // 2027
     const e1 = e0 * 1.04                // 2028 (still near-term: yr<=2028)
     const e2 = e1 * 1.025                // 2029 (switches to long-run)
     const e3 = e2 * 1.025                // 2030
-    expect(base.expArr[0]).toBe(Math.round(e0))
-    expect(base.expArr[1]).toBe(Math.round(e1))
-    expect(base.expArr[2]).toBe(Math.round(e2))
-    expect(base.expArr[3]).toBe(Math.round(e3))
-    expect(base.expArr).toEqual([99840, 103834, 106429, 109090, 111817])
+    expect(base.expArr[0]).toBe(Math.round(e0 + 36000))
+    expect(base.expArr[1]).toBe(Math.round(e1 + 36000))
+    expect(base.expArr[2]).toBe(Math.round(e2 + 36000))
+    expect(base.expArr[3]).toBe(Math.round(e3 + 36000))
   })
 })
 
@@ -195,8 +198,8 @@ describe('runProjections — S5 parental leave', () => {
 
   it('records the leave year and pays PPL in the first leave year only', () => {
     expect(base.leaveYrs).toEqual([2028])
-    // PPL_MONTHLY(1373) × PPL_MONTHS(4)
-    expect(base.person2Arr[1]).toBe(5492)
+    // 26 weeks × PPL_WEEKLY, taxed as income
+    expect(base.person2Arr[1]).toBe(Math.round(calcAfterTax(PPL_TOTAL)))
   })
 
   it('pays nothing on leave when parentalLeaveEnabled is false', () => {
@@ -213,7 +216,8 @@ describe('runProjections — S5 parental leave', () => {
 
   it('mortgage stress rises in the leave year (household gross income falls)', () => {
     expect(base.mortStressArr[1]).toBeGreaterThan(base.mortStressArr[0])
-    expect(base.mortStressArr[1]).toBe(28.7) // 3000×12 / (120000+5492) × 100
+    // 3000×12 / (120000 gross + PPL gross) × 100
+    expect(base.mortStressArr[1]).toBe(parseFloat((36000 / (120000 + PPL_TOTAL) * 100).toFixed(1)))
   })
 })
 
@@ -227,7 +231,7 @@ describe('runProjections — S5b two consecutive leave years (PPL edge case)', (
 
   it('flags both years as on-leave but pays PPL only in the first', () => {
     expect(base.leaveYrs).toEqual([2027, 2028])
-    expect(base.person2Arr[0]).toBe(5492) // 2027 — first leave year, PPL paid
+    expect(base.person2Arr[0]).toBe(Math.round(calcAfterTax(PPL_TOTAL))) // 2027 — first leave year, PPL paid
     expect(base.person2Arr[1]).toBe(0)    // 2028 — still on leave, no PPL
     expect(base.person2Arr[2]).toBe(90812) // 2029 — back full-time
   })
@@ -283,19 +287,29 @@ describe('runProjections — S6b the drift regression (sfInfl=5, currentYear=202
 
 describe('runProjections — S7 HELP clearing', () => {
   const { base } = runProjections(makeProjectionInputs({
-    person2HasHELP: true, person2HELPBalance: 9_000, helpDebt: 25_000,
+    person2HasHELP: true, person2HELPBalance: 9_000,
   }))
 
   it('clears in the second year and reports the correct year', () => {
-    expect(base.helpClearedYr).toBe(2028)
+    expect(base.person2HelpClearedYr).toBe(2028)
+    expect(base.person1HelpClearedYr).toBeNull()
   })
 
   it('deducts the full statutory repayment in year 1: calcAfterTax(120000,true) = 90812 - 8400', () => {
     expect(base.person2Arr[0]).toBe(82412)
   })
 
-  it('characterizes a known defect: the clearing year still deducts the FULL repayment (8400), not the residual (600) — helpActive is read from the pre-repayment balance (projections.ts:272,280-283)', () => {
-    expect(base.person2Arr[1]).toBe(82412) // same as year 1, even though only $600 of debt remained
+  it('the clearing year deducts only the residual owed (600), not the full repayment', () => {
+    expect(base.person2Arr[1]).toBe(90212) // 90812 − 600
+  })
+
+  it('counts the outstanding HELP balance as a debt in net worth', () => {
+    // No mortgage, so lower cash doesn't also change offset interest.
+    const noLoan = { mortBalance: 0, mortPayment: 0 }
+    const noHelp = runProjections(makeProjectionInputs(noLoan)).base
+    const withHelp = runProjections(makeProjectionInputs({ ...noLoan, person2HasHELP: true, person2HELPBalance: 9_000 })).base
+    // End of year 1: 600 still owed, and 8400 less take-home than without HELP.
+    expect(noHelp.nwArr[0] - withHelp.nwArr[0]).toBe(600 + 8400)
   })
 
   it('once cleared, income returns to the no-HELP figure', () => {
@@ -304,7 +318,8 @@ describe('runProjections — S7 HELP clearing', () => {
 })
 
 describe('runProjections — S8 deficit year', () => {
-  const { base } = runProjections(makeProjectionInputs({ baseMonthlyExpenses: 20_000 }))
+  // 17k + the 3k mortgage repayment = 20k/month = 240k/yr of expenses.
+  const { base } = runProjections(makeProjectionInputs({ baseMonthlyExpenses: 17_000 }))
 
   it('runs a flat deficit: 181624 - 240000 = -58376', () => {
     expect(base.deficitArr).toEqual([-58376, -58376, -58376, -58376, -58376])

@@ -95,7 +95,7 @@ async function main() {
   // Users can edit, delete, and add their own via the Budget tab.
   const aeCount = await prisma.annualExpense.count();
   if (aeCount === 0) {
-    await (prisma.annualExpense.createMany as Function)({
+    await prisma.annualExpense.createMany({
       data: [
         { name: 'Council rates',   cat: 'Home',      amt:  1200, month: 2 },
         { name: 'Car rego',        cat: 'Transport',  amt:   900, month: 5 },
@@ -141,7 +141,7 @@ async function main() {
   }
 
   // ── Rent settings ─────────────────────────────────────────────────────────
-  await (prisma.rentSettings as any).upsert({
+  await prisma.rentSettings.upsert({
     where:  { id: 1 },
     update: {},
     create: {

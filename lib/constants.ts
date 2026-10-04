@@ -13,8 +13,17 @@ export const CAT_COLORS = [
 ];
 
 export const PARTNER_FTE = 100000;
-export const PPL_MONTHLY = 1373;
-export const PPL_MONTHS = 4;
+// Paid Parental Leave (Services Australia), FY2026-27 rates: paid at the
+// national minimum wage — $26.44/hr x 7.6 h = $200.94/day, 5 days/week —
+// for 26 weeks for births from 1 July 2026. It is TAXABLE income (callers
+// run it through calcAfterTax). Super is also paid on it, into the parent's
+// fund, which these cashflow models don't track. Re-check every 1 July: see
+// the 'ppl-rate' watchdog entry (lib/watchdog.ts).
+export const PPL_WEEKLY  = 1004.70;
+export const PPL_WEEKS   = 26;
+export const PPL_TOTAL   = PPL_WEEKLY * PPL_WEEKS;   // gross, per birth
+export const PPL_MONTHS  = (PPL_WEEKS * 12) / 52;     // 6 months
+export const PPL_MONTHLY = PPL_TOTAL / PPL_MONTHS;    // gross per month on PPL
 
 /**
  * Calendar year in which all default cost figures are denominated — the

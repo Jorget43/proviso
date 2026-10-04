@@ -3,7 +3,7 @@ import { prisma } from '@/lib/db'
 import { requireAdult } from '@/lib/auth'
 import { calcAfterTax } from '@/lib/tax'
 import { toMonthly } from '@/lib/formatting'
-import { CATS, PPL_MONTHLY, PPL_MONTHS } from '@/lib/constants'
+import { CATS, PPL_TOTAL, PPL_MONTHS, PPL_WEEKS } from '@/lib/constants'
 import { workDaysForYear } from '@/lib/projections'
 import { computeCashOnHand } from '@/lib/netWorth'
 import Panel from '@/components/ui/Panel'
@@ -51,7 +51,9 @@ export default async function CashflowPage() {
   const totalExp = expenses.reduce((s, e) => s + toMonthly(e.amt, e.freq), 0)
   const delta = totalInc - totalExp
 
-  const leaveDelta = person1Net + PPL_MONTHLY - totalExp
+  // PPL is taxable: spread its after-tax amount over the months it's paid.
+  const pplNetMonthly = calcAfterTax(PPL_TOTAL) / PPL_MONTHS
+  const leaveDelta = person1Net + pplNetMonthly - totalExp
   const burnDelta  = person1Net - totalExp
   const runway     = burnDelta < 0 ? cashOnHand / Math.abs(burnDelta) : Infinity
 
@@ -121,7 +123,7 @@ export default async function CashflowPage() {
               labels={labels}
               data={burnData}
               color="#9B2560"
-              note={`${person2Name} on leave — PPL for 18 wks, then ${person1Name} only.`}
+              note={`${person2Name} on leave — PPL for ${PPL_WEEKS} wks (after tax), then ${person1Name} only.`}
             />
           </Panel>
         )}

@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
-import { withErrors } from '@/lib/apiHandler'
+import { donationSchema } from '@/lib/schemas'
+import { parseBody, withErrors } from '@/lib/apiHandler'
 import { prisma } from '@/lib/db'
 import { authorize } from '@/lib/rbac'
 
@@ -10,17 +11,11 @@ export const PUT = withErrors(async (req: NextRequest, { params }: { params: Pro
   if (!gate.ok) return gate.res
 
   const { id } = await params
-  const { charity, abn, amount, date, financialYr, notes } = await req.json()
+  // source/txnId are fixed at creation, so they're dropped from updates.
+  const { charity, abn, amount, date, financialYr, notes } = await parseBody(req, donationSchema.partial())
   const row = await prisma.donation.update({
     where: { id: Number(id) },
-    data: {
-      charity: String(charity),
-      abn: abn ? String(abn) : '',
-      amount: Number(amount),
-      date: String(date),
-      financialYr: Number(financialYr),
-      notes: notes ? String(notes) : '',
-    },
+    data:  { charity, abn, amount, date, financialYr, notes },
   })
   return Response.json(row)
 })

@@ -1,16 +1,18 @@
+import { withErrors, parseBody } from '@/lib/apiHandler'
+import { forgotPasswordSchema } from '@/lib/schemas'
 import { randomBytes } from 'crypto'
 import { prisma } from '@/lib/db'
 import { sendResetEmail } from '@/lib/resetEmail'
 
 const TOKEN_TTL_MS = 60 * 60 * 1000 // 1 hour
 
-export async function POST(req: Request) {
-  const { username } = await req.json()
+export const POST = withErrors(async (req: Request) => {
+  const { username } = await parseBody(req, forgotPasswordSchema).catch(() => ({ username: undefined }))
   if (!username) {
     return Response.json({ ok: true }) // no enumeration
   }
 
-  const user = await prisma.user.findUnique({ where: { username: String(username).trim() } })
+  const user = await prisma.user.findUnique({ where: { username } })
 
   // Always return success — never reveal whether the username exists or has an email.
   if (user?.email) {
@@ -35,4 +37,4 @@ export async function POST(req: Request) {
   }
 
   return Response.json({ ok: true })
-}
+})

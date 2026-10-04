@@ -63,7 +63,7 @@ export default function SecurityPanel({ hasTOTP }: Props) {
         <>
           <p style={{ fontSize: '0.78rem', color: 'var(--t2)', margin: '0 0 12px', lineHeight: 1.5 }}>
             Two-factor authentication adds a second layer of security to your account.
-            After signing in with your password, you'll be asked for a code from your authenticator app.
+            After signing in with your password, you’ll be asked for a code from your authenticator app.
           </p>
           {error && <ErrorBox message={error} />}
           <button className="add-btn" disabled={busy} onClick={startEnroll}>
@@ -82,7 +82,7 @@ export default function SecurityPanel({ hasTOTP }: Props) {
             <Image src={qr} alt="TOTP QR code" width={180} height={180} unoptimized />
           </div>
           <details style={{ marginBottom: 12 }}>
-            <summary style={{ fontSize: '0.72rem', color: 'var(--t3)', cursor: 'pointer' }}>Can't scan? Enter manually</summary>
+            <summary style={{ fontSize: '0.72rem', color: 'var(--t3)', cursor: 'pointer' }}>Can’t scan? Enter manually</summary>
             <div style={{ fontSize: '0.72rem', fontFamily: 'monospace', background: 'var(--surface2)',
               border: '1px solid var(--border)', borderRadius: 5, padding: '6px 8px', marginTop: 6,
               wordBreak: 'break-all', color: 'var(--t2)' }}>
@@ -114,7 +114,7 @@ export default function SecurityPanel({ hasTOTP }: Props) {
             </div>
             <p style={{ fontSize: '0.73rem', color: 'var(--t2)', margin: 0, lineHeight: 1.5 }}>
               These codes can each be used once if you lose access to your authenticator app.
-              Store them somewhere safe — they won't be shown again.
+              Store them somewhere safe — they won’t be shown again.
             </p>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 14 }}>

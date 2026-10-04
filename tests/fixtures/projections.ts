@@ -22,6 +22,8 @@ export function makeProjectionInputs(overrides: Partial<ProjectionInputs> = {}):
     person1FTE: 120_000,
     person2FTE: 120_000,
     taxMode: true,
+    person1HasHELP: false,
+    person1HELPBalance: 0,
     person2HasHELP: false,
     person2HELPBalance: 0,
     person1MonthlyNet: 7_000,
@@ -46,13 +48,14 @@ export function makeProjectionInputs(overrides: Partial<ProjectionInputs> = {}):
     cashOnHand: 50_000,
     propValue: 800_000,
     cryptoValue: 10_000,
-    helpDebt: 0,
 
     // ── Both persons full-time from the fixture year ──
     person1Phases: [{ year: FX_YEAR, days: 5 }],
     person2Phases: [{ year: FX_YEAR, days: 5 }],
 
-    baseMonthlyExpenses: 8_000, // → $96,000/yr
+    // Excludes the mortgage: $5,000 + the $3,000 repayment the engine pays
+    // itself = $8,000/month ($96,000/yr) of reported expenses while the loan runs.
+    baseMonthlyExpenses: 5_000,
     oneoffs: [],
     parentalLeaveEnabled: true,
 
@@ -89,6 +92,8 @@ export function makeProjectionInputs(overrides: Partial<ProjectionInputs> = {}):
 export function renter(overrides: Partial<ProjectionInputs> = {}): ProjectionInputs {
   return makeProjectionInputs({
     rentMode: true,
+    // No mortgage to exclude, so the whole $8,000/month budget is the base.
+    baseMonthlyExpenses: 8_000,
     monthlyRent: 2_500,
     rentIncreaseRate: 0,
     mortBalance: 0,

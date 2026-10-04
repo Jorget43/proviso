@@ -16,7 +16,7 @@ export default async function BudgetPage() {
     prisma.householdSettings.findUnique({ where: { id: 1 } }),
     prisma.childcareSettings.upsert({ where: { id: 1 }, update: {}, create: { id: 1 } }),
     prisma.annualExpense.findMany({ orderBy: { month: 'asc' } }),
-    (prisma.rentSettings as any).findUnique({ where: { id: 1 } }),
+    prisma.rentSettings.findUnique({ where: { id: 1 } }),
   ])
 
   const currentYear = new Date().getFullYear()

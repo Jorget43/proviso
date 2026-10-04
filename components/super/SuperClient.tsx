@@ -41,6 +41,12 @@ export default function SuperClient({ canEdit, initial, context, mortgage, budge
   // NOT persisted (carry-forward is derived from SuperHistory rows, not a
   // saved setting), only used to feed usable headroom into the projection.
   const [cfByMember, setCfByMember] = useState<Record<string, CarryForwardResult>>({})
+  // Stable identity: a fresh array each render used to drive an infinite
+  // update loop through ConcessionalCarryForward's onCarryForward.
+  const members = useMemo(
+    () => (inputs.partnerEnabled ? [person1Name, person2Name] : [person1Name]),
+    [inputs.partnerEnabled, person1Name, person2Name],
+  )
 
   const set = useCallback((field: Field, value: number | boolean) => {
     setInputs(prev => ({ ...prev, [field]: value }))
@@ -386,7 +392,7 @@ export default function SuperClient({ canEdit, initial, context, mortgage, budge
       <div style={{ marginTop: '1rem' }}>
         <ReadOnlyFence canEdit={canEdit}>
           <ConcessionalCarryForward
-            members={inputs.partnerEnabled ? [person1Name, person2Name] : [person1Name]}
+            members={members}
             initialRows={superHistory}
             onCarryForward={setCfByMember}
           />

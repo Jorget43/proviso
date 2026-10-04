@@ -9,7 +9,7 @@ export default function GlobalError({ reset }: { error: Error; reset: () => void
         <div style={{ maxWidth: 480, padding: '2rem', textAlign: 'center' }}>
           <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>⚠</div>
           <h1 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '0.5rem', color: '#f1f5f9' }}>
-            Proviso can't reach the database
+            Proviso can’t reach the database
           </h1>
           <p style={{ color: '#94a3b8', fontSize: '0.9rem', lineHeight: 1.6, marginBottom: '1.5rem' }}>
             The database file may be corrupted or the container is out of disk space.

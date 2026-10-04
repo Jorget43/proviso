@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
-import { withErrors } from '@/lib/apiHandler'
+import { annualExpenseSchema } from '@/lib/schemas'
+import { parseBody, withErrors } from '@/lib/apiHandler'
 import { prisma } from '@/lib/db'
 import { authorize } from '@/lib/rbac'
 
@@ -10,11 +11,8 @@ export const PUT = withErrors(async (req: NextRequest, { params }: { params: Pro
   if (!gate.ok) return gate.res
 
   const { id } = await params
-  const { name, cat, amt, month } = await req.json()
-  const row = await prisma.annualExpense.update({
-    where: { id: Number(id) },
-    data: { name, cat, amt: Number(amt), month: Number(month) },
-  })
+  const data = await parseBody(req, annualExpenseSchema.partial())
+  const row = await prisma.annualExpense.update({ where: { id: Number(id) }, data })
   return Response.json(row)
 })
 

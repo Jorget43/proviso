@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 
@@ -13,9 +13,7 @@ export default function ResetPasswordForm() {
   const [busy, setBusy]           = useState(false)
   const [done, setDone]           = useState(false)
 
-  useEffect(() => {
-    if (!token) setError('Invalid or missing reset token.')
-  }, [token])
+  const shownError = error ?? (token ? null : 'Invalid or missing reset token.')
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -67,7 +65,7 @@ export default function ResetPasswordForm() {
                   autoComplete="new-password" required style={inputStyle} />
               </label>
 
-              {error && (
+              {shownError && (
                 <div style={{ fontSize: '0.74rem', color: 'var(--red)', background: 'color-mix(in srgb, var(--red) 10%, transparent)',
                   border: '1px solid color-mix(in srgb, var(--red) 25%, transparent)', borderRadius: 5, padding: '7px 9px' }}>
                   {error}

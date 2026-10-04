@@ -3,6 +3,7 @@ import { DM_Sans, DM_Serif_Display } from 'next/font/google'
 import './globals.css'
 import TopNav from '@/components/layout/TopNav'
 import UpdateBanner from '@/components/ui/UpdateBanner'
+import SaveErrorToast from '@/components/ui/SaveErrorToast'
 import { getSession } from '@/lib/auth'
 import { getLatestVersion, isUpdateAvailable } from '@/lib/versionCheck'
 
@@ -47,6 +48,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <TopNav user={session ? { name: session.name, role: session.role } : null} />
         {session && <UpdateBanner currentVersion={currentVersion} latestVersion={latestVersion} />}
         {children}
+        {session && <SaveErrorToast />}
       </body>
     </html>
   )

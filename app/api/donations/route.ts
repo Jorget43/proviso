@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
-import { withErrors } from '@/lib/apiHandler'
+import { donationSchema } from '@/lib/schemas'
+import { parseBody, withErrors } from '@/lib/apiHandler'
 import { prisma } from '@/lib/db'
 import { authorize, requireAdultRead } from '@/lib/rbac'
 
@@ -20,21 +21,9 @@ export const POST = withErrors(async (req: NextRequest) => {
   const gate = await authorize('budget:write')
   if (!gate.ok) return gate.res
 
-  const { charity, abn, amount, date, financialYr, source, txnId, notes } = await req.json()
-  if (!charity || amount == null || !date || !financialYr) {
-    return Response.json({ error: 'charity, amount, date and financialYr are required' }, { status: 400 })
-  }
+  const { charity, abn, amount, date, financialYr, source, txnId, notes } = await parseBody(req, donationSchema)
   const row = await prisma.donation.create({
-    data: {
-      charity: String(charity),
-      abn: abn ? String(abn) : '',
-      amount: Number(amount),
-      date: String(date),
-      financialYr: Number(financialYr),
-      source: source ?? 'manual',
-      txnId: txnId ? Number(txnId) : null,
-      notes: notes ? String(notes) : '',
-    },
+    data: { charity, abn: abn ?? '', amount, date, financialYr, source: source ?? 'manual', txnId: txnId ?? null, notes: notes ?? '' },
   })
   return Response.json(row, { status: 201 })
 })

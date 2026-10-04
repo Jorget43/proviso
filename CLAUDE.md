@@ -97,6 +97,9 @@ EOFY is seasonal — surfaced via May/June `◷ EOFY` pill in `TopNav`, reachabl
 - **Optimistic updates**: all CRUD hits state first, then API — no loading spinners
 - **Tax engine** (`lib/tax.ts`): ATO 2024–25 Stage 3 brackets, LITO, Medicare, HELP repayments
 - **Projection engine** (`lib/projections.ts`): 20-year dual simulation (with/without school fees), stepped inflation, monthly mortgage loop with live offset; renter mode with compound rent growth and optional purchase plan (deposit from cash/investments with ~12% CGT haircut, then mortgage via `computeMonthlyRepayment`)
+  - **Mortgage repayments are modelled, not budgeted**: `baseMonthlyExpenses` passed to the engine EXCLUDES the Budget's mortgage line(s) (`cat === 'Home'` and name matching /mortgage/i — `ProjectionsClient` subtracts `budgetMortgageMonthly` while a loan is modelled). `simulateMortgageYear` pays `mortPayment` out of cash each month, never inflated, and stops the month the loan clears (partial final payment); `annualPaid` is added back into reported `expArr`. Don't put repayments back into the inflating expense base — that was the "phantom mortgage after payoff" bug. If `mortPayment` is 0 the Budget line is used as the scheduled payment.
+  - **HELP for both people**, from real balances on the Debts tab (`findHelpDebt`), indexed yearly, repayment capped at the residual, outstanding balance subtracted from net worth. Results: `person1HelpClearedYr` / `person2HelpClearedYr`.
+  - **PPL** comes from `PPL_TOTAL` (`lib/constants.ts`, FY2026-27: 26 weeks × $1,004.70) and is taxed via `calcAfterTax`, indexed for later leave years. Watchdog entry `ppl-rate`.
 - **Super engine** (`lib/super.ts`): per-person `runSuperProjection` + household `runHouseholdProjection`; accumulation (15%/30% tax) → drawdown (tax-free pension phase); Div 293 at $250k. Concessional cap comes from `lib/superHistory.ts`'s `legislativeCap()` (single source, see Phase 15) — `super.ts` does not maintain its own cap model. First-year cap can be topped up by `firstYearCapBonus` (carry-forward headroom, wired from `ConcessionalCarryForward` via `SuperClient`).
 - **HELP indexation engine** (`lib/help.ts`): indexable base, 1-June countdown/window, marginal-rate equivalence
 - **Carry-forward engine** (`lib/superHistory.ts`): `LEGISLATIVE_CONCESSIONAL_CAP` (legislated table, extrapolated beyond it via AWOTE ≈3.5%/yr floored to the nearest $2,500 — the ATO's published rounding rule) + 5-year concessional carry-forward gated on prior-year TSB < $500k
@@ -187,7 +190,7 @@ All migrations must be **additive only** — `update.sh` (or Watchtower, if opte
 - **`proxy.ts`**: optimistic cookie gate (fast, not the security boundary); `requireSession()` is the real boundary
 - **`lib/rbac.ts`**: scopes `actuals:write`, `budget:write`, `users:write`, `child:write`; `authorize(action)` called at the top of all mutating handlers
 - **Roles**: CFO (all scopes), PARTNER (`actuals:write` only), CHILD (`child:write` only — `/child` pocket money page)
-- **59 mutating route handlers** have `authorize()` guards; update the count when adding routes. Passkey management routes (`register-options`, `register-verify`, DELETE `passkey/[id]`) use `getSession()` directly (all roles can manage their own passkeys) — they are auth-gated but not RBAC-gated.
+- **60 mutating route handlers** have `authorize()` guards; update the count when adding routes. Passkey management routes (`register-options`, `register-verify`, DELETE `passkey/[id]`) use `getSession()` directly (all roles can manage their own passkeys) — they are auth-gated but not RBAC-gated.
 
 ## Roadmap
 
@@ -324,13 +327,24 @@ Items 1–4 shipped. Item 5 not yet built.
 - **Generic replacements**: `SF_BASE`/seed school levels (standard Year 1–6 naming), `INDEPENDENT_WEIGHTS`, Actuals sample CSV; `DEFAULT_LIFE_PHASES` deleted (dead code).
 - **Git history rewritten** to a fresh root; old tags removed. Old GHCR image versions contain the old migrations and must be deleted from the package settings.
 
+### Phase 19 — Renaming, projection accuracy, save feedback, validation, lint (2026-10-05)
+
+- **Renaming people** (`lib/members.ts`): SuperHistory, HelpDebtDetail, InvestmentParcel and the "<name> HELP debt" Debt are keyed by display name, so every rename goes through `renameMembers()` (cascade, via temporary names so swaps can't collide). `PUT /api/household` renames from Settings (CFO); onboarding re-runs cascade too. Names must be non-empty, ≤40 chars and distinct. HELP debts are matched with `findHelpDebt()` — exact name or whole-word prefix, never substring.
+- **Projection engine**: mortgage payoff, Person 1 HELP, real HELP balances (was a hard-coded $50k), PPL rates — see "Projection engine" above. Simple-mode Person 2 income now uses their own net pay and growth (was a hard-coded $100k on Person 1's growth).
+- **Super tab crash (shipped in v1.6.0)**: `ConcessionalCarryForward` reported results up via `onCarryForward` from an effect keyed on a `members` array recreated every render → infinite update loop ("Maximum update depth exceeded"). Fixed at both ends (memoised array; effect keyed on names and only reports changed results). Reproduced and verified in headless Chrome.
+- **Failed saves are no longer silent**: `components/ui/SaveErrorToast.tsx` (mounted in the root layout) wraps `window.fetch` once and shows a plain-language notice + Reload for any failed same-origin mutation to `/api/*` except `/api/auth/*`. A screen that shows its own inline error sends `X-Handles-Errors: 1`. Create flows must check `res.ok` before appending a response to state.
+- **Validation everywhere**: every mutating route parses its body with a zod schema in `lib/schemas.ts` (ranges, ISO dates, length caps, unknown keys stripped; no raw body ever reaches Prisma — settings singletons used to accept arbitrary columns). `parseBody` turns failures into plain-language messages ("Amount must be at least 0"), shown to users by SaveErrorToast. Public auth routes are wrapped in `withErrors` so malformed input is a 400, not a 500.
+- **Lint is clean** (`npx eslint .` → 0 problems; was 44 errors). Notably the Projections `Slider` was declared inside the component (remounted on every change); it's now module-level.
+- **Not done here (known)**: the tax engine is still calibrated to FY2024-25 (incl. a simplified $26k Medicare cut-off) — watchdog flags it; the update banner reads GitHub *Releases* but the repo publishes tags only.
+
 ## Security checklist for new features
 
 > When designing features that handle user data, add new routes, or touch auth — read [`docs/security-privacy-legal.md`](docs/security-privacy-legal.md) for the full legal, privacy, and cybersecurity context first.
 
 - [ ] Writes to DB → has `authorize()` guard; wrap the handler in `withErrors` (`lib/apiHandler.ts`)
 - [ ] Reads household/sensitive data → GET behind `requireAdultRead()` (`lib/rbac.ts`); adult pages use `requireAdult()`
-- [ ] Accepts user input → `parseBody(req, schema)` with a zod schema in `lib/schemas.ts` (`.partial()` for updates, `.finite()` on numbers)
+- [ ] Accepts user input → `parseBody(req, schema)` with a zod schema in `lib/schemas.ts` (`.partial()` for updates, `.finite()` on numbers, ranges on everything) — never `await req.json()` into Prisma
+- [ ] Client save → check `res.ok` before using the response; failures surface via SaveErrorToast (or send `X-Handles-Errors: 1` and show the error inline)
 - [ ] Renders user-supplied text → no `dangerouslySetInnerHTML`; use React's escaping
 - [ ] Sends data off-device → explicit user consent; document in privacy policy
 - [ ] Privacy gate → `node scripts/privacy-scan.mjs --tree HEAD` prints clean; no real values in code, tests, samples, docs or commit text (see § Privacy guardrails)

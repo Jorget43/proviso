@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/db'
-import { withErrors } from '@/lib/apiHandler'
+import { pocketMoneySchema } from '@/lib/schemas'
+import { parseBody, withErrors } from '@/lib/apiHandler'
 import { getSession } from '@/lib/auth'
 import { authorize } from '@/lib/rbac'
 
@@ -26,26 +27,17 @@ export const POST = withErrors(async (req: Request) => {
   const gate = await authorize('child:write')
   if (!gate.ok) return gate.res
 
-  const { userId, amount, description, date, category } = await req.json()
-  if (amount == null || !description || !date) {
-    return Response.json({ error: 'amount, description and date are required' }, { status: 400 })
-  }
+  const { userId, amount, description, date, category } = await parseBody(req, pocketMoneySchema)
 
-  const targetId = userId ? Number(userId) : gate.user.userId
+  const targetId = userId ?? gate.user.userId
 
   if (gate.user.role === 'CHILD') {
     if (targetId !== gate.user.userId) return Response.json({ error: 'Forbidden' }, { status: 403 })
-    if (Number(amount) > 0) return Response.json({ error: 'Children can only record spends' }, { status: 403 })
+    if (amount > 0) return Response.json({ error: 'Children can only record spends' }, { status: 403 })
   }
 
   const tx = await prisma.pocketMoneyTx.create({
-    data: {
-      userId:      targetId,
-      amount:      Number(amount),
-      description: String(description),
-      date:        String(date),
-      category:    String(category ?? 'general'),
-    },
+    data: { userId: targetId, amount, description, date, category: category ?? 'general' },
   })
   return Response.json({ tx })
 })

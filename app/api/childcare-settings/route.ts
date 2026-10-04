@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/db'
-import { withErrors } from '@/lib/apiHandler'
+import { childcareSettingsSchema } from '@/lib/schemas'
+import { parseBody, withErrors } from '@/lib/apiHandler'
 import { authorize, requireAdultRead } from '@/lib/rbac'
 import { NextRequest } from 'next/server'
 
@@ -17,7 +18,7 @@ export async function GET() {
 export const PUT = withErrors(async (request: NextRequest) => {
   const gate = await authorize('budget:write')
   if (!gate.ok) return gate.res
-  const body = await request.json()
+  const body = await parseBody(request, childcareSettingsSchema)
   const updated = await prisma.childcareSettings.upsert({
     where:  { id: 1 },
     update: body,

@@ -113,8 +113,6 @@ export function categorizeTxnWithSource(
   return { cat: 'Other', source: 'system', ruleId: null };
 }
 
-let _parseIdCounter = 0;
-
 export function parseCsvText(raw: string, customRules: CustomRule[]): ParsedTransaction[] {
   const txns: ParsedTransaction[] = [];
 

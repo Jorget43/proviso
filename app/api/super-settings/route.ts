@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
-import { withErrors } from '@/lib/apiHandler'
+import { superSettingsSchema } from '@/lib/schemas'
+import { parseBody, withErrors } from '@/lib/apiHandler'
 import { authorize, requireAdultRead } from '@/lib/rbac'
 import { prisma } from '@/lib/db'
 
@@ -35,7 +36,8 @@ export const PUT = withErrors(async (req: NextRequest) => {
   const gate = await authorize('budget:write')
   if (!gate.ok) return gate.res
   // Body uses HouseholdSuperInputs field names; map to DB column names
-  const body = await req.json()
+  const body = await parseBody(req, superSettingsSchema)
+  // Only the fields sent are written (undefined is ignored by Prisma).
   const dbData = {
     currentBalance:            body.person1Balance,
     retirementAge:             body.person1RetirementAge,

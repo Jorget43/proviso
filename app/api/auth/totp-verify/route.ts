@@ -1,13 +1,12 @@
+import { withErrors, parseBody } from '@/lib/apiHandler'
+import { totpVerifySchema } from '@/lib/schemas'
 import { verify as totpVerify } from 'otplib'
 import { prisma } from '@/lib/db'
 import { createSession, verifyPassword } from '@/lib/auth'
 import { getPendingTotp, recordFailedTotp, consumePendingTotp } from '@/lib/totpPending'
 
-export async function POST(req: Request) {
-  const { nonce, code, isRecovery } = await req.json()
-  if (!nonce || !code) {
-    return Response.json({ error: 'Nonce and code required' }, { status: 400 })
-  }
+export const POST = withErrors(async (req: Request) => {
+  const { nonce, code, isRecovery } = await parseBody(req, totpVerifySchema, 'Enter the code')
 
   const userId = getPendingTotp(String(nonce))
   if (!userId) {
@@ -36,7 +35,7 @@ export async function POST(req: Request) {
   consumePendingTotp(String(nonce))
   await createSession(userId)
   return Response.json({ ok: true })
-}
+})
 
 function failed(nonce: string, message: string): Response {
   const canRetry = recordFailedTotp(nonce)

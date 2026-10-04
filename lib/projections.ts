@@ -9,7 +9,7 @@ import { simulateMortgageYear, computeMonthlyRepayment } from './mortgage';
 import { schoolFeesForYear, type FeeSchedule } from './schoolFees';
 import { lifePhaseCostForYear } from './lifephases';
 import type { LifePhase }       from './lifephases';
-import { PARTNER_FTE, PPL_MONTHLY, PPL_MONTHS, NEAR_TERM_INFLATION_HORIZON } from './constants';
+import { PPL_TOTAL, NEAR_TERM_INFLATION_HORIZON } from './constants';
 
 export interface WorkPhase {
   year: number;
@@ -27,8 +27,12 @@ export interface ProjectionInputs {
   person1FTE:         number;   // gross annual
   person2FTE:         number;   // gross annual FTE
   taxMode:            boolean;
+  // HELP: a person's balance is repaid via compulsory repayments on their
+  // gross income, indexed yearly, and counted as a debt in net worth.
+  person1HasHELP:     boolean;
+  person1HELPBalance: number;   // current HELP balance (from the Debts tab)
   person2HasHELP:     boolean;
-  person2HELPBalance: number;   // current HELP balance (for cleared-year tracking)
+  person2HELPBalance: number;
   person1MonthlyNet:  number;   // used in simple (non-tax) mode only
   person2MonthlyNet:  number;   // used in simple (non-tax) mode only
 
@@ -47,17 +51,17 @@ export interface ProjectionInputs {
   // Current balances
   mortBalance:        number;
   mortRate:           number;   // as percent (e.g. 6.25)
-  mortPayment:        number;   // monthly repayment
+  mortPayment:        number;   // scheduled monthly repayment — paid until the loan clears
   cashOnHand:         number;
   propValue:          number;   // house value (mortgage balance + equity)
   cryptoValue:        number;
-  helpDebt:           number;   // total HELP for net-worth debt tracking (crude $10k/yr reduction)
 
   // Work schedule phases — both persons
   person1Phases:      WorkPhase[];
   person2Phases:      WorkPhase[];
 
-  // Expense base (monthly total — already includes mortgage repayment as a line item)
+  // Expense base (monthly total) EXCLUDING mortgage repayments — those are
+  // modelled from mortPayment and stop when the loan is paid off.
   baseMonthlyExpenses: number;
 
   // One-off home expenses
@@ -114,7 +118,8 @@ export interface ProjectionResult {
   sfSibArr:       number[];
   sfTotalArr:     number[];
   leaveYrs:       number[];
-  helpClearedYr:  number | null;
+  person1HelpClearedYr: number | null;
+  person2HelpClearedYr: number | null;
   rentArr:        number[];   // annual rent paid each year (0 for homeowners / post-purchase)
   purchaseYr:     number | null; // year of rent→own transition (null if no purchase plan)
 }
@@ -146,20 +151,17 @@ export function workDaysForYear(phases: WorkPhase[], year: number): number {
   return getPhaseForYear(year, getSortedPhases(phases)).days
 }
 
-function daysToAnnual(days: number): number {
-  return days === 0 ? 0 : PARTNER_FTE * (days / 5);
-}
 
 
 export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
   const {
-    person1FTE, person2FTE, taxMode, person2HasHELP,
+    person1FTE, person2FTE, taxMode, person1HasHELP, person2HasHELP,
     person1MonthlyNet, person2MonthlyNet,
     person1GrowthRate, person2GrowthRate,
     expInflNear, expInfl, childcareInfl,
     propGrowth, savingsRate, investReturn,
     projYears,
-    mortBalance, mortRate, mortPayment, cashOnHand, propValue, cryptoValue, helpDebt,
+    mortBalance, mortRate, mortPayment, cashOnHand, propValue, cryptoValue,
     person1Phases, person2Phases, baseMonthlyExpenses, oneoffs,
     parentalLeaveEnabled,
     schoolFeesOn, sfC1Start, sfC1ExitIdx, sfC2Start, sfC2ExitIdx, sfInfl, sfSchedule,
@@ -199,16 +201,18 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
     let pVal      = rentMode ? 0 : propValue;
     let cash      = cashOnHand;
     let invest    = 0;
-    let hDebt     = helpDebt;
-    let crypto    = cryptoValue;
-    let p2HELP = person2HasHELP ? inputs.person2HELPBalance : 0;
+    const crypto  = cryptoValue;
+    let p1HELP    = person1HasHELP ? Math.max(0, inputs.person1HELPBalance) : 0;
+    let p2HELP    = person2HasHELP ? Math.max(0, inputs.person2HELPBalance) : 0;
 
     // Renter state — tracked locally so we can mutate through the year loop
     let isRenting      = rentMode;
     let rentAnnual     = monthlyRent * 12;
     let lMortRate      = rentMode ? 0 : mRate;   // local (may change at purchase year)
     let lMortPayment   = rentMode ? 0 : mortPayment;
-    let extraAnnualExp = 0;   // mortgage payment added at purchase year (not in expBase)
+    // PPL is set at the national minimum wage, which is reindexed each July;
+    // expense inflation stands in for that from the current rate onward.
+    let pplIndex       = 1;
 
     const nwArr:          number[] = [];
     const incArr:         number[] = [];
@@ -228,13 +232,16 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
     const sfTotalArr:     number[] = [];
     const leaveYrs:       number[] = [];
     const rentArr:        number[] = [];
-    let   helpClearedYr:  number | null = null;
+    let   person1HelpClearedYr: number | null = null;
+    let   person2HelpClearedYr: number | null = null;
     const purchaseYr:     number | null = (rentMode && purchasePlanEnabled) ? targetPurchaseYear : null;
 
     for (let i = 0; i < projYears; i++) {
       const yr          = cy + i + 1;
       const yearInflRate = inflRateForYear(yr);
       expBase  *= (1 + yearInflRate);
+      if (i > 0) pplIndex *= (1 + yearInflRate);
+      const pplGross = (parentalLeaveEnabled ? PPL_TOTAL : 0) * pplIndex;
       if (!isRenting) pVal *= (1 + pG);  // only grow property value when owned
 
       // ── Rent → own transition ──────────────────────────────────────────────
@@ -251,7 +258,6 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
         mb               = targetPropertyValue * (1 - depositPct / 100);
         lMortRate        = newMortgageRate / 100;
         lMortPayment     = computeMonthlyRepayment(mb, newMortgageRate, newMortgageTermYrs * 12);
-        extraAnnualExp   = lMortPayment * 12;  // separate from expBase (which has no mortgage for renters)
         pVal             = targetPropertyValue * (1 + pG);  // property starts growing from purchase year
         rentAnnual       = 0;
       }
@@ -262,34 +268,47 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
       const isLeave      = phase.days === 0;
       const isFirstLeave = isLeave && leaveSt.has(yr);
 
+      // HELP balances are indexed on 1 June; expense inflation stands in for CPI.
+      p1HELP *= (1 + yearInflRate);
+      p2HELP *= (1 + yearInflRate);
+
       const p1GrossYr   = p1GrossBase * Math.pow(1 + jG, i + 1);
       const p1DaysGross = p1GrossYr * (p1Phase.days / 5);
+      // Compulsory repayment, capped at what's still owed, so the clearing year
+      // only deducts the residual.
+      const p1Repay     = p1HELP > 0 ? Math.min(p1HELP, calcHELPRepayment(p1DaysGross)) : 0;
       let p1Annual: number;
       if (taxMode) {
-        p1Annual = calcAfterTax(p1DaysGross);
+        p1Annual = calcAfterTax(p1DaysGross) - p1Repay;
       } else {
+        // Simple mode: the entered net pay is taken as already net of HELP.
         p1Annual = person1MonthlyNet * 12 * Math.pow(1 + jG, i + 1) * (p1Phase.days / 5);
+      }
+      if (p1Repay > 0) {
+        p1HELP = Math.max(0, p1HELP - p1Repay);
+        if (p1HELP < 1 && person1HelpClearedYr === null) { p1HELP = 0; person1HelpClearedYr = yr; }
       }
 
       let p2Annual: number;
       if (isLeave) {
-        p2Annual = (parentalLeaveEnabled && isFirstLeave) ? PPL_MONTHLY * PPL_MONTHS : 0;
+        // PPL is paid once per birth (the first leave year) and is taxable.
+        p2Annual = isFirstLeave ? calcAfterTax(pplGross) : 0;
         leaveYrs.push(yr);
       } else {
         const p2GrossFTE  = p2GrossBase * Math.pow(1 + gG, i + 1);
         const p2DaysGross = p2GrossFTE * (phase.days / 5);
-        const helpActive  = person2HasHELP && p2HELP > 0;
+        const p2Repay     = p2HELP > 0 ? Math.min(p2HELP, calcHELPRepayment(p2DaysGross)) : 0;
 
         if (taxMode) {
-          p2Annual = calcAfterTax(p2DaysGross, helpActive);
+          p2Annual = calcAfterTax(p2DaysGross) - p2Repay;
         } else {
-          p2Annual = daysToAnnual(phase.days) * Math.pow(1 + jG * 0.5, i);
+          // Simple mode mirrors Person 1: entered net pay, own growth rate.
+          p2Annual = person2MonthlyNet * 12 * Math.pow(1 + gG, i + 1) * (phase.days / 5);
         }
 
-        if (helpActive) {
-          const repay = Math.min(p2HELP, calcHELPRepayment(p2DaysGross));
-          p2HELP      = Math.max(0, p2HELP - repay);
-          if (p2HELP === 0 && !helpClearedYr) helpClearedYr = yr;
+        if (p2Repay > 0) {
+          p2HELP = Math.max(0, p2HELP - p2Repay);
+          if (p2HELP < 1 && person2HelpClearedYr === null) { p2HELP = 0; person2HelpClearedYr = yr; }
         }
       }
       person1Arr.push(Math.round(p1Annual));
@@ -309,17 +328,19 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
 
       // ── Monthly cashflow loop (mortgage with live offset) ──
       const annualInc  = p2Annual + p1Annual;
-      // For renters: rent is separate (not in expBase) and grows at rentIncreaseRate.
-      // For post-purchase: extraAnnualExp holds the new mortgage payment (also separate).
-      const annualExp  = expBase + sf.total + phaseOverlay + rentAnnual + extraAnnualExp;
+      // Rent is separate from expBase and grows at rentIncreaseRate. Mortgage
+      // repayments are NOT in here: simulateMortgageYear pays them out of cash
+      // at the actual (un-inflated) amount and stops once the loan is cleared,
+      // for the current loan and for one started by a purchase plan alike.
+      const nonMortExp  = expBase + sf.total + phaseOverlay + rentAnnual;
       const oneoffTotal = oneoffs.filter(o => o.year === yr).reduce((s, o) => s + o.amt, 0);
 
-      // For renters (no mortgage): simulateMortgageYear with mb=0/payment=0 just accumulates cash.
-      // For post-purchase: uses the new mortgage parameters set at transition year.
-      const monthlyNetFlow = (annualInc - annualExp) / 12;
+      const monthlyNetFlow = (annualInc - nonMortExp) / 12;
       const mortResult = simulateMortgageYear(mb, cash, lMortRate, lMortPayment, monthlyNetFlow);
       mb   = mortResult.endBalance;
       cash = mortResult.endCash;
+      const mortPaid   = mortResult.annualPaid;
+      const annualExp  = nonMortExp + mortPaid;   // reported expenses include repayments
 
       // Grow rent for next year (only while renting)
       rentArr.push(Math.round(rentAnnual));
@@ -334,11 +355,8 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
       cash    = Math.max(0, cash - invested);
       invest  = invest * (1 + iR) + invested;
 
-      // Crude HELP debt reduction for net-worth calculation (not the repayment model above)
-      hDebt = Math.max(0, hDebt - Math.min(10000, hDebt));
-
       const equity = pVal - mb;
-      const nw     = equity + cash + invest + crypto - hDebt;
+      const nw     = equity + cash + invest + crypto - p1HELP - p2HELP;
 
       phaseArr.push(Math.round(phaseOverlay));
       deficitArr.push(Math.round(annualInc - annualExp));
@@ -347,13 +365,13 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
       // Mortgage stress: annual repayments / gross household income (standard AU definition)
       const p1GrossForStress = p1GrossBase * Math.pow(1 + jG, i + 1) * (p1Phase.days / 5);
       const p2GrossForStress = (() => {
-        if (isLeave) return (parentalLeaveEnabled && isFirstLeave) ? PPL_MONTHLY * PPL_MONTHS : 0;
+        if (isLeave) return isFirstLeave ? pplGross : 0;
         const fte = p2GrossBase * Math.pow(1 + gG, i + 1);
         return fte * (phase.days / 5);
       })();
       const grossHousehold = p1GrossForStress + p2GrossForStress;
-      // For renters pre-purchase, lMortPayment=0 → stress=0 (correct). Post-purchase uses new payment.
-      const stressPct = grossHousehold > 0 ? (lMortPayment * 12) / grossHousehold * 100 : 0;
+      // Repayments actually made: 0 while renting and once the loan is cleared.
+      const stressPct = grossHousehold > 0 ? mortPaid / grossHousehold * 100 : 0;
       mortStressArr.push(parseFloat(stressPct.toFixed(1)));
 
       nwArr.push(Math.round(nw));
@@ -367,7 +385,7 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
     return {
       nwArr, incArr, expArr, mortArr, cashArr, investArr,
       person1Arr, person2Arr, phaseArr, deficitArr, cashRunningArr, mortStressArr,
-      sfC1Arr, sfC2Arr, sfSibArr, sfTotalArr, leaveYrs, helpClearedYr,
+      sfC1Arr, sfC2Arr, sfSibArr, sfTotalArr, leaveYrs, person1HelpClearedYr, person2HelpClearedYr,
       rentArr, purchaseYr,
     };
   }

@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import Panel from '@/components/ui/Panel'
 import { fmt } from '@/lib/formatting'
 import {
@@ -34,11 +34,23 @@ export default function ConcessionalCarryForward({ members, initialRows, onCarry
 
   const currentFy = currentFinancialYearEnding()
 
+  // Keyed on the member *names*, not the array: callers pass a fresh array
+  // every render, and depending on its identity made this recompute on every
+  // render — which, via onCarryForward → parent setState, looped forever and
+  // crashed the Super tab ("Maximum update depth exceeded").
+  const membersKey = JSON.stringify(members)
   const cfByMember = useMemo(
-    () => Object.fromEntries(members.map(m => [m, computeCarryForward(m, rowsByMember[m] ?? [])])),
-    [members, rowsByMember],
+    () => Object.fromEntries((JSON.parse(membersKey) as string[]).map(m => [m, computeCarryForward(m, rowsByMember[m] ?? [])])),
+    [membersKey, rowsByMember],
   )
-  useEffect(() => { onCarryForward?.(cfByMember) }, [cfByMember, onCarryForward])
+  // Only report genuinely new results upward.
+  const lastReported = useRef<string | null>(null)
+  useEffect(() => {
+    const serialised = JSON.stringify(cfByMember)
+    if (serialised === lastReported.current) return
+    lastReported.current = serialised
+    onCarryForward?.(cfByMember)
+  }, [cfByMember, onCarryForward])
 
   const upsert = async (member: string, body: SuperHistoryRow) => {
     const res = await fetch('/api/super-history', {
@@ -46,6 +58,8 @@ export default function ConcessionalCarryForward({ members, initialRows, onCarry
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     })
+    // Failure is reported by SaveErrorToast; never store an error body as a row.
+    if (!res.ok) return null
     return (await res.json()) as SuperHistoryItem
   }
 
@@ -66,6 +80,7 @@ export default function ConcessionalCarryForward({ members, initialRows, onCarry
       concessionalUtilised: 0,
       totalSuperBalance:    0,
     })
+    if (!saved) return
     setRowsByMember(s => ({
       ...s,
       [member]: [...(s[member] ?? []), saved].sort((a, b) => b.financialYearEnding - a.financialYearEnding),
@@ -73,19 +88,18 @@ export default function ConcessionalCarryForward({ members, initialRows, onCarry
   }
 
   const updateRow = (member: string, id: number, field: keyof SuperHistoryRow, value: number) => {
-    setRowsByMember(s => {
-      const next = (s[member] ?? []).map(r => r.id === id ? { ...r, [field]: value } : r)
-      const row = next.find(r => r.id === id)
-      if (row) {
-        upsert(member, {
-          member,
-          financialYearEnding:  row.financialYearEnding,
-          concessionalCap:      row.concessionalCap,
-          concessionalUtilised: row.concessionalUtilised,
-          totalSuperBalance:    row.totalSuperBalance,
-        })
-      }
-      return { ...s, [member]: next }
+    const current = (rowsByMember[member] ?? []).find(r => r.id === id)
+    if (!current) return
+    const row = { ...current, [field]: value }
+    // State updaters must stay pure (React may run them twice), so the save
+    // happens out here rather than inside setRowsByMember.
+    setRowsByMember(s => ({ ...s, [member]: (s[member] ?? []).map(r => (r.id === id ? row : r)) }))
+    upsert(member, {
+      member,
+      financialYearEnding:  row.financialYearEnding,
+      concessionalCap:      row.concessionalCap,
+      concessionalUtilised: row.concessionalUtilised,
+      totalSuperBalance:    row.totalSuperBalance,
     })
   }
 

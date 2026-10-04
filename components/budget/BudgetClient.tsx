@@ -45,6 +45,10 @@ interface BudgetClientProps {
   person2Name: string
 }
 
+function isManagedChildcare(e: { cat: string; name: string }): boolean {
+  return e.cat === CHILDCARE_CAT && e.name === CHILDCARE_NAME
+}
+
 export default function BudgetClient({
   canEdit,
   initialExpenses,
@@ -86,23 +90,44 @@ export default function BudgetClient({
 
   const monthlyIncome = person1Net + person2Net
 
+  // The managed "Childcare" line always shows the current CCS-adjusted cost
+  // (or disappears when childcare is off) — derived here so the page is right
+  // immediately; the effect further down only persists it.
+  const childcareNet = useMemo(
+    () => (childcare.enabled
+      ? Math.round(computeChildcare({
+          costPerDay:  childcare.costPerDay,
+          daysPerWeek: childcare.daysPerWeek,
+          numChildren: childcare.numChildren,
+          familyIncome,
+        }).netMonthly)
+      : null),
+    [childcare, familyIncome],
+  )
+  const shownExpenses = useMemo(
+    () => expenses.flatMap(e => (isManagedChildcare(e)
+      ? (childcareNet === null ? [] : [{ ...e, amt: childcareNet }])
+      : [e])),
+    [expenses, childcareNet],
+  )
+
   const monthlyExpenses = useMemo(
-    () => expenses.reduce((s, e) => s + toMonthly(e.amt, e.freq), 0)
+    () => shownExpenses.reduce((s, e) => s + toMonthly(e.amt, e.freq), 0)
           + annualExpenses.reduce((s, a) => s + a.amt / 12, 0)
           + (rentSettings?.enabled ? rentSettings.monthlyRent : 0),
-    [expenses, annualExpenses, rentSettings],
+    [shownExpenses, annualExpenses, rentSettings],
   )
 
   const catMonthly = useMemo(() => {
     const m: Record<string, number> = {}
     CATS.forEach(c => { m[c] = 0 })
-    expenses.forEach(e => { m[e.cat] = (m[e.cat] ?? 0) + toMonthly(e.amt, e.freq) })
+    shownExpenses.forEach(e => { m[e.cat] = (m[e.cat] ?? 0) + toMonthly(e.amt, e.freq) })
     annualExpenses.forEach(a => { m[a.cat] = (m[a.cat] ?? 0) + a.amt / 12 })
     if (rentSettings?.enabled) {
       m['Home'] = (m['Home'] ?? 0) + rentSettings.monthlyRent
     }
     return m
-  }, [expenses, annualExpenses, rentSettings])
+  }, [shownExpenses, annualExpenses, rentSettings])
 
   const delta = monthlyIncome - monthlyExpenses
   const savingsRate = monthlyIncome > 0 ? delta / monthlyIncome * 100 : 0
@@ -114,6 +139,7 @@ export default function BudgetClient({
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ cat, name: 'New item', freq: 'monthly', amt: 0 }),
     })
+    if (!res.ok) return  // failure is reported by SaveErrorToast
     const created: Expense = await res.json()
     setExpenses(prev => [...prev, created])
   }, [])
@@ -192,43 +218,35 @@ export default function BudgetClient({
     })
   }, [rentSettings])
 
-  // ── Childcare managed budget line ───────────────────────────────────────────
-  // Keep a managed "Childcare" budget line in sync with the CCS calculation.
+  // ── Childcare managed budget line: persist ──────────────────────────────────
+  // Saves the derived line (see shownExpenses). State is only updated once the
+  // server answers, so this never triggers a synchronous re-render.
   const childcareSyncing = useRef(false)
   useEffect(() => {
     // Read-only viewers (Partner) can't write — syncing would just 403.
-    if (!canEdit) return
-    const managed = expenses.find(e => e.cat === CHILDCARE_CAT && e.name === CHILDCARE_NAME)
-    if (childcare.enabled) {
-      const net = Math.round(computeChildcare({
-        costPerDay:   childcare.costPerDay,
-        daysPerWeek:  childcare.daysPerWeek,
-        numChildren:  childcare.numChildren,
-        familyIncome,
-      }).netMonthly)
-      if (managed) {
-        if (Math.round(managed.amt) !== net) {
-          setExpenses(prev => prev.map(e => e.id === managed.id ? { ...e, amt: net } : e))
-          fetch(`/api/expenses/${managed.id}`, {
-            method: 'PUT', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ amt: net }),
-          })
-        }
-      } else if (!childcareSyncing.current) {
-        childcareSyncing.current = true
-        fetch('/api/expenses', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ cat: CHILDCARE_CAT, name: CHILDCARE_NAME, freq: 'monthly', amt: net }),
-        })
-          .then(r => r.json())
-          .then((created: Expense) => setExpenses(prev => [...prev, created]))
-          .finally(() => { childcareSyncing.current = false })
-      }
-    } else if (managed) {
-      setExpenses(prev => prev.filter(e => e.id !== managed.id))
-      fetch(`/api/expenses/${managed.id}`, { method: 'DELETE' })
+    if (!canEdit || childcareSyncing.current) return
+    const managed = expenses.find(isManagedChildcare)
+    const json = { 'Content-Type': 'application/json' }
+    let request: Promise<void> | null = null
+    if (childcareNet !== null && managed && Math.round(managed.amt) !== childcareNet) {
+      request = fetch(`/api/expenses/${managed.id}`, { method: 'PUT', headers: json, body: JSON.stringify({ amt: childcareNet }) })
+        .then(r => { if (r.ok) setExpenses(prev => prev.map(e => (e.id === managed.id ? { ...e, amt: childcareNet } : e))) })
+    } else if (childcareNet !== null && !managed) {
+      request = fetch('/api/expenses', {
+        method: 'POST', headers: json,
+        body: JSON.stringify({ cat: CHILDCARE_CAT, name: CHILDCARE_NAME, freq: 'monthly', amt: childcareNet }),
+      })
+        .then(r => (r.ok ? r.json() : null))
+        .then((created: Expense | null) => { if (created) setExpenses(prev => [...prev, created]) })
+    } else if (childcareNet === null && managed) {
+      request = fetch(`/api/expenses/${managed.id}`, { method: 'DELETE' })
+        .then(r => { if (r.ok) setExpenses(prev => prev.filter(e => e.id !== managed.id)) })
     }
-  }, [canEdit, childcare, familyIncome, expenses])
+    if (request) {
+      childcareSyncing.current = true
+      request.finally(() => { childcareSyncing.current = false })
+    }
+  }, [canEdit, childcareNet, expenses])
 
   return (
     <div className="page">
@@ -279,7 +297,7 @@ export default function BudgetClient({
 
       <ReadOnlyFence canEdit={canEdit}>
         <ExpenseTable
-          expenses={expenses}
+          expenses={shownExpenses}
           onAdd={addExpense}
           onUpdate={updateExpense}
           onDelete={deleteExpense}

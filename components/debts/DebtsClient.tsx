@@ -1,5 +1,5 @@
 'use client'
-import { useState, useMemo, useCallback, useEffect } from 'react'
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import { toMonthly } from '@/lib/formatting'
 import DebtGrid, { type DebtItem } from './DebtGrid'
 import AssetGrid, { type AssetItem } from './AssetGrid'
@@ -81,6 +81,7 @@ export default function DebtsClient({
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: 'New debt', amt: 0 }),
     })
+    if (!res.ok) return  // failure is reported by SaveErrorToast
     const created: DebtItem = await res.json()
     setDebts(prev => [...prev, created])
   }, [])
@@ -107,6 +108,7 @@ export default function DebtsClient({
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: 'New asset', amt: 0 }),
     })
+    if (!res.ok) return  // failure is reported by SaveErrorToast
     const created: AssetItem = await res.json()
     setAssets(prev => [...prev, created])
   }, [])
@@ -136,12 +138,23 @@ export default function DebtsClient({
     })
   }, [])
 
-  // Keep the mortgage offset balance in lock-step with the flagged cash accounts.
+  // While accounts are flagged as offset, their sum IS the offset balance:
+  // derive it for display, and only persist it from the effect (an effect
+  // that also set state cost an extra render pass per change).
+  const shownMortgage = useMemo(
+    () => (offsetLinked ? { ...mortgage, offsetBal: offsetTotal } : mortgage),
+    [offsetLinked, offsetTotal, mortgage],
+  )
+  const persistedOffset = useRef(initialMortgage.offsetBal)
   useEffect(() => {
-    if (offsetLinked && mortgage.offsetBal !== offsetTotal) {
-      updateMortgage({ offsetBal: offsetTotal })
-    }
-  }, [offsetLinked, offsetTotal, mortgage.offsetBal, updateMortgage])
+    if (!canEdit || !offsetLinked || persistedOffset.current === offsetTotal) return
+    persistedOffset.current = offsetTotal
+    fetch('/api/mortgage-settings', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ offsetBal: offsetTotal }),
+    })
+  }, [canEdit, offsetLinked, offsetTotal])
 
   // ── HELP indexation state (lifted so the seasonal alert stays in sync with edits) ──
   const helpMembers = useMemo(() => [
@@ -173,6 +186,7 @@ export default function DebtsClient({
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     })
+    if (!res.ok) return  // failure is reported by SaveErrorToast
     const saved: HelpDetail = await res.json()
     setHelpDetails(d => ({ ...d, [member]: saved }))
   }
@@ -232,7 +246,7 @@ export default function DebtsClient({
           <NetPosition totalDebts={totalDebts} totalAssets={totalAssets} />
           <ReadOnlyFence canEdit={canEdit}>
             <MortgageDetail
-              mortgage={mortgage}
+              mortgage={shownMortgage}
               mortgageDebtAmt={mortgageDebtAmt}
               onUpdate={updateMortgage}
               offsetLinked={offsetLinked}

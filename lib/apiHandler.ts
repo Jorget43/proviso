@@ -74,16 +74,55 @@ export function withErrors<A extends unknown[]>(
 
 // Read + validate a JSON body against a zod schema. Throws ApiError(400) on a
 // malformed body or a validation failure (safe to use inside withErrors).
-export async function parseBody<T>(req: Request, schema: ZodType<T>): Promise<T> {
+// `message` replaces the generic "Validation failed" — for screens that show
+// the error text directly (e.g. the sign-in forms).
+export async function parseBody<T>(req: Request, schema: ZodType<T>, message?: string): Promise<T> {
   let raw: unknown
   try {
     raw = await req.json()
   } catch {
-    throw new ApiError(400, 'Invalid JSON body')
+    throw new ApiError(400, message ?? 'Invalid JSON body')
   }
   const result = schema.safeParse(raw)
   if (!result.success) {
-    throw new ApiError(400, 'Validation failed', result.error.flatten().fieldErrors)
+    if (message) throw new ApiError(400, message)
+    const fieldErrors = result.error.flatten().fieldErrors as Record<string, string[] | undefined>
+    // The message is shown to the user (SaveErrorToast, inline form errors),
+    // so phrase it in plain language. `details` keeps the raw per-field list.
+    const problems = Object.entries(fieldErrors)
+      .flatMap(([field, msgs]) => (msgs ?? []).slice(0, 1).map(m => describeProblem(field, m)))
+    const summary =
+      problems.length === 1 ? problems[0]
+      : problems.length > 1 ? `Some values aren’t valid: ${problems.join('; ')}`
+      : 'Validation failed'
+    throw new ApiError(400, summary, fieldErrors)
   }
   return result.data
+}
+
+// "daysPerWeek" → "Days per week", "person1Name" → "Person 1 name", "amt" → "Amount".
+function fieldLabel(field: string): string {
+  const special: Record<string, string> = { amt: 'Amount', cat: 'Category', abn: 'ABN', fte: 'FTE' }
+  if (special[field]) return special[field]
+  const words = field
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/([a-zA-Z])(\d)/g, '$1 $2')
+    .replace(/(\d)([a-zA-Z])/g, '$1 $2')
+    .toLowerCase()
+  return words.charAt(0).toUpperCase() + words.slice(1)
+}
+
+// Rewrite zod's default wording; keep custom schema messages as they are.
+function describeProblem(field: string, msg: string): string {
+  const label = fieldLabel(field)
+  let m: RegExpMatchArray | null
+  if ((m = msg.match(/^Too small: expected number to be >=?\s*(\S+)/))) return `${label} must be at least ${m[1]}`
+  if ((m = msg.match(/^Too big: expected number to be <=?\s*(\S+)/))) return `${label} must be at most ${m[1]}`
+  if (/^Too small: expected string to have >=?\s*1 characters?/.test(msg)) return `${label} can’t be empty`
+  if ((m = msg.match(/^Too big: expected string to have <=?\s*(\d+) characters/))) return `${label} must be at most ${m[1]} characters`
+  if (/^Invalid input: expected \w+, received undefined/.test(msg)) return `${label} is required`
+  if (/^Invalid input: expected (number|string|boolean)/.test(msg)) return `${label} has the wrong type`
+  if (/^Invalid option/.test(msg)) return `${label} isn’t one of the allowed values`
+  if (/^Invalid email/i.test(msg)) return `${label} isn’t a valid email address`
+  return `${label}: ${msg}`
 }

@@ -172,6 +172,8 @@ export default function ActualsClient({
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(pendingTxns),
     })
+    // On failure keep the pending import so it can be retried (SaveErrorToast reports it).
+    if (!res.ok) return
     const data = await res.json()
     setTxnHistory(data.transactions)
     setPendingTxns([])
@@ -205,6 +207,7 @@ export default function ActualsClient({
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ pattern, cat: newCat }),
     })
+    if (!res.ok) return  // failure is reported by SaveErrorToast
     const rule: CustomRule = await res.json()
     setCustomRules(prev => {
       const existing = prev.find(r => r.id === rule.id)
@@ -230,6 +233,7 @@ export default function ActualsClient({
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ pattern: 'new pattern', cat: CATS[0] }),
     })
+    if (!res.ok) return  // failure is reported by SaveErrorToast
     const rule: CustomRule = await res.json()
     setCustomRules(prev => [...prev, rule])
   }, [])

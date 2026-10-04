@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useState, useSyncExternalStore } from 'react'
 
 // Two independent notices, at most one shown at a time:
 //   - "available"  an newer GitHub release exists (CFO-only, driven by the
@@ -11,6 +11,22 @@ const DISMISSED_UPDATE_KEY = 'proviso_dismissed_update'
 
 type Mode = 'none' | 'available' | 'updated'
 
+const SEP = '\n'
+
+function subscribeStorage(onChange: () => void) {
+  window.addEventListener('storage', onChange)
+  return () => window.removeEventListener('storage', onChange)
+}
+
+// A primitive snapshot, so React can compare it between renders.
+function readStored(): string {
+  try {
+    return `${localStorage.getItem(DISMISSED_UPDATE_KEY) ?? ''}${SEP}${localStorage.getItem(SEEN_KEY) ?? ''}`
+  } catch {
+    return SEP
+  }
+}
+
 export default function UpdateBanner({
   currentVersion,
   latestVersion = null,
@@ -18,23 +34,24 @@ export default function UpdateBanner({
   currentVersion: string
   latestVersion?: string | null
 }) {
-  const [mode, setMode] = useState<Mode>('none')
+  // localStorage is an external store: read it with useSyncExternalStore (the
+  // server snapshot is null, so nothing renders until the browser has it).
+  const stored = useSyncExternalStore(subscribeStorage, readStored, () => null)
+  const [dismissedNow, setDismissedNow] = useState(false)
 
-  useEffect(() => {
-    if (currentVersion === 'dev') return
-    if (latestVersion) {
-      if (localStorage.getItem(DISMISSED_UPDATE_KEY) !== latestVersion) {
-        setMode('available')
-        return
-      }
-    }
-    if (localStorage.getItem(SEEN_KEY) !== currentVersion) setMode('updated')
-  }, [currentVersion, latestVersion])
+  let mode: Mode = 'none'
+  if (stored !== null && !dismissedNow && currentVersion !== 'dev') {
+    const [dismissedUpdate, seen] = stored.split(SEP)
+    if (latestVersion && dismissedUpdate !== latestVersion) mode = 'available'
+    else if (seen !== currentVersion) mode = 'updated'
+  }
 
   function dismiss() {
-    if (mode === 'available' && latestVersion) localStorage.setItem(DISMISSED_UPDATE_KEY, latestVersion)
-    if (mode === 'updated') localStorage.setItem(SEEN_KEY, currentVersion)
-    setMode('none')
+    try {
+      if (mode === 'available' && latestVersion) localStorage.setItem(DISMISSED_UPDATE_KEY, latestVersion)
+      if (mode === 'updated') localStorage.setItem(SEEN_KEY, currentVersion)
+    } catch { /* storage unavailable — dismiss for this page view only */ }
+    setDismissedNow(true)
   }
 
   if (mode === 'none') return null

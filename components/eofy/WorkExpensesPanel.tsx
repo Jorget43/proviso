@@ -108,6 +108,7 @@ export default function WorkExpensesPanel({ initialExpenses, fyEnding, fyLabel }
       setEditId(null)
     } else {
       const res = await fetch('/api/work-expenses', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...body, source: 'manual' }) })
+      if (!res.ok) return  // failure is reported by SaveErrorToast
       const created: WorkExpense = await res.json()
       setExpenses(prev => [created, ...prev])
       setAdding(false)
@@ -135,7 +136,8 @@ export default function WorkExpensesPanel({ initialExpenses, fyEnding, fyLabel }
   function toggleSelect(id: number) {
     setSelected(prev => {
       const next = new Set(prev)
-      next.has(id) ? next.delete(id) : next.add(id)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
       return next
     })
   }
@@ -229,7 +231,7 @@ export default function WorkExpensesPanel({ initialExpenses, fyEnding, fyLabel }
                 <button onClick={() => setSelected(new Set())} style={{ fontSize: '0.73rem', color: 'var(--t3)', background: 'none', border: 'none', cursor: 'pointer' }}>Clear</button>
               </div>
               <p style={{ fontSize: '0.68rem', color: 'var(--t3)', marginTop: 8, marginBottom: 0 }}>
-                Imported items default to category "Other" — edit them to set the correct category for your accountant report.
+                Imported items default to category “Other” — edit them to set the correct category for your accountant report.
               </p>
             </>
           )}

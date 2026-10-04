@@ -38,6 +38,7 @@ export default function InvestmentsClient({ canEdit, initialParcels, members, ma
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ member: members[0], name: 'New holding', purchaseDate: new Date().toISOString().slice(0, 10) }),
     })
+    if (!res.ok) return  // failure is reported by SaveErrorToast
     const created: Parcel = await res.json()
     setParcels(p => [...p, created])
   }, [members])

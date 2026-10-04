@@ -58,7 +58,7 @@ export default function ExpenseTable({
   const [form, setForm]               = useState<typeof BLANK>(BLANK)
   const [annualError, setAnnualError] = useState<string | null>(null)
 
-  function patchForm<K extends keyof typeof BLANK>(k: K, v: any) {
+  function patchForm<K extends keyof typeof BLANK>(k: K, v: string | number) {
     setForm(f => ({ ...f, [k]: v }))
   }
 
@@ -328,7 +328,7 @@ export default function ExpenseTable({
 
 function AnnualForm({ form, patch, onSubmit, onCancel }: {
   form: { name: string | number; cat: string; amt: string | number; month: number }
-  patch: (k: any, v: any) => void
+  patch: (k: 'name' | 'cat' | 'amt' | 'month', v: string | number) => void
   onSubmit: (e: React.FormEvent) => void
   onCancel: () => void
 }) {

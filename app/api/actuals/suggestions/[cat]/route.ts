@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
-import { withErrors } from '@/lib/apiHandler'
+import { suggestionStateSchema } from '@/lib/schemas'
+import { parseBody, withErrors } from '@/lib/apiHandler'
 import { authorize } from '@/lib/rbac'
 import { prisma } from '@/lib/db'
 
@@ -7,7 +8,7 @@ export const PUT = withErrors(async (request: NextRequest, { params }: { params:
   const gate = await authorize('actuals:write')
   if (!gate.ok) return gate.res
   const { cat } = await params
-  const body = await request.json()
+  const body = await parseBody(request, suggestionStateSchema)
   const state = await prisma.suggestionState.upsert({
     where:  { cat },
     update: { status: body.status },

@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
-import { withErrors } from '@/lib/apiHandler'
+import { oneOffSchema } from '@/lib/schemas'
+import { parseBody, withErrors } from '@/lib/apiHandler'
 import { authorize, requireAdultRead } from '@/lib/rbac'
 import { prisma } from '@/lib/db'
 
@@ -13,7 +14,7 @@ export async function GET() {
 export const POST = withErrors(async (request: NextRequest) => {
   const gate = await authorize('budget:write')
   if (!gate.ok) return gate.res
-  const body = await request.json()
+  const body = await parseBody(request, oneOffSchema)
   const oneoff = await prisma.oneOff.create({
     data: { name: body.name ?? 'New expense', amt: body.amt ?? 0, year: body.year ?? new Date().getFullYear() + 1 },
   })

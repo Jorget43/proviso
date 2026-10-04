@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/db'
-import { withErrors } from '@/lib/apiHandler'
+import { allowanceSchema } from '@/lib/schemas'
+import { parseBody, withErrors } from '@/lib/apiHandler'
 import { getSession } from '@/lib/auth'
 import { authorize } from '@/lib/rbac'
 
@@ -23,13 +24,12 @@ export const PUT = withErrors(async (req: Request) => {
   const gate = await authorize('budget:write')
   if (!gate.ok) return gate.res
 
-  const { userId, amount, dayOfWeek } = await req.json()
-  if (!userId || amount == null) return Response.json({ error: 'userId and amount required' }, { status: 400 })
+  const { userId, amount, dayOfWeek } = await parseBody(req, allowanceSchema)
 
   const schedule = await prisma.allowanceSchedule.upsert({
-    where:  { userId: Number(userId) },
-    create: { userId: Number(userId), amount: Number(amount), dayOfWeek: Number(dayOfWeek ?? 5) },
-    update: { amount: Number(amount), dayOfWeek: Number(dayOfWeek ?? 5) },
+    where:  { userId },
+    create: { userId, amount, dayOfWeek },
+    update: { amount, dayOfWeek },
   })
   return Response.json({ schedule })
 })
