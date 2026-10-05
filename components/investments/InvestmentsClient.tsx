@@ -110,9 +110,9 @@ export default function InvestmentsClient({ canEdit, initialParcels, members, ma
       <ReadOnlyFence canEdit={canEdit}>
       <Panel title="Investment parcels" dotColor="var(--teal)">
         <p style={{ fontSize: '0.72rem', color: 'var(--t3)', marginBottom: 14, lineHeight: 1.5 }}>
-          Each purchase is a separate parcel — the 50% CGT discount applies per parcel once held 12+ months.
-          Set a planned sale year to test the gain against a future holding period and push the estimated CGT
-          into Projections as a one-off.
+          Add each purchase separately: the tax on selling depends on how long each one was held — keep it
+          12 months or more and only half the gain is taxed. Pick the year you plan to sell to see the tax then,
+          and add it to Projections.
         </p>
 
         {parcels.length === 0 && (
@@ -121,59 +121,63 @@ export default function InvestmentsClient({ canEdit, initialParcels, members, ma
           </p>
         )}
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div className="parcels">
           {parcels.map(p => {
             const c = cgtByParcel.get(p.id)!
             return (
-              <div key={p.id} style={{ border: '1px solid var(--border)', borderRadius: 'var(--r)', padding: 12 }}>
-                {/* Editable fields */}
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'flex-end' }}>
-                  <Field label="Holding" width={150}>
-                    <input className="da-input name" defaultValue={p.name} onBlur={e => update(p.id, 'name', e.target.value)} style={{ width: '100%' }} />
+              <div key={p.id} className="parcel">
+                <div className="parcel-head">
+                  <span className="parcel-title">{p.name || 'Unnamed holding'}</span>
+                  <button className="parcel-remove" onClick={() => remove(p.id)} aria-label={`Remove ${p.name}`}>Remove</button>
+                </div>
+
+                {/* Editable fields — two columns on a phone, one row on desktop */}
+                <div className="parcel-fields">
+                  <Field label="Holding" wide>
+                    <input className="parcel-input" defaultValue={p.name} onBlur={e => update(p.id, 'name', e.target.value)} />
                   </Field>
-                  <Field label="Owner" width={120}>
-                    <select value={p.member} onChange={e => update(p.id, 'member', e.target.value)} className="da-input" style={{ width: '100%', height: 32 }}>
+                  <Field label="Owner">
+                    <select value={p.member} onChange={e => update(p.id, 'member', e.target.value)} className="parcel-input">
                       {members.map(m => <option key={m} value={m}>{m}</option>)}
                     </select>
                   </Field>
-                  <Field label="Quantity" width={90}>
-                    <input type="number" step="any" defaultValue={p.quantity} onBlur={e => update(p.id, 'quantity', parseFloat(e.target.value) || 0)} style={fieldInput} />
-                  </Field>
-                  <Field label="Buy price" width={100}>
-                    <div className="input-prefix" style={{ width: '100%' }}><span>$</span>
-                      <input type="number" step="any" defaultValue={p.purchasePrice} onBlur={e => update(p.id, 'purchasePrice', parseFloat(e.target.value) || 0)} style={{ textAlign: 'right', width: '100%' }} /></div>
-                  </Field>
-                  <Field label="Buy date" width={130}>
-                    <input type="date" defaultValue={p.purchaseDate?.slice(0, 10)} onBlur={e => update(p.id, 'purchaseDate', e.target.value)} style={fieldInput} />
-                  </Field>
-                  <Field label="Now price" width={100}>
-                    <div className="input-prefix" style={{ width: '100%' }}><span>$</span>
-                      <input type="number" step="any" defaultValue={p.currentPrice} onBlur={e => update(p.id, 'currentPrice', parseFloat(e.target.value) || 0)} style={{ textAlign: 'right', width: '100%' }} /></div>
-                  </Field>
-                  <Field label="Plan to sell" width={110}>
-                    <select value={p.sellYear ?? ''} onChange={e => update(p.id, 'sellYear', e.target.value ? parseInt(e.target.value) : null)} className="da-input" style={{ width: '100%', height: 32 }}>
-                      <option value="">—</option>
+                  <Field label="Plan to sell">
+                    <select value={p.sellYear ?? ''} onChange={e => update(p.id, 'sellYear', e.target.value ? parseInt(e.target.value) : null)} className="parcel-input">
+                      <option value="">Not planned</option>
                       {sellYears.map(y => <option key={y} value={y}>{y}</option>)}
                     </select>
                   </Field>
-                  <button className="del-btn" onClick={() => remove(p.id)} style={{ marginBottom: 2 }}>&#215;</button>
+                  <Field label="Quantity">
+                    <input className="parcel-input" type="number" step="any" inputMode="decimal" defaultValue={p.quantity} onBlur={e => update(p.id, 'quantity', parseFloat(e.target.value) || 0)} />
+                  </Field>
+                  <Field label="Bought on">
+                    <input className="parcel-input" type="date" defaultValue={p.purchaseDate?.slice(0, 10)} onBlur={e => update(p.id, 'purchaseDate', e.target.value)} />
+                  </Field>
+                  <Field label="Price paid">
+                    <div className="input-prefix parcel-money"><span>$</span>
+                      <input type="number" step="any" inputMode="decimal" defaultValue={p.purchasePrice} onBlur={e => update(p.id, 'purchasePrice', parseFloat(e.target.value) || 0)} /></div>
+                  </Field>
+                  <Field label="Price now">
+                    <div className="input-prefix parcel-money"><span>$</span>
+                      <input type="number" step="any" inputMode="decimal" defaultValue={p.currentPrice} onBlur={e => update(p.id, 'currentPrice', parseFloat(e.target.value) || 0)} /></div>
+                  </Field>
                 </div>
 
-                {/* CGT outcome */}
-                <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border)', display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'center', fontSize: '0.74rem' }}>
-                  <Stat label="Market value" value={fmt(c.marketValue)} />
-                  <Stat label={c.isLoss ? 'Capital loss' : 'Capital gain'} value={fmtS(c.capitalGain)} color={c.capitalGain >= 0 ? 'var(--green)' : 'var(--red)'} />
-                  <span style={{ fontSize: '0.7rem', padding: '2px 8px', borderRadius: 4,
-                    background: c.discountEligible ? 'var(--green-lt)' : 'var(--surface2)',
-                    color: c.discountEligible ? 'var(--green)' : 'var(--t3)' }}>
-                    {c.isLoss ? 'No CGT on a loss' : c.discountEligible ? '50% discount (held 12mo+)' : `No discount (held ${c.heldMonths}mo)`}
+                {/* What a sale would mean */}
+                <div className="parcel-result">
+                  <Stat label="Worth now" value={fmt(c.marketValue)} />
+                  <Stat label={c.isLoss ? 'Loss' : 'Gain'} value={fmtS(c.capitalGain)} color={c.capitalGain >= 0 ? 'var(--green)' : 'var(--red)'} />
+                  <Stat label="Est. tax (CGT)" value={fmt(c.estimatedCgt)} color="var(--red)" />
+                  <Stat label="You'd keep" value={fmt(c.netProceeds)} />
+                </div>
+                <div className="parcel-foot">
+                  <span className={`parcel-badge ${c.discountEligible && !c.isLoss ? 'on' : ''}`}>
+                    {c.isLoss ? 'No tax on a loss' : c.discountEligible ? 'Half the gain is taxed (held 12 months+)' : `Full gain taxed (held ${c.heldMonths} month${c.heldMonths === 1 ? '' : 's'})`}
                   </span>
-                  <Stat label="Est. CGT" value={fmt(c.estimatedCgt)} color="var(--red)" />
-                  <Stat label="Net proceeds" value={fmt(c.netProceeds)} />
                   {p.sellYear && !c.isLoss && c.estimatedCgt > 0 && (
-                    <button className="hint-link" style={{ fontSize: '0.72rem', marginLeft: 'auto' }}
+                    <button className="hint-link parcel-send"
                       onClick={() => sendToProjections(p, c.estimatedCgt)} disabled={sentIds[p.id]}>
-                      {sentIds[p.id] ? 'Added to Projections ✓' : `Send ${fmt(c.estimatedCgt)} to Projections (${p.sellYear})`}
+                      {sentIds[p.id] ? 'Added to Projections ✓' : `Add ${fmt(c.estimatedCgt)} tax to Projections (${p.sellYear})`}
                     </button>
                   )}
                 </div>
@@ -195,22 +199,20 @@ export default function InvestmentsClient({ canEdit, initialParcels, members, ma
   )
 }
 
-const fieldInput: React.CSSProperties = { width: '100%', textAlign: 'left' }
-
-function Field({ label, width, children }: { label: string; width: number; children: React.ReactNode }) {
+function Field({ label, wide, children }: { label: string; wide?: boolean; children: React.ReactNode }) {
   return (
-    <div style={{ width, display: 'flex', flexDirection: 'column', gap: 3 }}>
-      <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--t3)' }}>{label}</span>
+    <label className={`parcel-field${wide ? ' wide' : ''}`}>
+      <span className="parcel-label">{label}</span>
       {children}
-    </div>
+    </label>
   )
 }
 
 function Stat({ label, value, color }: { label: string; value: string; color?: string }) {
   return (
-    <span style={{ display: 'inline-flex', flexDirection: 'column' }}>
-      <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--t3)' }}>{label}</span>
-      <span style={{ fontWeight: 500, color: color ?? 'var(--t1)' }}>{value}</span>
+    <span className="parcel-stat">
+      <span className="parcel-label">{label}</span>
+      <span className="parcel-stat-value" style={color ? { color } : undefined}>{value}</span>
     </span>
   )
 }
