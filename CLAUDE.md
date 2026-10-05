@@ -379,8 +379,8 @@ Tracked in [`docs/security-privacy-legal.md`](docs/security-privacy-legal.md) §
 
 ### Mobile & ease of use (after Phase 22)
 - **Two "net worth" figures disagree**: Home and Wealth use everything listed as owned minus owed; Projections' "Net worth today" is the engine baseline (`computeCurrentNetWorth`: house equity + offset cash + crypto, no shares or other assets). Pre-existing, but now both are prominent — unify the definition or label the difference.
-- Onboarding doesn't ask the "Your situation" questions (renting, childcare, school fees); Home points people to Settings instead. A wizard step would surface them earlier.
-- Not yet redesigned for phones beyond the global touch rules: Debts & Assets grids, Investments parcels, EOFY panels, Super inputs, the Projections work-pattern and fee-schedule tables. Usable at 390px, but still small-text desktop layouts.
+- ~~Onboarding doesn't ask the "Your situation" questions~~ — done (v1.11.0+): Own/Rent on step 5, new step 6 for childcare, school fees, parental leave.
+- ~~Small-text desktop layouts on phones~~ — checked at 390px after v1.11.0: Own & owe rows restacked, Investments labels/dropdowns fixed, work-pattern wording plain; EOFY, Super and the school-fee controls were already fine. Remaining polish is cosmetic (parcel cards are dense).
 - Native app: the API (`app/api/*`, zod-validated, cookie auth) is already separate from the pages; a native client would need token auth alongside the cookie session.
 
 ### Deferred (revisit only if needed)
