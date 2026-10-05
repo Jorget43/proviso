@@ -3,15 +3,16 @@ import { prisma } from '@/lib/db'
 import { requireAdult } from '@/lib/auth'
 import { computeWatchdog } from '@/lib/watchdog'
 import SettingsClient from '@/components/settings/SettingsClient'
+import { loadSituation } from '@/lib/situation'
 
 export default async function SettingsPage() {
   const me = await requireAdult()
-  const [hs, income, projSettings, mortgage, superSettings] = await Promise.all([
+  const [hs, income, mortgage, superSettings, situation] = await Promise.all([
     prisma.householdSettings.findUnique({ where: { id: 1 } }),
     prisma.incomeSettings.findUniqueOrThrow({ where: { id: 1 } }),
-    prisma.projectionSettings.findUniqueOrThrow({ where: { id: 1 } }),
     prisma.mortgageSettings.findFirst(),
     prisma.superSettings.findFirst(),
+    loadSituation(),
   ])
 
   // Member list is CFO-only (matches the users:write guard on the API).
@@ -49,7 +50,7 @@ export default async function SettingsPage() {
       mortgageBalance={mortgage?.balance ?? 0}
       superBalance={superSettings?.currentBalance ?? 0}
       partnerSuperBalance={superSettings?.partnerBalance ?? 0}
-      parentalLeaveEnabled={projSettings.parentalLeaveEnabled}
+      situation={situation}
       currentRole={me.role}
       currentUserId={me.userId}
       users={users}

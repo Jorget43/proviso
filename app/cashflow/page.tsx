@@ -97,6 +97,8 @@ export default async function CashflowPage() {
   CATS.forEach(c => { catMonthly[c] = 0 })
   expenses.forEach(e => { catMonthly[e.cat] = (catMonthly[e.cat] ?? 0) + toMonthly(e.amt, e.freq) })
 
+  const showLeave = partnerEnabled && projSettings?.parentalLeaveEnabled === true
+
   return (
     <div className="page">
       <CashflowBanner
@@ -107,17 +109,18 @@ export default async function CashflowPage() {
         runway={runway}
         person1Name={person1Name}
         person2Name={person2Name}
+        showLeave={showLeave}
       />
-      <div className="two-col">
-        <Panel title={partnerEnabled ? '24-month cashflow (both working)' : '24-month cashflow'} dotColor="var(--green)">
+      <div className={showLeave ? 'two-col' : undefined}>
+        <Panel title={showLeave ? 'Next 24 months (both working)' : 'Cash over the next 24 months'} dotColor="var(--green)">
           <CashflowLineChart
             labels={labels}
             data={cfData}
             color="#166B45"
-            note="Lumpy month hits applied in relevant months."
+            note="Yearly bills land in the month they're due."
           />
         </Panel>
-        {partnerEnabled && projSettings?.parentalLeaveEnabled !== false && (
+        {showLeave && (
           <Panel title="Parental leave scenario" dotColor="var(--pink)">
             <CashflowLineChart
               labels={labels}

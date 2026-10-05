@@ -7,6 +7,7 @@ import { computeCashOnHand } from '@/lib/netWorth'
 import { computeBudgetSummary, upcomingAnnualExpenses } from '@/lib/budgetSummary'
 import { isEofySeason } from '@/lib/eofy'
 import { fmt, fmtK } from '@/lib/formatting'
+import { loadSituation, situationLabels } from '@/lib/situation'
 
 export const dynamic = 'force-dynamic'
 
@@ -63,10 +64,11 @@ export default async function Home() {
   const since = snapshots.find(s => s.takenAt >= yearAgo && ((s.totalAssets ?? 0) !== 0 || (s.totalDebts ?? 0) !== 0))
   const change = since ? netPosition - ((since.totalAssets ?? 0) - (since.totalDebts ?? 0)) : null
 
+  const situation = await loadSituation()
   const cash = computeCashOnHand(assets)
   const coverMonths = budget.monthlyExpenses > 0 ? cash / budget.monthlyExpenses : null
   const hasMortgageDebt = debts.some(d => /mortgage/i.test(d.name))
-  const mortgageLeft = hasMortgageDebt ? null : (mortgage && mortgage.balance > 0 ? mortgage.balance : null)
+  const mortgageLeft = hasMortgageDebt || situation.renting ? null : (mortgage && mortgage.balance > 0 ? mortgage.balance : null)
   const mortgageEndYear = mortgage?.endDate ? Number(mortgage.endDate.slice(0, 4)) : null
   const superTotal = (superSettings?.currentBalance ?? 0) + (hs.partnerEnabled ? (superSettings?.partnerBalance ?? 0) : 0)
 
@@ -180,6 +182,18 @@ export default async function Home() {
             <Link href="/budget">Add things like car rego or insurance</Link> so they never catch you out.
           </p>
         )}
+      </section>
+
+      <section className="home-section">
+        <h2 className="home-h2">Your situation</h2>
+        <div className="home-situation">
+          <ul>
+            {situationLabels(situation, hs.person2Name).map(l => <li key={l}>{l}</li>)}
+          </ul>
+          <Link href="/settings#situation">
+            {me.role === 'CFO' ? 'Change what applies to you' : 'See what’s included'} →
+          </Link>
+        </div>
       </section>
 
       <section className="home-section">

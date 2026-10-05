@@ -1,5 +1,6 @@
 'use client'
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
+import Link from 'next/link'
 import { fmt, fmtS } from '@/lib/formatting'
 import { computeBudgetSummary, isManagedChildcare, CHILDCARE_CAT, CHILDCARE_NAME } from '@/lib/budgetSummary'
 import MetricCard from '@/components/ui/MetricCard'
@@ -344,13 +345,16 @@ export default function BudgetClient({
         onDelete={t => (t.id === null || t.kind === 'rent' ? Promise.resolve() : removeLine(t.kind, t.id))}
       />
 
-      <ReadOnlyFence canEdit={canEdit}>
-        <ChildcarePanel
-          settings={childcare}
-          familyIncome={familyIncome}
-          onUpdate={updateChildcare}
-        />
-      </ReadOnlyFence>
+      {/* Situational sections appear only when switched on (Settings → Your situation) */}
+      {childcare.enabled && (
+        <ReadOnlyFence canEdit={canEdit}>
+          <ChildcarePanel
+            settings={childcare}
+            familyIncome={familyIncome}
+            onUpdate={updateChildcare}
+          />
+        </ReadOnlyFence>
+      )}
 
       <div className="two-col">
         <SpendDonut catMonthly={catMonthly} />
@@ -363,6 +367,14 @@ export default function BudgetClient({
           />
         </div>
       </div>
+
+      {canEdit && (!childcare.enabled || !rentSettings?.enabled) && (
+        <p className="situation-hint">
+          {!childcare.enabled && !rentSettings?.enabled ? 'Paying for childcare, or renting?'
+            : !childcare.enabled ? 'Paying for childcare?' : 'Renting?'}{' '}
+          <Link href="/settings#situation">Switch it on in Your situation</Link> and it&rsquo;ll show up here.
+        </p>
+      )}
     </div>
   )
 }

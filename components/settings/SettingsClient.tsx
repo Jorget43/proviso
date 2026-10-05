@@ -7,6 +7,8 @@ import Panel from '@/components/ui/Panel'
 import MembersPanel, { type Member } from './MembersPanel'
 import SecurityPanel from './SecurityPanel'
 import PasskeyPanel from './PasskeyPanel'
+import SituationPanel from './SituationPanel'
+import type { Situation } from '@/lib/situation'
 
 interface Props {
   person1Name:          string
@@ -17,7 +19,7 @@ interface Props {
   mortgageBalance:      number
   superBalance:         number
   partnerSuperBalance:  number
-  parentalLeaveEnabled: boolean
+  situation:            Situation
   currentRole:          string
   currentUserId:        number
   users:                Member[]
@@ -32,7 +34,7 @@ export default function SettingsClient({
   person1Name, person2Name, partnerEnabled,
   person1FTE, person2FTE, mortgageBalance,
   superBalance, partnerSuperBalance,
-  parentalLeaveEnabled,
+  situation,
   currentRole, currentUserId, users, hasTOTP, passkeys, watchdog, buildVersion, buildDate,
 }: Props) {
   const isCfo = currentRole === 'CFO'
@@ -110,9 +112,12 @@ export default function SettingsClient({
           <div className="da-row"><span className="da-label">Mortgage balance</span><span>{mortgageBalance > 0 ? fmt(mortgageBalance) : '—'}</span></div>
           <div className="da-row"><span className="da-label">{person1Name} super</span><span>{fmt(superBalance)}</span></div>
           {partnerEnabled && <div className="da-row"><span className="da-label">{person2Name} super</span><span>{fmt(partnerSuperBalance)}</span></div>}
-          <div className="da-row"><span className="da-label">Parental leave</span><span>{parentalLeaveEnabled ? 'Enabled' : 'Disabled'}</span></div>
         </div>
       </Panel>
+
+      <div style={{ marginTop: '1.5rem' }}>
+        <SituationPanel initial={situation} canEdit={isCfo} person2Name={person2Name} />
+      </div>
 
       <div style={{ marginTop: '1.5rem' }}>
         <SecurityPanel hasTOTP={hasTOTP} />
@@ -141,7 +146,7 @@ export default function SettingsClient({
       )}
 
       {isCfo && (
-      <div style={{ marginTop: '1.5rem', padding: '1.25rem', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r)' }}>
+      <div id="rerun" style={{ marginTop: '1.5rem', padding: '1.25rem', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r)' }}>
         <div style={{ fontSize: '0.875rem', fontWeight: 500, marginBottom: '0.4rem' }}>Re-run setup wizard</div>
         <p style={{ fontSize: '0.78rem', color: 'var(--t2)', marginBottom: '1rem', lineHeight: 1.5 }}>
           This will restart the onboarding questionnaire. Your existing data will not be deleted — the wizard will update the values you enter and leave everything else intact.
@@ -178,7 +183,7 @@ export default function SettingsClient({
 
       <div style={{ marginTop: '1.25rem', fontSize: '0.72rem', color: 'var(--t3)' }}>
         {isCfo
-          ? 'To edit individual figures (incomes, expenses, super balances, debts) use the relevant tab above.'
+          ? 'To edit individual figures (incomes, expenses, super balances, debts) use Spending, Wealth or Future.'
           : 'You have view + Actuals-import access. Editing is reserved for CFO members.'}
       </div>
 
