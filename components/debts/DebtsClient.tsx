@@ -49,8 +49,6 @@ export default function DebtsClient({
   const [assets,   setAssets]   = useState<AssetItem[]>(initialAssets)
   const [mortgage, setMortgage] = useState<MortgageSettings>(initialMortgage)
 
-  const totalDebts  = useMemo(() => debts.reduce((s, d) => s + d.amt, 0), [debts])
-  const totalAssets = useMemo(() => assets.reduce((s, a) => s + a.amt, 0), [assets])
 
   const cashOnHand = useMemo(
     () => assets.find(a => a.name.toLowerCase().includes('cash'))?.amt ?? 0,
@@ -243,7 +241,7 @@ export default function DebtsClient({
           </ReadOnlyFence>
         </div>
         <div>
-          <NetPosition totalDebts={totalDebts} totalAssets={totalAssets} />
+          <NetPosition debts={debts} assets={assets} />
           <ReadOnlyFence canEdit={canEdit}>
             <MortgageDetail
               mortgage={shownMortgage}

@@ -39,7 +39,9 @@ export default async function ProjectionsPage() {
   const person1HELPBalance = findHelpDebt(debts, person1Name)?.amt ?? 0
   const person2HELPBalance = hs?.partnerEnabled ? (findHelpDebt(debts, person2Name)?.amt ?? 0) : 0
 
-  const { mortDebt, propValue, cryptoValue, cashOnHand } = computeCurrentNetWorth(debts, assets, mortgage)
+  const { mortDebt, propValue, cryptoValue, cashOnHand, otherAssets, debtsOwed, netWorth } = computeCurrentNetWorth(debts, assets, mortgage)
+  // HELP balances are repaid inside the engine; any other debt is held flat.
+  const otherDebts = Math.max(0, debtsOwed - person1HELPBalance - person2HELPBalance)
 
   const currentYear = new Date().getFullYear()
 
@@ -64,6 +66,9 @@ export default async function ProjectionsPage() {
       cashOnHand={cashOnHand}
       propValue={propValue}
       cryptoValue={cryptoValue}
+      investmentsValue={otherAssets}
+      otherDebts={otherDebts}
+      netWorthToday={netWorth}
       currentYear={currentYear}
       person1Name={person1Name}
       person2Name={person2Name}

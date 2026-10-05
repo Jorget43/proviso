@@ -55,6 +55,10 @@ export interface ProjectionInputs {
   cashOnHand:         number;
   propValue:          number;   // house value (mortgage balance + equity)
   cryptoValue:        number;
+  // Everything else on the Own & owe lists, so the starting point matches the
+  // net worth shown elsewhere (lib/netWorth.ts). Optional, default 0.
+  investmentsValue?:  number;   // shares, other savings — the starting investment balance, grown at investReturn
+  otherDebts?:        number;   // debts other than the mortgage and modelled HELP — held flat (repayments sit in the budget)
 
   // Work schedule phases — both persons
   person1Phases:      WorkPhase[];
@@ -200,8 +204,9 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
     let mb        = rentMode ? 0 : mortBalance;
     let pVal      = rentMode ? 0 : propValue;
     let cash      = cashOnHand;
-    let invest    = 0;
+    let invest    = Math.max(0, inputs.investmentsValue ?? 0);
     const crypto  = cryptoValue;
+    const otherDebts = Math.max(0, inputs.otherDebts ?? 0);
     let p1HELP    = person1HasHELP ? Math.max(0, inputs.person1HELPBalance) : 0;
     let p2HELP    = person2HasHELP ? Math.max(0, inputs.person2HELPBalance) : 0;
 
@@ -356,7 +361,7 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
       invest  = invest * (1 + iR) + invested;
 
       const equity = pVal - mb;
-      const nw     = equity + cash + invest + crypto - p1HELP - p2HELP;
+      const nw     = equity + cash + invest + crypto - p1HELP - p2HELP - otherDebts;
 
       phaseArr.push(Math.round(phaseOverlay));
       deficitArr.push(Math.round(annualInc - annualExp));

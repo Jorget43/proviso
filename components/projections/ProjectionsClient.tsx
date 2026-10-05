@@ -86,6 +86,9 @@ interface ProjectionsClientProps {
   cashOnHand:           number
   propValue:            number
   cryptoValue:          number
+  investmentsValue:     number   // other assets (shares etc.) — starting investments
+  otherDebts:           number   // debts besides the mortgage and modelled HELP
+  netWorthToday:        number   // lib/netWorth — same figure as Home and Own & owe
   currentYear:          number
   person1Name:          string
   person2Name:          string
@@ -143,7 +146,7 @@ export default function ProjectionsClient({
   initialSettings, initialPerson1Phases, initialPerson2Phases, initialOneoffs, initialLifePhases, initialFeeSchedule,
   income, baseMonthlyExpenses, budgetMortgageMonthly, person1HELPBalance, person2HELPBalance,
   mortBalance, mortRate, mortPayment, mortEndDate,
-  cashOnHand, propValue, cryptoValue, currentYear,
+  cashOnHand, propValue, cryptoValue, investmentsValue, otherDebts, netWorthToday, currentYear,
   person1Name, person2Name, initialRentSettings, initialSnapshots,
 }: ProjectionsClientProps) {
   const [settings,       setSettings]       = useState<ProjSettings>(initialSettings)
@@ -210,6 +213,8 @@ export default function ProjectionsClient({
     cashOnHand,
     propValue,
     cryptoValue,
+    investmentsValue,
+    otherDebts,
     person1Phases,
     person2Phases,
     baseMonthlyExpenses:  expensesExMortgage,
@@ -235,14 +240,14 @@ export default function ProjectionsClient({
     depositFromInvestments: rentSt.depositFromInvestments,
     newMortgageRate:       rentSt.newMortgageRate,
     newMortgageTermYrs:    rentSt.newMortgageTermYrs,
-  }), [settings, person1Phases, person2Phases, oneoffs, lifePhases, income, sfSchedule, expensesExMortgage, mortBalance, mortRate, effectivePayment, person1HELPBalance, person2HELPBalance, cashOnHand, propValue, cryptoValue, currentYear, rentSt])
+  }), [settings, person1Phases, person2Phases, oneoffs, lifePhases, income, sfSchedule, expensesExMortgage, mortBalance, mortRate, effectivePayment, person1HELPBalance, person2HELPBalance, cashOnHand, propValue, cryptoValue, investmentsValue, otherDebts, currentYear, rentSt])
 
   const output = useMemo(() => runProjections(inputs), [inputs])
   const main   = output.withFees ?? output.base
   const sfOn   = settings.schoolFeesOn
 
   // ── Banner values ──
-  const initNW  = (rentSt.enabled ? 0 : propValue) + cashOnHand + cryptoValue - (rentSt.enabled ? 0 : mortBalance)
+  const initNW  = netWorthToday
   const finalNW = main.nwArr[main.nwArr.length - 1]
   const clearedIdx = main.mortArr.findIndex(v => v <= 0)
   const mortCleared = clearedIdx >= 0 ? output.labels[clearedIdx] : 'Not in period'

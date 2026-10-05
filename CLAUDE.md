@@ -366,6 +366,7 @@ The assumptions watchdog (`/admin/watchdog` for the CFO when `WATCHDOG_ENABLED=t
 
 ### Known model simplifications (by design, not bugs)
 - Projections apply today's tax rates and thresholds to every future year (no bracket indexation), so far-out years overstate tax slightly.
+- Net worth: other assets (shares, non-offset savings) grow at the investment return; debts other than the mortgage and modelled HELP are held flat (their repayments sit in the budget), so long horizons slightly understate net worth when such debts exist.
 - Medicare: single low-income threshold only; family/senior thresholds and the Medicare levy surcharge aren't modelled.
 - CCS: assumes Centre Based Day Care for a below-school-age child, a 10-hour session, and that the family's activity level covers the days booked; no withholding.
 - `marginalRate()` ignores the LITO taper and the Medicare shade-in band (headline rate only — used for guidance figures).
@@ -378,7 +379,7 @@ Tracked in [`docs/security-privacy-legal.md`](docs/security-privacy-legal.md) §
 - `braces` (via eslint-config-next → fast-glob → micromatch): dev-only DoS advisory with no patched version yet; Dependabot will raise it when one exists.
 
 ### Mobile & ease of use (after Phase 22)
-- **Two "net worth" figures disagree**: Home and Wealth use everything listed as owned minus owed; Projections' "Net worth today" is the engine baseline (`computeCurrentNetWorth`: house equity + offset cash + crypto, no shares or other assets). Pre-existing, but now both are prominent — unify the definition or label the difference.
+- ~~Two "net worth" figures disagree~~ — done: one definition in `lib/netWorth.ts` (everything on Own & owe, home counted once as equity, super excluded), used by Home, Own & owe, Projections and the monthly snapshots. Snapshots before `NET_WORTH_DEFINED_FROM` used the narrower old definition, so the Projections "actual" history line may step at the switch.
 - ~~Onboarding doesn't ask the "Your situation" questions~~ — done (v1.11.0+): Own/Rent on step 5, new step 6 for childcare, school fees, parental leave.
 - ~~Small-text desktop layouts on phones~~ — checked at 390px after v1.11.0: Own & owe rows restacked, Investments labels/dropdowns fixed, work-pattern wording plain; EOFY, Super and the school-fee controls were already fine. Remaining polish is cosmetic (parcel cards are dense).
 - Native app: the API (`app/api/*`, zod-validated, cookie auth) is already separate from the pages; a native client would need token auth alongside the cookie session.

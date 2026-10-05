@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/db'
 import { requireSession } from '@/lib/auth'
 import { workDaysForYear } from '@/lib/projections'
-import { computeCashOnHand } from '@/lib/netWorth'
+import { computeCashOnHand, computeCurrentNetWorth, NET_WORTH_DEFINED_FROM } from '@/lib/netWorth'
 import { computeBudgetSummary, upcomingAnnualExpenses } from '@/lib/budgetSummary'
 import { isEofySeason } from '@/lib/eofy'
 import { fmt, fmtK } from '@/lib/formatting'
@@ -56,13 +56,13 @@ export default async function Home() {
   })
 
   // Same figure as Wealth → Own & owe: everything listed as owned minus owed.
-  const totalAssets = assets.reduce((s, a) => s + a.amt, 0)
-  const totalDebts  = debts.reduce((s, d) => s + d.amt, 0)
-  const netPosition = totalAssets - totalDebts
-  // Change since the oldest snapshot from the last 12 months that had data.
+  const { netWorth: netPosition } = computeCurrentNetWorth(debts, assets, mortgage)
+  // Change since the oldest snapshot from the last 12 months that had data —
+  // only snapshots taken under the current net-worth definition compare.
   const yearAgo = new Date(now); yearAgo.setFullYear(year - 1)
-  const since = snapshots.find(s => s.takenAt >= yearAgo && ((s.totalAssets ?? 0) !== 0 || (s.totalDebts ?? 0) !== 0))
-  const change = since ? netPosition - ((since.totalAssets ?? 0) - (since.totalDebts ?? 0)) : null
+  const from = new Date(Math.max(yearAgo.getTime(), NET_WORTH_DEFINED_FROM.getTime()))
+  const since = snapshots.find(s => s.takenAt >= from && ((s.totalAssets ?? 0) !== 0 || (s.totalDebts ?? 0) !== 0))
+  const change = since ? netPosition - since.netWorth : null
 
   const situation = await loadSituation()
   const cash = computeCashOnHand(assets)
@@ -130,12 +130,14 @@ export default async function Home() {
         <h2 className="home-h2">Where you stand</h2>
         <div className="home-stats">
           <Link href="/debts" className="home-stat">
-            <span className="home-stat-label">What you own minus what you owe</span>
+            <span className="home-stat-label">Net worth</span>
             <span className="home-stat-value">{fmtK(netPosition)}</span>
-            {change !== null && change !== 0 && since && (
+            {change !== null && change !== 0 && since ? (
               <span className={`home-stat-sub ${change > 0 ? 'up' : 'down'}`}>
                 {change > 0 ? '▲' : '▼'} {fmtK(Math.abs(change))} since {MONTHS[since.takenAt.getMonth()]}
               </span>
+            ) : (
+              <span className="home-stat-sub">what you own minus what you owe</span>
             )}
           </Link>
           <Link href="/debts" className="home-stat">
