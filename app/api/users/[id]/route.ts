@@ -2,7 +2,7 @@ import { prisma } from '@/lib/db'
 import { userUpdateSchema } from '@/lib/schemas'
 import { parseBody, withErrors } from '@/lib/apiHandler'
 import { authorize } from '@/lib/rbac'
-import { hashPassword } from '@/lib/auth'
+import { hashPassword, revokeSessions } from '@/lib/auth'
 
 // Guard: never let the household lose its last CFO.
 async function wouldRemoveLastCfo(targetId: number, newRole?: string): Promise<boolean> {
@@ -38,6 +38,8 @@ export const PUT = withErrors(async (req: Request, { params }: { params: Promise
     data,
     select: { id: true, name: true, username: true, role: true, email: true },
   })
+  // A new password signs that user out everywhere else.
+  if (data.passwordHash) await revokeSessions(id, { keepCurrent: true })
   return Response.json(user)
 })
 

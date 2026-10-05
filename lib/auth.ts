@@ -16,7 +16,30 @@ import { prisma } from './db'
 const scryptAsync = promisify(scrypt)
 
 export const SESSION_COOKIE = 'proviso_session'
-const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000 // 30 days
+
+// Session lifetime (Phase 21): a session ends after 7 days without use, and
+// 30 days after sign-in no matter what. `Session.expiresAt` is the idle
+// deadline; using the app pushes it forward (at most once a day, so reads
+// don't write on every request), capped at createdAt + 30 days. The cookie
+// itself lives the full 30 days — the DB row is what's checked.
+const DAY_MS          = 24 * 60 * 60 * 1000
+const SESSION_IDLE_MS = 7 * DAY_MS
+const SESSION_MAX_MS  = 30 * DAY_MS
+const RENEW_AFTER_MS  = DAY_MS
+
+export function sessionExpiry(now: number, createdAt: Date): Date {
+  return new Date(Math.min(now + SESSION_IDLE_MS, createdAt.getTime() + SESSION_MAX_MS))
+}
+
+// Extend once a day of use has passed since the last extension. Also clamps a
+// deadline that's further out than the idle window (sessions created before
+// the idle timeout existed carried a flat 30-day expiry).
+export function needsRenewal(now: number, expiresAt: Date, createdAt: Date): boolean {
+  const target = sessionExpiry(now, createdAt).getTime()
+  const remaining = expiresAt.getTime() - now
+  return expiresAt.getTime() !== target &&
+    (remaining < SESSION_IDLE_MS - RENEW_AFTER_MS || remaining > SESSION_IDLE_MS)
+}
 
 export type Role = 'CFO' | 'PARTNER' | 'CHILD'
 
@@ -47,8 +70,11 @@ export async function verifyPassword(password: string, stored: string): Promise<
 
 export async function createSession(userId: number): Promise<void> {
   const token = randomBytes(32).toString('hex')
-  const expiresAt = new Date(Date.now() + SESSION_TTL_MS)
+  const now = Date.now()
+  const expiresAt = sessionExpiry(now, new Date(now))
   await prisma.session.create({ data: { userId, token, expiresAt } })
+  // Housekeeping: drop rows that have already expired (any user).
+  await prisma.session.deleteMany({ where: { expiresAt: { lt: new Date(now) } } })
 
   const cookieStore = await cookies()
   cookieStore.set(SESSION_COOKIE, token, {
@@ -58,7 +84,7 @@ export async function createSession(userId: number): Promise<void> {
     // (e.g. Tailscale Serve).
     secure:   process.env.COOKIE_SECURE === 'true',
     sameSite: 'lax',
-    expires:  expiresAt,
+    expires:  new Date(now + SESSION_MAX_MS),
     path:     '/',
   })
 }
@@ -72,6 +98,14 @@ export async function destroySession(): Promise<void> {
   }
 }
 
+// Ends a user's sessions — e.g. after their password is changed. With
+// `keepCurrent`, the session making the request survives (changing your own
+// password shouldn't sign you out of the device you did it on).
+export async function revokeSessions(userId: number, { keepCurrent = false } = {}): Promise<void> {
+  const current = keepCurrent ? (await cookies()).get(SESSION_COOKIE)?.value : undefined
+  await prisma.session.deleteMany({ where: { userId, ...(current ? { token: { not: current } } : {}) } })
+}
+
 // Secure check — validates the cookie token against the DB. Memoised per render.
 export const getSession = cache(async (): Promise<SessionUser | null> => {
   const cookieStore = await cookies()
@@ -79,7 +113,20 @@ export const getSession = cache(async (): Promise<SessionUser | null> => {
   if (!token) return null
 
   const session = await prisma.session.findUnique({ where: { token }, include: { user: true } })
-  if (!session || session.expiresAt < new Date()) return null
+  if (!session) return null
+
+  const now = Date.now()
+  if (session.expiresAt.getTime() <= now) {
+    await prisma.session.deleteMany({ where: { id: session.id } })
+    return null
+  }
+  if (needsRenewal(now, session.expiresAt, session.createdAt)) {
+    // updateMany: a concurrent sign-out may already have removed the row.
+    await prisma.session.updateMany({
+      where: { id: session.id },
+      data:  { expiresAt: sessionExpiry(now, session.createdAt) },
+    })
+  }
 
   return {
     userId:   session.user.id,
