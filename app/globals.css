@@ -260,6 +260,9 @@ body {
 
 /* ── Two-column grid ── */
 .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+/* Grid items default to min-width: auto, so a wide table inside would widen
+   the whole column past the screen instead of scrolling in its wrapper. */
+.two-col > * { min-width: 0; }
 
 /* ── Income inputs ── */
 .income-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
@@ -1250,6 +1253,7 @@ input[type=range] { width: 100%; accent-color: var(--t3); }
   .income-grid { grid-template-columns: 1fr; }
   .lumpy-grid { grid-template-columns: 1fr; }
   .nav-readonly { display: none; }
+  .panel-head { flex-wrap: wrap; gap: 6px 1rem; }
   .da-label { min-width: 0; flex: 0 0 38%; }
   .da-row > .da-input:not(.narrow):not(.wide) { min-width: 0; flex: 1; width: auto; }
   /* Super projection table: drop secondary columns so the essentials
