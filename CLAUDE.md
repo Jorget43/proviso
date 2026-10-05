@@ -73,18 +73,22 @@ Treat it as an incident: stop pushing, don't "fix forward". If it's only local, 
 
 ## Status: all tabs live
 
-| Tab            | Route           |
-|----------------|-----------------|
-| Budget         | `/budget`       |
-| Debts & Assets | `/debts`        |
-| Cashflow       | `/cashflow`     |
-| Projections    | `/projections`  |
-| Actuals        | `/actuals`      |
-| Super          | `/super`        |
-| EOFY (seasonal)| `/eofy`         |
-| Investments    | `/investments`  |
+Mobile-first since Phase 22: four destinations ("hubs", `lib/navigation.ts`) shown as a bottom tab bar on phones and top tabs on desktop, with a segmented sub-nav inside each hub. Page URLs predate the hubs and are unchanged.
 
-EOFY is seasonal — surfaced via May/June `◷ EOFY` pill in `TopNav`, reachable year-round by URL.
+| Hub      | Section (sub-nav)  | Route           |
+|----------|--------------------|-----------------|
+| Home     | overview           | `/`             |
+| Spending | Budget             | `/budget`       |
+|          | Actual spending    | `/actuals`      |
+| Wealth   | Own & owe          | `/debts`        |
+|          | Super              | `/super`        |
+|          | Investments        | `/investments`  |
+| Future   | Long term          | `/projections`  |
+|          | Next 2 years       | `/cashflow`     |
+| (⚙)      | Settings           | `/settings`     |
+| (seasonal) | EOFY             | `/eofy`         |
+
+EOFY is seasonal — surfaced via May/June `◷ EOFY` pill in `TopNav`, reachable year-round by URL. Situational sections (renting/buying, childcare, school fees, parental leave) appear only when switched on in Settings → Your situation (`lib/situation.ts`).
 
 ## Key architecture decisions
 
@@ -148,6 +152,8 @@ await (prisma.transaction.createMany as Function)({ data: [...], skipDuplicates:
 CSS vars: `--bg`, `--surface`, `--surface2`, `--border`, `--border-md`, `--t1/t2/t3`, `--blue/green/red/amber/purple/pink/teal` (each with `-lt` variant), `--r`, `--rl`
 
 Key classes: `.page`, `.banner` + `.b-item/.b-label/.b-value`, `.metrics`, `.mc`, `.panel` + `.panel-head/.panel-body`, `.two-col`, `.sidebar-layout`, `.da-grid/.da-row/.da-input`, `.pill` + color variants, `.toggle-switch/.toggle-slider`, `.slider-group/.slider-label`, `.tl-table`, `.add-btn`, `.del-btn`, `.input-prefix`, `.chart-wrap`, `.super-table`, `.super-badge`, `.super-hint`, `.super-context-box`, `.inc-person-card`, `.inc-breakdown`, `.inc-br-*`
+
+Mobile-first pieces (Phase 22): `.bottom-nav`, `.subnav`, `.sheet` (+ `components/ui/BottomSheet.tsx`, a native `<dialog>`), `.field`/`.field-money`/`.seg`/`.btn` for touch forms, `.scrub*` (+ `components/ui/ScrubChart.tsx`), `.explorer*`, `.whatif*`, `.exp-*` (Budget phone list), `.home-*`, `.situation-*`, `.mini-stats`. Rules of thumb: design at 390px first; touch inputs are ≥16px (iOS zooms otherwise — enforced under `pointer: coarse`); grid children need `min-width: 0` or wide content widens the column; never `overflow-x: hidden` on an ancestor of something sticky (use `clip`). `--bottom-nav-h` is the bottom bar's height (0 on desktop) for anything fixed to the bottom.
 
 ## Docker & deployment
 
@@ -371,6 +377,12 @@ Tracked in [`docs/security-privacy-legal.md`](docs/security-privacy-legal.md) §
 - "Sign out other devices" / session list in Settings — `revokeSessions()` exists, there's no UI.
 - `braces` (via eslint-config-next → fast-glob → micromatch): dev-only DoS advisory with no patched version yet; Dependabot will raise it when one exists.
 
+### Mobile & ease of use (after Phase 22)
+- **Two "net worth" figures disagree**: Home and Wealth use everything listed as owned minus owed; Projections' "Net worth today" is the engine baseline (`computeCurrentNetWorth`: house equity + offset cash + crypto, no shares or other assets). Pre-existing, but now both are prominent — unify the definition or label the difference.
+- Onboarding doesn't ask the "Your situation" questions (renting, childcare, school fees); Home points people to Settings instead. A wizard step would surface them earlier.
+- Not yet redesigned for phones beyond the global touch rules: Debts & Assets grids, Investments parcels, EOFY panels, Super inputs, the Projections work-pattern and fee-schedule tables. Usable at 390px, but still small-text desktop layouts.
+- Native app: the API (`app/api/*`, zod-validated, cookie auth) is already separate from the pages; a native client would need token auth alongside the cookie session.
+
 ### Deferred (revisit only if needed)
 - `Transaction` `@@index([ym])` — premature at household scale (see Phase 15).
 - **Phase 3 — CDR bank feeds**: researched, not built; CSV import stays the core. See [`docs/phase3-cdr-research.md`](docs/phase3-cdr-research.md).
@@ -383,6 +395,19 @@ Tracked in [`docs/security-privacy-legal.md`](docs/security-privacy-legal.md) §
 - **Security headers** (`lib/securityHeaders.ts`): CSP (self-only scripts/styles/connections/workers, no framing, no `<object>`/`<base>`, forms post only to the app), `X-Frame-Options`, `nosniff`, `Referrer-Policy: no-referrer` (reset tokens live in URLs), `Permissions-Policy`, COOP; `X-Powered-By` removed. `script-src` keeps `'unsafe-inline'` — Next's hydration needs it unless every page goes nonce-based dynamic. HSTS (1 year, no subdomains) from the proxy when `COOKIE_SECURE=true`. Verified by driving headless Edge over the DevTools protocol against a production build: all pages hydrate and draw charts with no CSP violations, the pdf.js worker loads, an injected cross-origin fetch is blocked.
 - **Sessions**: 7-day idle timeout, 30-day absolute limit (was a flat 30 days). Pre-existing sessions are clamped on next use. Changing a user's password in Settings ends their other sessions (the reset-password flow already did).
 - **Audit log**: `AuditEvent` (migration `0002_audit_log`), 365-day retention. Buffered per request and written after the handler returns — an insert from inside a `$transaction` would deadlock on the single SQLite connection. Failed requests' writes and zero-row bulk writes are dropped; unknown usernames from failed sign-ins aren't stored (could be a mistyped password). `/settings/activity` lists it for the CFO.
+
+### Phase 22 — Mobile-first: four hubs, Home overview, phone Budget, scrubbable charts, "Your situation" (2026-10-05)
+
+- **Why**: most use is on a phone (NAS-hosted, opened over the home network), desktop second, and a native app may follow. The audience is non-finance users, so fewer destinations and plainer words.
+- **Navigation** (`lib/navigation.ts`, `components/layout/TopNav.tsx`): seven tabs → Home / Spending / Wealth / Future; bottom tab bar on phones, top tabs on desktop, segmented sub-nav per hub; account menu (name, role, Sign out). `/` is now the Home overview instead of a redirect to `/budget`.
+- **Home** (`app/page.tsx`): "$X left over each month", plain-language prompts (shortfall, thin safety net, EOFY), where you stand, yearly bills due in the next three months, your situation. Budget arithmetic moved to `lib/budgetSummary.ts` so Home and Budget can't disagree.
+- **Budget on phones** (< 700px): category cards with share bars → tap a line → `ExpenseSheet` bottom sheet. "Regular" vs "annual" is one "How often?" choice (Yearly + due month = annual bill; switching kinds converts the record). Pinned In/Out/Left over bar; income folds to a one-line summary. Desktop keeps the inline table.
+- **Charts** (`ScrubChart`): drag sideways to move through years (vertical drags still scroll, `touch-action: pan-y`), fixed readout instead of a floating tooltip, readout doubles as a tap-to-hide legend. Charts pass `SCRUB_BASE` (Chart.js `events: []`, no tooltip/legend) and ScrubChart sets the active point for the crosshair.
+- **Projections**: headline sentence, then one chart at a time behind a picker, each with a one-line takeaway; loan/housing/school-fee views only when they apply. Controls grouped Basics / Work / Home / Plans — sidebar on desktop, half-height "What if?" drawer on phones so the chart stays visible. Read-only fence now wraps only the controls.
+- **Your situation** (`lib/situation.ts`, `SituationPanel`): one list of switches in Settings for renting (+ buying), childcare, school fees, parental leave; partner shown, changed via the wizard. Budget's childcare panel and Cashflow's parental-leave figures now follow their switch.
+- **Add to Home Screen**: `app/manifest.ts` (public in the proxy matcher — fetched without cookies), icons in `public/icons/`, theme colour, `viewport-fit=cover` with safe-area padding.
+- **Fixes found on the way**: `overflow-x: hidden` on html/body/.page made them scroll containers, so `position: sticky` (the top bar) never worked → `clip`. `.two-col`/`.sidebar-layout` children lacked `min-width: 0`, so wide tables (Actuals review) widened the page instead of scrolling.
+- **Verified** with a headless-Edge DevTools harness at 390px and 1280px against a scratch DB: sheet add/edit/convert/delete, scrubbing, legend toggles, live slider updates, situation switches, and a view-only partner account. Zero migrations. 246 tests (12 new: navigation, budget summary).
 
 ## Security checklist for new features
 
