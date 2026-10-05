@@ -78,6 +78,17 @@ This builds the standalone image locally and starts the `proviso` container on p
 
 Behind HTTPS (e.g. Tailscale Serve) set `COOKIE_SECURE=true` so session cookies carry the `Secure` flag and browsers get an HSTS header (remember HTTPS for this host for a year). Over a plain-http tailnet address leave it unset.
 
+### Protecting the data on disk
+
+Everything Proviso knows lives in one SQLite file, `/data/proviso.db`, in the `proviso-db` volume, alongside the three automatic `.bak` copies the container makes before each upgrade. Passwords and sign-in tokens in it are hashed, so the file can't be used to log in, but the household figures (budget, balances, transactions) are stored as plain data.
+
+Proviso doesn't encrypt the file itself. Protect it where it's stored instead: that covers the backups too, and a key kept in the app's own settings would sit on the same machine as the data anyway.
+
+- **Unraid**: put the disk or pool that holds Docker's data (usually the cache pool with `appdata` and the Docker image) on an encrypted file system — *XFS - encrypted* or *BTRFS - encrypted*. Changing a disk's file system erases it, so move its data off first. Unraid then asks for the passphrase or keyfile each time the array starts. Keep that passphrase somewhere safe: without it the data can't be recovered.
+- **Other Linux hosts**: keep the Docker volume on a LUKS-encrypted disk or partition.
+- **Synology / QNAP**: use the NAS's encrypted volume or encrypted shared-folder feature for the folder holding the volume.
+- **Copies that leave the NAS** (cloud sync, USB drives): encrypt them, e.g. with an encrypting backup tool such as restic or an encrypted archive.
+
 ## What's inside
 
 Built for phones first (Add to Home Screen opens it like an app), with the same layout on desktop:

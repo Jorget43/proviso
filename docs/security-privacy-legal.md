@@ -90,6 +90,6 @@ The Australian Privacy Principles (APPs) become binding on the developer once th
 
 | Gap | Risk | Fix |
 |---|---|---|
-| SQLite not encrypted at rest | Physical volume access exposes all data | Document that volume-level encryption is the user's responsibility; future: SQLCipher |
+| SQLite not encrypted at rest | Physical volume access exposes the household figures (passwords and session tokens are hashed) | By decision: drive/volume encryption, documented in README § "Protecting the data on disk". In-app encryption isn't planned — its key would live on the same host |
 
 **Content Security Policy:** see `lib/securityHeaders.ts` — the comment there explains each directive and how the per-request nonce works.

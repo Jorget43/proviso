@@ -375,9 +375,9 @@ The assumptions watchdog (`/admin/watchdog` for the CFO when `WATCHDOG_ENABLED=t
 ### Security hardening still open
 Tracked in [`docs/security-privacy-legal.md`](docs/security-privacy-legal.md) § Cybersecurity. Phase 21 closed headers/CSP, HSTS, the audit log, session lifetime and automated dependency updates. Left:
 - ~~Nonce-based CSP~~ — done (Phase 24): `'unsafe-inline'` is gone from `script-src`.
-- SQLite encryption at rest — volume-level encryption is the operator's job for now; SQLCipher would be the in-app route.
+- ~~SQLite encryption at rest~~ — decided (2026-10-05): **not built in-app**; README § "Protecting the data on disk" recommends drive encryption (Unraid encrypted XFS/BTRFS, LUKS, NAS volume encryption) plus encrypted off-site copies. In-app would need Prisma 5 → 7 with the libSQL adapter, an in-place conversion of live data, and a key stored on the same host as the data — little gain for the risk.
 - ~~"Sign out other devices" / session list in Settings~~ — done (Phase 24): Settings → Your devices.
-- `braces` (via eslint-config-next → fast-glob → micromatch): dev-only DoS advisory with no patched version yet; Dependabot will raise it when one exists.
+- `braces` (via eslint-config-next → fast-glob → micromatch): GHSA-vfj7-8cjw-p6xm, no patched version as of 2026-10-05 (3.0.3 is the latest, and Next's canary lint plugin still pins fast-glob 3.3.1). Not exploitable here: lint-only, patterns from our own config, never in the image; CI's audit gate is `--omit=dev`. `npm audit fix` suggests eslint-config-next 14 — a downgrade, don't. Dependabot will raise it when a fix exists.
 
 ### Mobile & ease of use (after Phase 22)
 - ~~Two "net worth" figures disagree~~ — done: one definition in `lib/netWorth.ts` (everything on Own & owe, home counted once as equity, super excluded), used by Home, Own & owe, Projections and the monthly snapshots. Snapshots before `NET_WORTH_DEFINED_FROM` used the narrower old definition, so the Projections "actual" history line may step at the switch.
