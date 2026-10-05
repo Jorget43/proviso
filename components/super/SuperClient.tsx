@@ -358,10 +358,9 @@ export default function SuperClient({ canEdit, initial, context, mortgage, budge
 
         {/* ── Right: chart ── */}
         <Panel title="Balance over time" dotColor="var(--blue)">
-          <p style={{ fontSize: '0.72rem', color: 'var(--t3)', marginBottom: '0.5rem' }}>
-            {inputs.partnerEnabled
-              ? `Blue = ${person1Name} · Purple = ${person2Name} · Green = Combined · Dashed = today's $`
-              : 'Blue = accumulation · Amber = drawdown · Dashed = today\'s $'}
+          <p style={{ fontSize: '0.8rem', color: 'var(--t2)', marginBottom: '0.75rem', lineHeight: 1.45 }}>
+            Super grows until retirement (marked ↓ on the timeline), then gets drawn down.
+            &ldquo;Today&rsquo;s $&rdquo; shows what that money is worth after inflation.
           </p>
           <SuperBalanceChart
             combined={result.combined}

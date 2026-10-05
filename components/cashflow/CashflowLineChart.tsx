@@ -6,12 +6,12 @@ import {
   LinearScale,
   CategoryScale,
   Filler,
-  Tooltip,
 } from 'chart.js'
 import { Line } from 'react-chartjs-2'
-import { crosshair } from '@/lib/chartPlugins'
+import { crosshair, SCRUB_BASE, AXIS_TICKS, kTicks } from '@/lib/chartPlugins'
+import ScrubChart from '@/components/ui/ScrubChart'
 
-ChartJS.register(LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip)
+ChartJS.register(LineElement, PointElement, LinearScale, CategoryScale, Filler)
 
 interface CashflowLineChartProps {
   labels: string[]
@@ -21,55 +21,33 @@ interface CashflowLineChartProps {
 }
 
 export default function CashflowLineChart({ labels, data, color, note }: CashflowLineChartProps) {
-  const bg = color + '12'
+  const datasets = [{
+    label: 'Cash in the bank',
+    data,
+    borderColor: color,
+    backgroundColor: color + '12',
+    fill: true,
+    tension: 0.35,
+    pointRadius: 0,
+    pointHoverRadius: 4,
+    borderWidth: 2,
+  }]
 
   return (
     <>
-      <div className="chart-wrap" style={{ height: 240 }}>
+      <ScrubChart labels={labels} datasets={datasets} height={240}>
         <Line
           plugins={[crosshair]}
-          data={{
-            labels,
-            datasets: [{
-              label: 'Balance',
-              data,
-              borderColor: color,
-              backgroundColor: bg,
-              fill: true,
-              tension: 0.35,
-              pointRadius: 2,
-              borderWidth: 2,
-            }],
-          }}
+          data={{ labels, datasets }}
           options={{
-            responsive: true,
-            maintainAspectRatio: false,
-            interaction: { mode: 'index' as const, intersect: false },
-            plugins: {
-              legend: { display: false },
-              tooltip: {
-                callbacks: {
-                  label: ctx => ` Balance: $${(ctx.parsed.y as number).toLocaleString('en-AU')}`,
-                },
-              },
-            },
+            ...SCRUB_BASE,
             scales: {
-              x: {
-                ticks: { font: { size: 10 }, color: '#A09484' },
-                grid: { display: false },
-              },
-              y: {
-                ticks: {
-                  callback: v => '$' + Math.round(Number(v) / 1000) + 'k',
-                  font: { size: 10 },
-                  color: '#A09484',
-                },
-                grid: { color: 'rgba(0,0,0,0.05)' },
-              },
+              x: { ticks: AXIS_TICKS, grid: { display: false } },
+              y: { ticks: { ...AXIS_TICKS, callback: kTicks }, grid: { color: 'rgba(0,0,0,0.05)' } },
             },
           }}
         />
-      </div>
+      </ScrubChart>
       {note && <p className="proj-note mt1">{note}</p>}
     </>
   )

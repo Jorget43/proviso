@@ -1,8 +1,9 @@
 'use client'
-import { Chart as ChartJS, BarElement, LineElement, PointElement, LinearScale, CategoryScale, Tooltip, Legend } from 'chart.js'
+import { Chart as ChartJS, BarElement, LineElement, PointElement, LinearScale, CategoryScale } from 'chart.js'
 import { Chart } from 'react-chartjs-2'
-import { crosshair } from '@/lib/chartPlugins'
-ChartJS.register(BarElement, LineElement, PointElement, LinearScale, CategoryScale, Tooltip, Legend)
+import { crosshair, SCRUB_BASE, AXIS_TICKS, kTicks } from '@/lib/chartPlugins'
+import ScrubChart from '@/components/ui/ScrubChart'
+ChartJS.register(BarElement, LineElement, PointElement, LinearScale, CategoryScale)
 
 interface PersonIncomeChartProps {
   labels:      string[]
@@ -29,28 +30,22 @@ export default function PartnerIncomeChart({
   const fte1Ref  = labels.map((_, i) => Math.round(person1FTE * Math.pow(1 + g1, i + 1)))
   const fte2Ref  = labels.map((_, i) => Math.round(person2FTE * Math.pow(1 + g2 * 0.5, i)))
 
+  const datasets = [
+    { type: 'bar' as const,  label: person1Name,                  data: person1Data, backgroundColor: 'rgba(30,95,168,0.72)', borderRadius: 3, order: 2 },
+    { type: 'bar' as const,  label: person2Name,                  data: person2Data, backgroundColor: p2Colors,               borderRadius: 3, order: 3 },
+    { type: 'line' as const, label: `${person1Name} if full-time`, data: fte1Ref,    borderColor: 'rgba(30,95,168,0.35)',  borderDash: [4,4], borderWidth: 1.5, pointRadius: 0, pointHoverRadius: 0, fill: false, order: 1 },
+    { type: 'line' as const, label: `${person2Name} if full-time`, data: fte2Ref,    borderColor: 'rgba(160,148,132,0.45)', borderDash: [4,4], borderWidth: 1.5, pointRadius: 0, pointHoverRadius: 0, fill: false, order: 0 },
+  ]
+
   return (
-    <div className="chart-wrap" style={{ height: 210 }}>
-      <Chart type="bar" plugins={[crosshair]} data={{
-        labels,
-        datasets: [
-          { type: 'bar' as const,  label: person1Name,         data: person1Data, backgroundColor: 'rgba(30,95,168,0.72)', borderRadius: 3, order: 2 },
-          { type: 'bar' as const,  label: person2Name,         data: person2Data, backgroundColor: p2Colors,               borderRadius: 3, order: 3 },
-          { type: 'line' as const, label: `${person1Name} FTE`, data: fte1Ref,    borderColor: 'rgba(30,95,168,0.35)',  borderDash: [4,4], borderWidth: 1.5, pointRadius: 0, fill: false, order: 1 },
-          { type: 'line' as const, label: `${person2Name} FTE`, data: fte2Ref,    borderColor: 'rgba(160,148,132,0.45)', borderDash: [4,4], borderWidth: 1.5, pointRadius: 0, fill: false, order: 0 },
-        ],
-      }} options={{
-        responsive: true, maintainAspectRatio: false,
-        interaction: { mode: 'index' as const, intersect: false },
-        plugins: {
-          legend: { display: true, position: 'top', labels: { font: { size: 10 }, color: '#6A5F4A', boxWidth: 8, boxHeight: 8 } },
-          tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label}: $${(ctx.parsed.y as number).toLocaleString('en-AU')}` } },
-        },
+    <ScrubChart labels={labels} datasets={datasets} height={230} defaultIndex={0}>
+      <Chart type="bar" plugins={[crosshair]} data={{ labels, datasets }} options={{
+        ...SCRUB_BASE,
         scales: {
-          x: { ticks: { font: { size: 10 }, color: '#A09484' }, grid: { display: false } },
-          y: { ticks: { callback: v => '$' + Math.round(Number(v) / 1000) + 'k', font: { size: 10 }, color: '#A09484' }, grid: { color: 'rgba(0,0,0,0.05)' } },
+          x: { ticks: AXIS_TICKS, grid: { display: false } },
+          y: { ticks: { ...AXIS_TICKS, callback: kTicks }, grid: { color: 'rgba(0,0,0,0.05)' } },
         },
       }} />
-    </div>
+    </ScrubChart>
   )
 }

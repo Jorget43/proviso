@@ -93,6 +93,15 @@ interface ProjectionsClientProps {
   initialSnapshots:     NetWorthSnapshotRow[]
 }
 
+type View  = 'networth' | 'inout' | 'shortfall' | 'loan' | 'stress' | 'income' | 'fees'
+type Group = 'basics' | 'work' | 'home' | 'plans'
+const GROUPS: { key: Group; label: string }[] = [
+  { key: 'basics', label: 'Basics' },
+  { key: 'work',   label: 'Work' },
+  { key: 'home',   label: 'Home' },
+  { key: 'plans',  label: 'Plans' },
+]
+
 const DEFAULT_RENT: RentSettingsType = {
   id: 1, enabled: false, monthlyRent: 0, annualIncreaseRate: 5.0,
   purchasePlanEnabled: false, targetPurchaseYear: new Date().getFullYear() + 5,
@@ -104,8 +113,8 @@ const DEFAULT_RENT: RentSettingsType = {
 // Declared at module level: defined inside ProjectionsClient it was a new
 // component type on every render, so React remounted each slider whenever a
 // value changed — which can drop an in-progress drag or keyboard focus.
-function Slider({ label, min, max, step, value, cls, fmt: fmtFn = (v: number) => v + '%', onChange }: {
-  label: string; id?: string; min: number; max: number; step: number; value: number; cls: string
+function Slider({ label, hint, min, max, step, value, cls, fmt: fmtFn = (v: number) => v + '%', onChange }: {
+  label: string; hint?: string; id?: string; min: number; max: number; step: number; value: number; cls: string
   fmt?: (v: number) => string; onChange: (v: number) => void
 }) {
   const dec = (v: number) => onChange(Math.max(min, parseFloat((v - step).toFixed(4))))
@@ -115,14 +124,15 @@ function Slider({ label, min, max, step, value, cls, fmt: fmtFn = (v: number) =>
       <div className="slider-label">
         {label} <span>{fmtFn(value)}</span>
       </div>
+      {hint && <div className="slider-hint">{hint}</div>}
       <div className="slider-row">
-        <button className="slider-btn" type="button" onClick={() => dec(value)}>−</button>
+        <button className="slider-btn" type="button" onClick={() => dec(value)} aria-label={`Decrease ${label}`}>−</button>
         <input
-          type="range" className={cls} min={min} max={max} step={step}
+          type="range" className={cls} min={min} max={max} step={step} aria-label={label}
           value={value}
           onChange={e => onChange(parseFloat(e.target.value))}
         />
-        <button className="slider-btn" type="button" onClick={() => inc(value)}>+</button>
+        <button className="slider-btn" type="button" onClick={() => inc(value)} aria-label={`Increase ${label}`}>+</button>
       </div>
     </div>
   )
@@ -144,6 +154,9 @@ export default function ProjectionsClient({
   const [lifePhases,  setLifePhases]  = useState<LifePhase[]>(initialLifePhases)
   const [rentSt,      setRentSt]      = useState<RentSettingsType>(initialRentSettings ?? DEFAULT_RENT)
   const [snapshots,   setSnapshots]   = useState<NetWorthSnapshotRow[]>(initialSnapshots)
+  const [view,        setView]        = useState<View>('networth')
+  const [group,       setGroup]       = useState<Group>('basics')
+  const [whatIfOpen,  setWhatIfOpen]  = useState(false)
 
   const sfSchedule = useMemo<FeeSchedule>(() => {
     if (settings.sfPresetKey) {
@@ -382,123 +395,224 @@ export default function ProjectionsClient({
   }, [])
 
 
-  return (
-    <div className="page">
-      <ReadOnlyFence canEdit={canEdit}>
-      {/* ── Banner ── */}
-      <div className="banner">
-        <div className="b-item"><div className="b-label">Net worth in {settings.projYears} yrs</div><div className="b-value green">{fmtK(finalNW)}</div></div>
-        <div className="b-div" />
-        <div className="b-item"><div className="b-label">Growth</div><div className="b-value green">+{fmtK(finalNW - initNW)}</div></div>
-        <div className="b-div" />
-        {rentSt.enabled
-          ? <div className="b-item"><div className="b-label">Total rent paid</div><div className="b-value red">{fmtK(totalRentPaid)}</div></div>
-          : <div className="b-item"><div className="b-label">Mortgage cleared</div><div className="b-value">{mortCleared}</div></div>
-        }
-        <div className="b-div" />
-        <div className="b-item"><div className="b-label">Investments</div><div className="b-value blue">{fmtK(finalInvest)}</div></div>
-        {sfOn && (<>
-          <div className="b-div" />
-          <div className="b-item"><div className="b-label">Total school fees</div><div className="b-value red">{fmtK(totalFees)}</div></div>
-          <div className="b-div" />
-          <div className="b-item"><div className="b-label">NW cost of schooling</div><div className="b-value red">{fmtK(nwFeeCost)}</div></div>
-        </>)}
-      </div>
+  // ── Chart explorer: one chart at a time, each with a plain-language takeaway ──
+  const lastLabel   = output.labels[output.labels.length - 1]
+  const growth      = finalNW - initNW
+  const hasLoan     = main.mortArr.some(v => v > 0)
+  const hasHousing  = main.mortStressArr.some(v => v > 0)
+  const deficitIdx  = main.deficitArr.flatMap((v, i) => (v < 0 ? [i] : []))
+  const stressIdx   = main.mortStressArr.flatMap((v, i) => (v > 30 ? [i] : []))
+  const peakStress  = Math.max(0, ...main.mortStressArr)
+  const hhIncome    = main.person1Arr.map((v, i) => v + (main.person2Arr[i] ?? 0))
+  const plural      = (n: number, w: string) => `${n} ${w}${n === 1 ? '' : 's'}`
 
-      {/* ── Sidebar layout ── */}
+  const views: { key: View; label: string; takeaway: string }[] = [
+    {
+      key: 'networth', label: 'Net worth',
+      takeaway: `By ${lastLabel} you're on track to be worth ${fmtK(finalNW)} — ${growth >= 0 ? 'up' : 'down'} ${fmtK(Math.abs(growth))} on today.`
+        + (sfOn && nwFeeCost > 0 ? ` Without school fees it would be about ${fmtK(nwFeeCost)} more.` : ''),
+    },
+    {
+      key: 'inout', label: 'Money in & out',
+      takeaway: deficitIdx.length === 0
+        ? 'Your income covers your spending in every year shown.'
+        : `You spend more than you earn in ${plural(deficitIdx.length, 'year')}, starting ${output.labels[deficitIdx[0]]}.`,
+    },
+    {
+      key: 'shortfall', label: 'Good & tight years',
+      takeaway: (() => {
+        const worst = Math.min(...main.deficitArr)
+        const wi = main.deficitArr.indexOf(worst)
+        return worst < 0
+          ? `Most years leave money over. The tightest is ${output.labels[wi]}, when you'd be ${fmtK(-worst)} short.`
+          : `Every year leaves money over — the leanest is ${output.labels[wi]}, with ${fmtK(worst)} to spare.`
+      })(),
+    },
+    ...(hasLoan ? [{
+      key: 'loan' as const, label: 'Home loan',
+      takeaway: clearedIdx >= 0
+        ? `Your home loan is paid off in ${mortCleared}.`
+        : `Your home loan isn't paid off within the ${settings.projYears} years shown.`,
+    }] : []),
+    ...(hasHousing ? [{
+      key: 'stress' as const, label: 'Housing costs',
+      takeaway: stressIdx.length === 0
+        ? 'Home loan repayments stay under 30% of your income — a comfortable level.'
+        : `Repayments take more than 30% of your income in ${plural(stressIdx.length, 'year')}, peaking at ${peakStress.toFixed(0)}% in ${output.labels[main.mortStressArr.indexOf(peakStress)]}.`,
+    }] : []),
+    {
+      key: 'income', label: 'Income',
+      takeaway: `Household income before tax goes from ${fmtK(hhIncome[0] ?? 0)} to ${fmtK(hhIncome[hhIncome.length - 1] ?? 0)} a year.`
+        + (main.leaveYrs.length ? ` ${person2Name} is on parental leave in ${main.leaveYrs.join(', ')}.` : ''),
+    },
+    ...(sfOn ? [{
+      key: 'fees' as const, label: 'School fees',
+      takeaway: (() => {
+        const peak = Math.max(0, ...main.sfTotalArr)
+        return `School fees add up to ${fmtK(totalFees)}, peaking at ${fmtK(peak)} in ${output.labels[main.sfTotalArr.indexOf(peak)]}.`
+      })(),
+    }] : []),
+  ]
+  const current = views.find(v => v.key === view) ?? views[0]
+
+  function openWhatIf() {
+    setWhatIfOpen(true)
+    document.getElementById('explorer')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
+  return (
+    <div className={`page proj${whatIfOpen ? ' whatif-open' : ''}`}>
+      <section className="proj-headline">
+        <p className="proj-lede">
+          In {lastLabel}, you&rsquo;re on track to be worth <strong>{fmtK(finalNW)}</strong>.
+        </p>
+        <p className="proj-lede-sub">
+          {hasLoan && (clearedIdx >= 0 ? `Home loan paid off in ${mortCleared}. ` : 'Home loan still being paid off. ')}
+          {rentSt.enabled && `${fmtK(totalRentPaid)} paid in rent along the way. `}
+          {deficitIdx.length > 0 ? `${plural(deficitIdx.length, 'tight year')} where spending beats income.` : 'No years where spending beats income.'}
+        </p>
+      </section>
+
       <div className="sidebar-layout">
         {/* ── Main column ── */}
-        <div>
-          <Panel title="Net worth trajectory" dotColor="var(--green)">
-            <NetWorthChart
-              labels={output.labels} nwData={main.nwArr} nwNoFees={sfOn ? output.base.nwArr : null}
-              investData={main.investArr} cashData={main.cashArr} sfOn={sfOn}
-              historyLabels={historyLabels} historyData={historyData}
-            />
-          </Panel>
-          <div style={{ marginTop: '1rem' }}>
-            <Panel title="Projection accuracy" dotColor="var(--amber)">
-              <NetWorthHistoryPanel snapshots={snapshots} onAdd={addSnapshot} onDelete={deleteSnapshot} />
-            </Panel>
-          </div>
-          <div style={{ marginTop: '1rem' }}>
-            <Panel title="Income by person" dotColor="var(--pink)">
-              <PartnerIncomeChart
-                labels={output.labels}
-                person1Data={main.person1Arr} person2Data={main.person2Arr}
-                person1Name={person1Name}   person2Name={person2Name}
-                leaveYrs={main.leaveYrs}
-                person1FTE={income.person1FTE} person2FTE={income.person2FTE}
-                person1Growth={settings.person1Growth} person2Growth={settings.person2Growth}
-              />
-              <p className="proj-note mt1">Pink = {person2Name} on leave. Dashed = FTE reference per person.</p>
-            </Panel>
-          </div>
-          <div style={{ marginTop: '1rem' }}>
-            <Panel title="Annual income vs expenses" dotColor="var(--blue)">
-              <IncExpProjChart
-                labels={output.labels} incData={main.incArr} expData={main.expArr}
-                phaseData={main.phaseArr} sfTotalData={main.sfTotalArr} sfOn={sfOn}
-              />
-            </Panel>
-          </div>
-          <div style={{ marginTop: '1rem' }}>
-            <Panel
-              title="Income vs expenses — deficit years highlighted"
-              dotColor="var(--red)"
-              right={main.deficitArr.filter(v => v < 0).length > 0
-                ? <span className="pill pill-red">{main.deficitArr.filter(v => v < 0).length} deficit year{main.deficitArr.filter(v => v < 0).length > 1 ? 's' : ''}</span>
-                : undefined}
-            >
-              <DeficitChart labels={output.labels} deficitData={main.deficitArr} cashRunningData={main.cashRunningArr} />
-            </Panel>
-          </div>
-          <div style={{ marginTop: '1rem' }}>
-            <Panel
-              title="Mortgage stress & housing cost ratio"
-              dotColor="var(--amber)"
-              right={main.mortStressArr.filter(v => v > 30).length > 0
-                ? <span className={`pill ${Math.max(...main.mortStressArr) > 35 ? 'pill-red' : 'pill-amber'}`}>{main.mortStressArr.filter(v => v > 30).length} stress year{main.mortStressArr.filter(v => v > 30).length > 1 ? 's' : ''}</span>
-                : undefined}
-            >
-              <MortStressChart labels={output.labels} stressData={main.mortStressArr} />
-            </Panel>
-          </div>
-          <div style={{ marginTop: '1rem' }}>
-            <Panel title="Mortgage paydown" dotColor="var(--purple)">
-              <MortPaydownChart labels={output.labels} mortData={main.mortArr} endDate={mortEndDate} />
-            </Panel>
-          </div>
-          {sfOn && (
-            <div style={{ marginTop: '1rem' }}>
-              <Panel title="Annual school fees breakdown" dotColor="var(--teal)" right={<span className="pill pill-teal">{fmtK(totalFees)} total</span>}>
+        <div className="proj-main">
+          <section className="panel explorer" id="explorer">
+            <div className="explorer-tabs" role="tablist" aria-label="Choose a chart">
+              {views.map(v => (
+                <button key={v.key} type="button" role="tab" aria-selected={current.key === v.key}
+                  className={`explorer-tab${current.key === v.key ? ' active' : ''}`}
+                  onClick={() => setView(v.key)}>
+                  {v.label}
+                </button>
+              ))}
+            </div>
+            <div className="panel-body">
+              <p className="explorer-takeaway">{current.takeaway}</p>
+              {current.key === 'networth' && (
+                <NetWorthChart
+                  labels={output.labels} nwData={main.nwArr} nwNoFees={sfOn ? output.base.nwArr : null}
+                  investData={main.investArr} cashData={main.cashArr} sfOn={sfOn}
+                  historyLabels={historyLabels} historyData={historyData}
+                />
+              )}
+              {current.key === 'inout' && (
+                <IncExpProjChart
+                  labels={output.labels} incData={main.incArr} expData={main.expArr}
+                  phaseData={main.phaseArr} sfTotalData={main.sfTotalArr} sfOn={sfOn}
+                />
+              )}
+              {current.key === 'shortfall' && (
+                <DeficitChart labels={output.labels} deficitData={main.deficitArr} cashRunningData={main.cashRunningArr} />
+              )}
+              {current.key === 'loan' && (
+                <MortPaydownChart labels={output.labels} mortData={main.mortArr} endDate={mortEndDate} />
+              )}
+              {current.key === 'stress' && (
+                <MortStressChart labels={output.labels} stressData={main.mortStressArr} />
+              )}
+              {current.key === 'income' && (
+                <PartnerIncomeChart
+                  labels={output.labels}
+                  person1Data={main.person1Arr} person2Data={main.person2Arr}
+                  person1Name={person1Name}   person2Name={person2Name}
+                  leaveYrs={main.leaveYrs}
+                  person1FTE={income.person1FTE} person2FTE={income.person2FTE}
+                  person1Growth={settings.person1Growth} person2Growth={settings.person2Growth}
+                />
+              )}
+              {current.key === 'fees' && (
                 <SchoolFeeChart
                   labels={output.labels} sfC1Arr={main.sfC1Arr} sfC2Arr={main.sfC2Arr}
                   sfSibArr={main.sfSibArr} sfTotalArr={main.sfTotalArr}
                   sfC1Start={settings.sfC1Start} sfC1ExitIdx={settings.sfC1ExitIdx}
                   sfC2Start={settings.sfC2Start} sfC2ExitIdx={settings.sfC2ExitIdx}
                 />
-              </Panel>
+              )}
             </div>
-          )}
-        </div>
+          </section>
 
-        {/* ── Sidebar ── */}
-        <div>
-          <Panel title={`${person1Name}'s working pattern`} dotColor="var(--blue)">
-            <WorkPhaseTimeline
-              phases={person1Phases} currentYear={currentYear}
-              fte={income.person1FTE} showLeave={false}
-              onUpdate={updatePerson1Phase} onDelete={deletePerson1Phase} onAdd={addPerson1Phase}
-            />
+          <Panel title="The numbers" dotColor="var(--purple)">
+            <div className="proj-summary">
+              {[
+                { label: 'Net worth today',           val: fmtK(initNW),  color: '' },
+                { label: `Net worth in ${lastLabel}`, val: fmtK(finalNW), color: 'var(--green)' },
+                ...(sfOn ? [
+                  { label: 'Without school fees',  val: fmtK(nwNoFeesFinal), color: '' },
+                  { label: 'School fees in total', val: fmtK(totalFees),     color: 'var(--red)' },
+                ] : []),
+                { label: `Cash in ${lastLabel}`,        val: fmtK(main.cashArr[main.cashArr.length - 1]), color: '' },
+                { label: `Investments in ${lastLabel}`, val: fmtK(finalInvest), color: 'var(--purple)' },
+                ...(hasLoan ? [{ label: `Home loan left in ${lastLabel}`, val: fmtK(main.mortArr[main.mortArr.length - 1]), color: 'var(--red)' }] : []),
+                { label: 'Spending today', val: '$' + Math.round(baseMonthlyExpenses).toLocaleString('en-AU') + '/mo', color: '' },
+                ...(main.leaveYrs.length ? [{ label: 'Parental leave', val: main.leaveYrs.join(', '), color: 'var(--pink)' }] : []),
+                ...(person1HELPBalance > 0 ? [{ label: `${person1Name}'s HELP debt cleared`, val: main.person1HelpClearedYr ? String(main.person1HelpClearedYr) : `After ${lastLabel}`, color: main.person1HelpClearedYr ? 'var(--teal)' : '' }] : []),
+                ...(person2HELPBalance > 0 ? [{ label: `${person2Name}'s HELP debt cleared`, val: main.person2HelpClearedYr ? String(main.person2HelpClearedYr) : `After ${lastLabel}`, color: main.person2HelpClearedYr ? 'var(--teal)' : '' }] : []),
+              ].map(({ label, val, color }) => (
+                <div key={label} className="proj-summary-row">
+                  <span>{label}</span>
+                  <strong style={{ color: color || undefined }}>{val}</strong>
+                </div>
+              ))}
+            </div>
           </Panel>
 
-          <div style={{ marginTop: '1rem' }}>
+          <ReadOnlyFence canEdit={canEdit}>
+            <Panel title="Track your actual net worth" dotColor="var(--amber)">
+              <NetWorthHistoryPanel snapshots={snapshots} onAdd={addSnapshot} onDelete={deleteSnapshot} />
+            </Panel>
+          </ReadOnlyFence>
+        </div>
+
+        {/* ── What if? — the sidebar on desktop, a half-height drawer on phones ── */}
+        <aside className={`whatif${whatIfOpen ? ' open' : ''}`} data-group={group} aria-label="What if? settings">
+          <div className="whatif-head">
+            <div className="whatif-title">
+              <strong>What if?</strong>
+              <button type="button" className="sheet-close" onClick={() => setWhatIfOpen(false)} aria-label="Close">×</button>
+            </div>
+            <div className="whatif-tabs" role="tablist">
+              {GROUPS.map(g => (
+                <button key={g.key} type="button" role="tab" aria-selected={group === g.key}
+                  className={`whatif-tab${group === g.key ? ' active' : ''}`} onClick={() => setGroup(g.key)}>
+                  {g.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="whatif-body">
+          <ReadOnlyFence canEdit={canEdit}>
+          <div className="wi-group" data-group="basics">
+            <Panel title="The basics" dotColor="var(--amber)">
+              <Slider label="Years to look ahead" min={5} max={40} step={1} value={settings.projYears} cls="amber-t" fmt={v => v + ' yrs'} onChange={v => patchSettings({ projYears: v })} />
+              <Slider label={`${person1Name}'s pay rise each year`} min={0} max={15} step={0.5} value={settings.person1Growth} cls="blue-t" onChange={v => patchSettings({ person1Growth: v })} />
+              {income.person2FTE > 0 && (
+                <Slider label={`${person2Name}'s pay rise each year`} min={0} max={15} step={0.5} value={settings.person2Growth} cls="green-t" onChange={v => patchSettings({ person2Growth: v })} />
+              )}
+              <Slider label="Leftover money you invest" hint="The rest stays as cash." min={0} max={100} step={5} value={settings.savingsRate} cls="purple-t" onChange={v => patchSettings({ savingsRate: v })} />
+              <Slider label="Investment growth each year" min={0} max={15} step={0.5} value={settings.investReturn} cls="purple-t" onChange={v => patchSettings({ investReturn: v })} />
+              <details className="wi-more">
+                <summary>More assumptions</summary>
+                <Slider label={`Price rises, ${currentYear}–${String(currentYear + 2).slice(2)}`} min={0} max={10} step={0.5} value={settings.expInflNear} cls="red-t" onChange={v => patchSettings({ expInflNear: v })} />
+                <Slider label="Price rises after that" min={0} max={8} step={0.5} value={settings.expInfl} cls="red-t" onChange={v => patchSettings({ expInfl: v })} />
+                <Slider label="Childcare price rises" min={0} max={15} step={0.5} value={settings.childcareInfl} cls="pink-t" onChange={v => patchSettings({ childcareInfl: v })} />
+                <Slider label="Property value growth" min={0} max={12} step={0.5} value={settings.propGrowth} cls="amber-t" onChange={v => patchSettings({ propGrowth: v })} />
+              </details>
+            </Panel>
+          </div>
+
+          <div className="wi-group" data-group="work">
+            <Panel title={`${person1Name}'s work`} dotColor="var(--blue)">
+              <WorkPhaseTimeline
+                phases={person1Phases} currentYear={currentYear}
+                fte={income.person1FTE} showLeave={false}
+                onUpdate={updatePerson1Phase} onDelete={deletePerson1Phase} onAdd={addPerson1Phase}
+              />
+            </Panel>
             <Panel
-              title={`${person2Name}'s working pattern`}
+              title={`${person2Name}'s work`}
               dotColor="var(--pink)"
               right={
-                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.7rem', color: 'var(--t3)', cursor: 'pointer' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.8rem', color: 'var(--t2)', cursor: 'pointer' }}>
                   <input
                     type="checkbox"
                     checked={settings.parentalLeaveEnabled}
@@ -517,27 +631,7 @@ export default function ProjectionsClient({
             </Panel>
           </div>
 
-          <div style={{ marginTop: '1rem' }}>
-            <Panel title="Income & wage growth" dotColor="var(--blue)">
-              <Slider label={`${person2Name} wage growth / yr`} id="person2Growth" min={0} max={15} step={0.5} value={settings.person2Growth} cls="green-t" onChange={v => patchSettings({ person2Growth: v })} />
-              <Slider label={`${person1Name} wage growth / yr`} id="person1Growth" min={0} max={15} step={0.5} value={settings.person1Growth} cls="blue-t" onChange={v => patchSettings({ person1Growth: v })} />
-            </Panel>
-          </div>
-
-          <div style={{ marginTop: '1rem' }}>
-            <Panel title="Economy & investments" dotColor="var(--amber)">
-              <Slider label="Near-term inflation 2026–28" id="expInflNear"   min={0} max={10}  step={0.5} value={settings.expInflNear}   cls="red-t" onChange={v => patchSettings({ expInflNear: v })} />
-              <Slider label="Long-run inflation 2029+"    id="expInfl"       min={0} max={8}   step={0.5} value={settings.expInfl}       cls="red-t" onChange={v => patchSettings({ expInfl: v })} />
-              <Slider label="Childcare inflation / yr"    id="childcareInfl" min={0} max={15}  step={0.5} value={settings.childcareInfl} cls="pink-t" onChange={v => patchSettings({ childcareInfl: v })} />
-              <Slider label="Property growth / yr"        id="propGrowth"    min={0} max={12}  step={0.5} value={settings.propGrowth}    cls="amber-t" onChange={v => patchSettings({ propGrowth: v })} />
-              <Slider label="Surplus invested %"          id="savingsRate"   min={0} max={100} step={5}   value={settings.savingsRate}   cls="purple-t" fmt={v => v + '%'} onChange={v => patchSettings({ savingsRate: v })} />
-              <Slider label="Investment return / yr"      id="investReturn"  min={0} max={15}  step={0.5} value={settings.investReturn}  cls="purple-t" onChange={v => patchSettings({ investReturn: v })} />
-              <Slider label="Projection horizon"          id="projYears"     min={5} max={40}  step={1}   value={settings.projYears}     cls="amber-t"  fmt={v => v + ' yrs'} onChange={v => patchSettings({ projYears: v })} />
-            </Panel>
-          </div>
-
-          {/* ── Housing mode ─────────────────────────────────────────── */}
-          <div style={{ marginTop: '1rem' }}>
+          <div className="wi-group" data-group="home">
             <Panel title="Housing" dotColor="var(--purple)">
               {/* Homeowner / Renter toggle */}
               <div style={{ display: 'flex', gap: 5, marginBottom: 10 }}>
@@ -680,13 +774,10 @@ export default function ProjectionsClient({
             </Panel>
           </div>
 
-          <div style={{ marginTop: '1rem' }}>
-            <Panel title="One-off expenses" dotColor="var(--blue)">
+          <div className="wi-group" data-group="plans">
+            <Panel title="Big one-off costs" dotColor="var(--blue)">
               <OneOffPanel oneoffs={oneoffs} onAdd={addOneoff} onUpdate={updateOneoff} onDelete={deleteOneoff} />
             </Panel>
-          </div>
-
-          <div style={{ marginTop: '1rem' }}>
             <Panel
               title="School fees"
               dotColor="var(--teal)"
@@ -839,11 +930,8 @@ export default function ProjectionsClient({
                 </div>
               )}
             </Panel>
-          </div>
-
-          <div style={{ marginTop: '1rem' }}>
             <Panel
-              title="Life phase expenses"
+              title="Life stage costs"
               dotColor="var(--teal)"
               right={
                 lifePhases.filter(p => p.enabled).length > 0
@@ -854,37 +942,19 @@ export default function ProjectionsClient({
               <LifePhasesPanel phases={lifePhases} onToggle={toggleLifePhase} />
             </Panel>
           </div>
-
-          <div style={{ marginTop: '1rem' }}>
-            <Panel title="Projection summary" dotColor="var(--purple)">
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: '0.74rem' }}>
-                {[
-                  { label: 'Starting net worth',  val: fmtK(initNW),          color: '' },
-                  { label: 'Final net worth',      val: fmtK(finalNW),         color: 'var(--green)' },
-                  ...(sfOn ? [
-                    { label: 'Final NW (no school fees)',   val: fmtK(nwNoFeesFinal), color: '' },
-                    { label: 'NW cost of schooling',        val: fmtK(nwFeeCost),     color: 'var(--red)' },
-                    { label: 'Total fees paid',             val: fmtK(totalFees),     color: 'var(--red)' },
-                  ] : []),
-                  { label: 'Final cash',      val: fmtK(main.cashArr[main.cashArr.length - 1]),     color: '' },
-                  { label: 'Final investments', val: fmtK(finalInvest), color: 'var(--purple)' },
-                  { label: 'Final mortgage',  val: fmtK(main.mortArr[main.mortArr.length - 1]),     color: 'var(--red)' },
-                  { label: 'Expense base',    val: '$' + Math.round(baseMonthlyExpenses).toLocaleString('en-AU') + '/mo', color: '' },
-                  { label: 'Leave years',     val: main.leaveYrs.join(', ') || 'None',             color: main.leaveYrs.length ? 'var(--pink)' : '' },
-                  ...(person1HELPBalance > 0 ? [{ label: `${person1Name} HELP cleared`, val: main.person1HelpClearedYr ? String(main.person1HelpClearedYr) : `Beyond ${settings.projYears}yr horizon`, color: main.person1HelpClearedYr ? 'var(--teal)' : '' }] : []),
-...(person2HELPBalance > 0 ? [{ label: `${person2Name} HELP cleared`, val: main.person2HelpClearedYr ? String(main.person2HelpClearedYr) : `Beyond ${settings.projYears}yr horizon`, color: main.person2HelpClearedYr ? 'var(--teal)' : '' }] : []),
-                ].map(({ label, val, color }) => (
-                  <div key={label} style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: 'var(--t2)' }}>{label}</span>
-                    <span style={{ fontWeight: 500, color: color || undefined }}>{val}</span>
-                  </div>
-                ))}
-              </div>
-            </Panel>
+          </ReadOnlyFence>
           </div>
-        </div>
+        </aside>
       </div>
-      </ReadOnlyFence>
+
+      {!whatIfOpen && (
+        <button type="button" className="whatif-fab" onClick={openWhatIf}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+            <path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12" /><circle cx="16" cy="6" r="2" /><circle cx="10" cy="12" r="2" /><circle cx="18" cy="18" r="2" />
+          </svg>
+          What if?
+        </button>
+      )}
     </div>
   )
 }

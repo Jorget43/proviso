@@ -34,7 +34,9 @@
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-html, body { overflow-x: hidden; }
+/* clip, not hidden: overflow-x: hidden makes body a scroll container, which
+   silently breaks position: sticky (top bar, pinned budget bar). */
+html, body { overflow-x: clip; }
 
 body {
   font-family: var(--font-dm-sans, 'DM Sans', sans-serif);
@@ -190,7 +192,7 @@ body {
   padding: 1.4rem 1.75rem 4rem;
   max-width: 1180px;
   margin: 0 auto;
-  overflow-x: hidden;
+  overflow-x: clip;
 }
 
 /* ── Metric cards ── */
@@ -854,6 +856,7 @@ input[type=range] { width: 100%; accent-color: var(--t3); }
 
 /* ── Sidebar layout (Projections) ── */
 .sidebar-layout { display: grid; grid-template-columns: 1fr 340px; gap: 1rem; }
+.sidebar-layout > * { min-width: 0; }
 
 /* ── Home overview (app/page.tsx) ── */
 .home { max-width: 760px; }
@@ -998,6 +1001,112 @@ input[type=range] { width: 100%; accent-color: var(--t3); }
   .budget-bar-left { text-align: right; }
   .budget-bar.good .budget-bar-left { color: var(--green); }
   .budget-bar.bad  .budget-bar-left { color: var(--red); }
+}
+
+/* ── Scrubbable charts (components/ui/ScrubChart.tsx) ── */
+.scrub-readout { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
+.scrub-year { font-family: var(--font-dm-serif, serif); font-size: 1.4rem; line-height: 1.1; }
+.scrub-items { display: flex; flex-wrap: wrap; gap: 6px; }
+.scrub-item {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: inherit; font-size: 0.8rem; color: var(--t2);
+  background: var(--surface); border: 1px solid var(--border); border-radius: 999px;
+  padding: 4px 10px; cursor: pointer;
+}
+.scrub-item strong { color: var(--t1); font-weight: 500; font-variant-numeric: tabular-nums; }
+.scrub-item.off { opacity: 0.45; }
+.scrub-item.off .scrub-label { text-decoration: line-through; }
+.scrub-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+.scrub-area { touch-action: pan-y; cursor: crosshair; -webkit-user-select: none; user-select: none; }
+.scrub-hint { font-size: 0.72rem; color: var(--t3); margin-top: 6px; }
+.scrub-hint-mouse { display: none; }
+@media (hover: hover) and (pointer: fine) {
+  .scrub-hint-mouse { display: inline; }
+  .scrub-hint-touch { display: none; }
+}
+.mini-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 14px 0; }
+.mini-stats.four { grid-template-columns: repeat(4, 1fr); }
+.mini-stat { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--r); padding: 8px 10px; display: flex; flex-direction: column; gap: 2px; }
+.mini-stat span { font-size: 0.72rem; color: var(--t3); }
+.mini-stat strong { font-size: 1.05rem; font-weight: 500; }
+
+/* ── Projections ── */
+.proj-headline { margin: 0.2rem 0 1.2rem; }
+.proj-lede { font-family: var(--font-dm-serif, serif); font-size: 1.6rem; line-height: 1.25; }
+.proj-lede strong { color: var(--green); font-weight: 400; }
+.proj-lede-sub { font-size: 0.95rem; color: var(--t2); margin-top: 6px; line-height: 1.45; }
+.explorer { scroll-margin-top: 64px; }
+.explorer-tabs {
+  display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none;
+  padding: 12px 1.2rem; border-bottom: 1px solid var(--border); background: var(--surface2);
+}
+.explorer-tabs::-webkit-scrollbar { display: none; }
+.explorer-tab {
+  flex-shrink: 0; font-family: inherit; font-size: 0.85rem; font-weight: 500;
+  color: var(--t2); background: var(--surface); border: 1px solid var(--border-md);
+  border-radius: 999px; padding: 7px 14px; cursor: pointer;
+}
+.explorer-tab.active { background: var(--t1); border-color: var(--t1); color: #F5F2EC; }
+.explorer-takeaway { font-size: 1rem; line-height: 1.45; margin-bottom: 12px; }
+.explorer-sub { font-size: 0.75rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.07em; color: var(--t3); margin: 6px 0 8px; }
+.proj-summary { display: flex; flex-direction: column; }
+.proj-summary-row { display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; font-size: 0.9rem; }
+.proj-summary-row + .proj-summary-row { border-top: 1px solid var(--border); }
+.proj-summary-row span { color: var(--t2); }
+.proj-summary-row strong { font-weight: 500; font-variant-numeric: tabular-nums; text-align: right; }
+.slider-hint { font-size: 0.75rem; color: var(--t3); margin: -2px 0 6px; }
+.wi-more { margin-top: 6px; border-top: 1px solid var(--border); padding-top: 10px; }
+.wi-more summary { font-size: 0.85rem; font-weight: 500; color: var(--blue); cursor: pointer; padding: 4px 0 10px; }
+.whatif-head, .whatif-fab { display: none; }
+
+@media (max-width: 900px) {
+  .proj-lede { font-size: 1.35rem; }
+  .mini-stats.four { grid-template-columns: repeat(2, 1fr); }
+
+  /* "What if?" settings: a drawer over the bottom half, so the chart above
+     stays in view while you move the sliders */
+  .whatif-fab {
+    display: inline-flex; align-items: center; gap: 8px;
+    position: fixed; right: 16px; bottom: calc(var(--bottom-nav-h) + 16px); z-index: 80;
+    font-family: inherit; font-size: 0.95rem; font-weight: 500;
+    color: #F5F2EC; background: var(--t1); border: none; border-radius: 999px;
+    padding: 12px 18px; box-shadow: 0 6px 20px rgba(26,22,16,0.3); cursor: pointer;
+  }
+  .whatif {
+    position: fixed; left: 0; right: 0; bottom: var(--bottom-nav-h); z-index: 90;
+    height: 46vh;
+    display: flex; flex-direction: column;
+    background: var(--bg);
+    border-radius: var(--rl) var(--rl) 0 0;
+    box-shadow: 0 -10px 30px rgba(26,22,16,0.18);
+    transform: translateY(calc(100% + var(--bottom-nav-h)));
+    visibility: hidden;
+    transition: transform .25s ease-out, visibility 0s linear .25s;
+  }
+  .whatif.open { transform: none; visibility: visible; transition: transform .25s ease-out; }
+  .whatif-head { display: block; padding: 10px 1rem 0; border-bottom: 1px solid var(--border-md); }
+  .whatif-title { display: flex; align-items: center; justify-content: space-between; font-size: 1rem; }
+  .whatif-tabs { display: flex; gap: 4px; margin-top: 6px; }
+  .whatif-tab {
+    flex: 1; font-family: inherit; font-size: 0.85rem; font-weight: 500;
+    color: var(--t2); background: none; border: none; border-bottom: 2px solid transparent;
+    padding: 10px 0; cursor: pointer;
+  }
+  .whatif-tab.active { color: var(--t1); border-bottom-color: var(--t1); }
+  .whatif-body { flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 12px 1rem 1rem; }
+  .whatif[data-group="basics"] .wi-group:not([data-group="basics"]),
+  .whatif[data-group="work"]   .wi-group:not([data-group="work"]),
+  .whatif[data-group="home"]   .wi-group:not([data-group="home"]),
+  .whatif[data-group="plans"]  .wi-group:not([data-group="plans"]) { display: none; }
+  /* While the drawer is open: room to scroll the chart to the top, and a
+     compact explorer (readout + chart only) that fits above the drawer */
+  .proj.whatif-open { padding-bottom: 50vh; }
+  .proj.whatif-open .explorer-tabs,
+  .proj.whatif-open .explorer-takeaway,
+  .proj.whatif-open .scrub-hint,
+  .proj.whatif-open .whatif-fab { display: none; }
+  .proj.whatif-open .scrub-area { height: 180px !important; }
+  .proj.whatif-open .explorer .panel-body { padding-top: 10px; padding-bottom: 10px; }
 }
 
 /* ── Bottom sheet (components/ui/BottomSheet.tsx) ──

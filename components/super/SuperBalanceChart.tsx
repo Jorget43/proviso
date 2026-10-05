@@ -1,12 +1,14 @@
 'use client'
 import {
   Chart as ChartJS,
-  LineElement, PointElement, LinearScale, CategoryScale, Tooltip, Legend, Filler,
+  LineElement, PointElement, LinearScale, CategoryScale, Filler,
 } from 'chart.js'
 import { Line } from 'react-chartjs-2'
 import type { CombinedRow, SuperRow } from '@/lib/super'
+import { crosshair, SCRUB_BASE, AXIS_TICKS, kTicks } from '@/lib/chartPlugins'
+import ScrubChart from '@/components/ui/ScrubChart'
 
-ChartJS.register(LineElement, PointElement, LinearScale, CategoryScale, Tooltip, Legend, Filler)
+ChartJS.register(LineElement, PointElement, LinearScale, CategoryScale, Filler)
 
 interface Props {
   combined:              CombinedRow[]
@@ -74,6 +76,7 @@ export default function SuperBalanceChart({
         {
           label: 'Balance',
           data: combined.map(c => Math.round(c.person1Balance)),
+          borderColor: 'rgba(30,95,168,0.85)',  // readout colour; the line is drawn per segment
           borderWidth: 2,
           pointRadius: 0,
           fill: false,
@@ -100,29 +103,11 @@ export default function SuperBalanceChart({
       ]
 
   const options = {
-    responsive: true,
-    maintainAspectRatio: false,
-    interaction: { mode: 'index' as const, intersect: false },
-    plugins: {
-      legend: {
-        labels: { font: { size: 11 }, color: '#6A5F4A', boxWidth: 20 },
-      },
-      tooltip: {
-        callbacks: {
-          label: (ctx: { dataset: { label?: string }; parsed: { y: number | null } }) => {
-            const v = ctx.parsed.y ?? 0
-            const label = ctx.dataset.label ?? ''
-            if (v >= 1_000_000) return `${label}: $${(v / 1_000_000).toFixed(2)}M`
-            return `${label}: $${v.toLocaleString('en-AU')}`
-          },
-        },
-      },
-    },
+    ...SCRUB_BASE,
     scales: {
       x: {
         ticks: {
-          color: '#A09484',
-          font: { size: 10 },
+          ...AXIS_TICKS,
           maxTicksLimit: 12,
           callback: (_: unknown, i: number) => {
             const c = combined[i]
@@ -135,24 +120,16 @@ export default function SuperBalanceChart({
         grid: { color: 'rgba(50,42,28,0.06)' },
       },
       y: {
-        ticks: {
-          color: '#A09484',
-          font: { size: 10 },
-          callback: (v: unknown) => {
-            const n = Number(v)
-            if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`
-            if (n >= 1_000)     return `$${(n / 1_000).toFixed(0)}k`
-            return `$${n}`
-          },
-        },
+        ticks: { ...AXIS_TICKS, callback: kTicks },
         grid: { color: 'rgba(50,42,28,0.06)' },
       },
     },
   }
+  const retireIdx = combined.findIndex(c => c.year === person1RetirementYear)
 
   return (
-    <div className="chart-wrap" style={{ height: 300 }}>
-      <Line data={{ labels, datasets }} options={options} />
-    </div>
+    <ScrubChart labels={labels} datasets={datasets} height={280} defaultIndex={retireIdx >= 0 ? retireIdx : undefined}>
+      <Line data={{ labels, datasets }} options={options} plugins={[crosshair]} />
+    </ScrubChart>
   )
 }
