@@ -131,7 +131,7 @@ packages/tokens  colours, spacing, type scale → generated for web CSS and nati
 
 ## Conventions the skills will enforce
 
-Planned project skills (`.claude/skills/`), written once this document is agreed:
+Project skills in `.claude/skills/` (written 2026-10-06). Each one points back here rather than repeating this document:
 
 - **`proviso-architecture`**: where code goes (core vs client vs sync vs relay); platform-file rules; no calculations in components; loaders only.
 - **`proviso-schema-change`**: D3's rules as a checklist: UUIDv7, `deletedAt`, additive-only, defaults, migration plus sync-protocol version bump, tests for old-version messages.
