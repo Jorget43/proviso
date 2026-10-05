@@ -29,6 +29,10 @@ interface FormState {
   mortgageRate:       string
   mortgageEndDate:    string
   hasParentalLeave:   boolean
+  renting:            boolean
+  monthlyRent:        string
+  payChildcare:       boolean
+  schoolFees:         boolean
 }
 
 // Suggested median values — sourced from ABS / ATO Australian data.
@@ -45,7 +49,8 @@ const SUGGEST = {
   mortgageRate:  { display: '6.2%',       value: '6.20',   note: 'Average variable rate (RBA)' },
 }
 
-const STEP_LABELS = ['About you', 'Your partner', 'Superannuation', 'Investments', 'Cash & mortgage']
+const STEP_LABELS = ['About you', 'Your partner', 'Superannuation', 'Investments', 'Cash & home', 'Your situation']
+const DONE_STEP = STEP_LABELS.length + 1
 
 function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return (
@@ -155,6 +160,8 @@ export default function OnboardingClient() {
     hasMortgage: false,
     mortgageBalance: '', mortgageRate: '', mortgageEndDate: '',
     hasParentalLeave: false,
+    renting: false, monthlyRent: '',
+    payChildcare: false, schoolFees: false,
   })
 
   const set = (patch: Partial<FormState>) => setForm(f => ({ ...f, ...patch }))
@@ -165,7 +172,7 @@ export default function OnboardingClient() {
       case 2: return !form.hasPartner || (!!form.person2Name.trim() && parseFloat(form.person2Age) > 0 && parseFloat(form.person2Income) > 0)
       case 3: return form.person1Super !== ''
       case 4: return true
-      case 5: return form.cashBalance !== ''
+      case 5: return form.cashBalance !== '' && (!form.renting || form.monthlyRent !== '')
       default: return true
     }
   }
@@ -200,11 +207,15 @@ export default function OnboardingClient() {
           cryptoValue:        parseFloat(form.cryptoValue)        || 0,
           otherInvestments:   parseFloat(form.otherInvestments)   || 0,
           cashBalance:        parseFloat(form.cashBalance)        || 0,
-          hasMortgage:        form.hasMortgage,
+          hasMortgage:        !form.renting && form.hasMortgage,
           mortgageBalance:    parseFloat(form.mortgageBalance)    || 0,
           mortgageRate:       parseFloat(form.mortgageRate)       || 0,
           mortgageEndDate:    form.mortgageEndDate,
-          hasParentalLeave:   form.hasParentalLeave,
+          hasParentalLeave:   form.hasPartner && form.hasParentalLeave,
+          renting:            form.renting,
+          monthlyRent:        parseFloat(form.monthlyRent) || 0,
+          payChildcare:       form.payChildcare,
+          schoolFees:         form.schoolFees,
         }),
       })
       if (!res.ok) {
@@ -213,8 +224,8 @@ export default function OnboardingClient() {
           ? data.error
           : 'Some details look invalid — please check each step.')
       }
-      setStep(6)
-      setTimeout(() => router.push('/budget'), 1800)
+      setStep(DONE_STEP)
+      setTimeout(() => router.push('/'), 1800)
     } catch (err) {
       setError(err instanceof Error && err.message ? err.message : 'Something went wrong — please try again.')
       setSubmitting(false)
@@ -243,8 +254,8 @@ export default function OnboardingClient() {
     )
   }
 
-  // ── Done (step 6) ─────────────────────────────────────────────────────────
-  if (step === 6) {
+  // ── Done ──────────────────────────────────────────────────────────────────
+  if (step === DONE_STEP) {
     return (
       <div className="ob-outer">
         <div className="ob-card">
@@ -252,7 +263,7 @@ export default function OnboardingClient() {
             <div className="ob-done-check">✓</div>
             <div className="ob-done-title">You&rsquo;re all set!</div>
             <p className="ob-done-sub">
-              Your dashboard is ready.<br />Taking you to Budget now…
+              Your dashboard is ready.<br />Taking you to your overview now…
             </p>
           </div>
         </div>
@@ -260,8 +271,8 @@ export default function OnboardingClient() {
     )
   }
 
-  // ── Form steps 1–5 ────────────────────────────────────────────────────────
-  const isLast = step === 5
+  // ── Form steps ────────────────────────────────────────────────────────────
+  const isLast = step === STEP_LABELS.length
   const p1 = form.person1Name || 'You'
   const p2 = form.person2Name || 'Partner'
 
@@ -473,7 +484,7 @@ export default function OnboardingClient() {
         {/* ── Step 5: Cash & mortgage ── */}
         {step === 5 && (
           <div>
-            <div className="ob-step-title">Cash & mortgage</div>
+            <div className="ob-step-title">Cash & home</div>
             <div className="ob-fields">
               <Field label="Cash & savings" hint="Total across all bank accounts">
                 <MoneyInput
@@ -484,6 +495,24 @@ export default function OnboardingClient() {
                 />
               </Field>
 
+              <Field label="Where do you live?">
+                <div className="ob-binary">
+                  <button type="button" className={`ob-binary-opt${!form.renting ? ' active' : ''}`} onClick={() => set({ renting: false })}>
+                    We own it
+                  </button>
+                  <button type="button" className={`ob-binary-opt${form.renting ? ' active' : ''}`} onClick={() => set({ renting: true })}>
+                    We rent
+                  </button>
+                </div>
+              </Field>
+
+              {form.renting && (
+                <Field label="Rent per month" hint="You can plan a future home purchase later, under Future → What if?">
+                  <MoneyInput value={form.monthlyRent} onChange={v => set({ monthlyRent: v })} />
+                </Field>
+              )}
+
+              {!form.renting && (
               <div className="ob-toggle-row">
                 <div>
                   <div className="ob-field-label">Home loan</div>
@@ -498,8 +527,9 @@ export default function OnboardingClient() {
                   <span className="toggle-slider" />
                 </label>
               </div>
+              )}
 
-              {form.hasMortgage && (
+              {!form.renting && form.hasMortgage && (
                 <>
                   <Field label="Outstanding balance">
                     <MoneyInput
@@ -550,20 +580,34 @@ export default function OnboardingClient() {
                 </>
               )}
 
-              <div className="ob-toggle-row">
-                <div>
-                  <div className="ob-field-label">Parental leave</div>
-                  <div className="ob-field-hint">Will either person take parental leave during the projection period?</div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Step 6: Your situation ── */}
+        {step === 6 && (
+          <div>
+            <div className="ob-step-title">Your situation</div>
+            <p className="ob-field-hint" style={{ marginBottom: 14 }}>
+              Switch on whatever applies — each adds a section to the app. You can change these any time in Settings.
+            </p>
+            <div className="ob-fields">
+              {[
+                { key: 'payChildcare' as const, label: 'We pay for childcare', hint: 'Adds childcare to your budget, with the Child Care Subsidy worked out for you.', show: true },
+                { key: 'schoolFees' as const, label: 'Plan for school fees', hint: 'Adds school fees for up to two children to your long-term plan.', show: true },
+                { key: 'hasParentalLeave' as const, label: 'Parental leave coming up', hint: `Models ${p2} taking leave, with Parental Leave Pay.`, show: form.hasPartner },
+              ].filter(o => o.show).map(o => (
+                <div key={o.key} className="ob-toggle-row">
+                  <div>
+                    <div className="ob-field-label">{o.label}</div>
+                    <div className="ob-field-hint">{o.hint}</div>
+                  </div>
+                  <label className="toggle-switch">
+                    <input type="checkbox" checked={form[o.key]} onChange={e => set({ [o.key]: e.target.checked })} />
+                    <span className="toggle-slider" />
+                  </label>
                 </div>
-                <label className="toggle-switch">
-                  <input
-                    type="checkbox"
-                    checked={form.hasParentalLeave}
-                    onChange={e => set({ hasParentalLeave: e.target.checked })}
-                  />
-                  <span className="toggle-slider" />
-                </label>
-              </div>
+              ))}
 
               {error && <div className="ob-error">{error}</div>}
             </div>

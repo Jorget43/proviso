@@ -57,6 +57,21 @@ describe('range checks', () => {
     expect(onboardingSchema.safeParse({ ...ok, person1Age: 30.5 }).success).toBe(false)
     expect(onboardingSchema.safeParse({ ...ok, mortgageEndDate: 'soon' }).success).toBe(false)
   })
+
+  it('onboarding accepts the optional situation answers and checks them', () => {
+    const ok = {
+      person1Name: 'A', person1Age: 30, person1Income: 1, person1HasHELP: false, person1HELPBalance: 0, person1Days: 5,
+      hasPartner: false, person2Name: 'B', person2Age: 0, person2Income: 0, person2HasHELP: false, person2HELPBalance: 0, person2Days: 5,
+      person1Super: 0, person2Super: 0, sharesValue: 0, cryptoValue: 0, otherInvestments: 0, cashBalance: 0,
+      hasMortgage: false, mortgageBalance: 0, mortgageRate: 0, mortgageEndDate: '', hasParentalLeave: false,
+    }
+    const parsed = onboardingSchema.safeParse({ ...ok, renting: true, monthlyRent: 2400, payChildcare: true, schoolFees: false })
+    expect(parsed.success).toBe(true)
+    expect(parsed.data).toMatchObject({ renting: true, monthlyRent: 2400, payChildcare: true, schoolFees: false })
+    // Omitted answers stay undefined, so the route leaves those settings alone.
+    expect(onboardingSchema.parse(ok).renting).toBeUndefined()
+    expect(onboardingSchema.safeParse({ ...ok, monthlyRent: -5 }).success).toBe(false)
+  })
 })
 
 describe('parseBody', () => {

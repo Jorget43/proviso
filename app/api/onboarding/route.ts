@@ -20,6 +20,7 @@ export const POST = withErrors(async (req: Request) => {
     cashBalance,
     hasMortgage, mortgageBalance, mortgageRate, mortgageEndDate,
     hasParentalLeave,
+    renting, monthlyRent, payChildcare, schoolFees,
   } = await parseBody(req, onboardingSchema)
 
   const invalid = validateMemberNames(person1Name, person2Name, hasPartner)
@@ -47,8 +48,19 @@ export const POST = withErrors(async (req: Request) => {
 
     await tx.projectionSettings.update({
       where: { id: 1 },
-      data: { parentalLeaveEnabled: hasParentalLeave },
+      data: {
+        parentalLeaveEnabled: hasPartner && hasParentalLeave,
+        ...(schoolFees !== undefined ? { schoolFeesOn: schoolFees } : {}),
+      },
     })
+
+    if (renting !== undefined) {
+      const rent = renting ? { enabled: true, monthlyRent: monthlyRent ?? 0 } : { enabled: false, purchasePlanEnabled: false }
+      await tx.rentSettings.upsert({ where: { id: 1 }, update: rent, create: { id: 1, ...rent } })
+    }
+    if (payChildcare !== undefined) {
+      await tx.childcareSettings.upsert({ where: { id: 1 }, update: { enabled: payChildcare }, create: { id: 1, enabled: payChildcare } })
+    }
 
     await tx.incomeSettings.update({
       where: { id: 1 },

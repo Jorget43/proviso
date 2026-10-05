@@ -182,6 +182,12 @@ export const onboardingSchema = z.object({
   mortgageRate:       z.number().finite().min(0).max(30),
   mortgageEndDate:    isoDateOrEmpty,
   hasParentalLeave:   z.boolean(),
+  // "Your situation" answers (Phase 23). Optional so an older client (or a
+  // re-run that skips them) leaves the existing settings untouched.
+  renting:            z.boolean().optional(),
+  monthlyRent:        money.optional(),
+  payChildcare:       z.boolean().optional(),
+  schoolFees:         z.boolean().optional(),
 })
 
 // ── Phase 19: schemas for the routes that still read raw JSON ─────────────────
