@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { DM_Sans, DM_Serif_Display } from 'next/font/google'
 import './globals.css'
 import TopNav from '@/components/layout/TopNav'
@@ -23,6 +23,19 @@ const dmSerif = DM_Serif_Display({
 export const metadata: Metadata = {
   title: 'Proviso',
   description: 'Your household, modelled.',
+  applicationName: 'Proviso',
+  appleWebApp: { capable: true, title: 'Proviso', statusBarStyle: 'black-translucent' },
+  icons: { apple: '/icons/apple-touch-icon.png' },
+}
+
+// viewport-fit=cover lets the app draw under the notch / home indicator when
+// launched from the home screen; the top and bottom bars pad themselves with
+// the safe-area insets.
+export const viewport: Viewport = {
+  width:        'device-width',
+  initialScale: 1,
+  viewportFit:  'cover',
+  themeColor:   '#1A1610',
 }
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {

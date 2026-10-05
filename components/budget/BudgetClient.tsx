@@ -1,9 +1,7 @@
 'use client'
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
-import { toMonthly, fmt, fmtS } from '@/lib/formatting'
-import { calcAfterTax } from '@/lib/tax'
-import { computeChildcare } from '@/lib/childcare'
-import { CATS } from '@/lib/constants'
+import { fmt, fmtS } from '@/lib/formatting'
+import { computeBudgetSummary, isManagedChildcare, CHILDCARE_CAT, CHILDCARE_NAME } from '@/lib/budgetSummary'
 import MetricCard from '@/components/ui/MetricCard'
 import ReadOnlyFence from '@/components/ui/ReadOnlyFence'
 import IncomePanel, { type IncomeSettings } from './IncomePanel'
@@ -11,9 +9,6 @@ import ExpenseTable, { type Expense, type AnnualExpense } from './ExpenseTable'
 import ChildcarePanel, { type ChildcareSettings } from './ChildcarePanel'
 import SpendDonut from './SpendDonut'
 import MonthlySummary from './MonthlySummary'
-
-const CHILDCARE_CAT  = 'Children'
-const CHILDCARE_NAME = 'Childcare'
 
 interface RentSettings {
   id:                    number
@@ -45,10 +40,6 @@ interface BudgetClientProps {
   person2Name: string
 }
 
-function isManagedChildcare(e: { cat: string; name: string }): boolean {
-  return e.cat === CHILDCARE_CAT && e.name === CHILDCARE_NAME
-}
-
 export default function BudgetClient({
   canEdit,
   initialExpenses,
@@ -69,68 +60,14 @@ export default function BudgetClient({
   const [annualExpenses, setAnnualExpenses] = useState<AnnualExpense[]>(initialAnnualExpenses)
   const [rentSettings, setRentSettings] = useState<RentSettings | null>(initialRentSettings)
 
-  // Each person's gross is pro-rated by days worked this year (same rule as
-  // the Projections engine); Person 2 counts only when the partner is enabled.
-  const person1Gross = income.person1FTE * (person1Days / 5)
-  const person2Gross = partnerEnabled ? income.person2FTE * (person2Days / 5) : 0
-
-  // Combined gross family income drives the CCS taper.
-  const familyIncome = person1Gross + person2Gross
-
-  const person1Net = useMemo(() => {
-    if (income.taxMode) return calcAfterTax(person1Gross, income.person1HasHELP) / 12
-    return income.person1MonthlyNet
-  }, [income, person1Gross])
-
-  const person2Net = useMemo(() => {
-    if (!partnerEnabled) return 0
-    if (income.taxMode) return calcAfterTax(person2Gross, income.person2HasHELP) / 12
-    return income.person2MonthlyNet
-  }, [income, person2Gross, partnerEnabled])
-
-  const monthlyIncome = person1Net + person2Net
-
-  // The managed "Childcare" line always shows the current CCS-adjusted cost
-  // (or disappears when childcare is off) — derived here so the page is right
-  // immediately; the effect further down only persists it.
-  const childcareNet = useMemo(
-    () => (childcare.enabled
-      ? Math.round(computeChildcare({
-          costPerDay:  childcare.costPerDay,
-          daysPerWeek: childcare.daysPerWeek,
-          numChildren: childcare.numChildren,
-          familyIncome,
-        }).netMonthly)
-      : null),
-    [childcare, familyIncome],
-  )
-  const shownExpenses = useMemo(
-    () => expenses.flatMap(e => (isManagedChildcare(e)
-      ? (childcareNet === null ? [] : [{ ...e, amt: childcareNet }])
-      : [e])),
-    [expenses, childcareNet],
-  )
-
-  const monthlyExpenses = useMemo(
-    () => shownExpenses.reduce((s, e) => s + toMonthly(e.amt, e.freq), 0)
-          + annualExpenses.reduce((s, a) => s + a.amt / 12, 0)
-          + (rentSettings?.enabled ? rentSettings.monthlyRent : 0),
-    [shownExpenses, annualExpenses, rentSettings],
-  )
-
-  const catMonthly = useMemo(() => {
-    const m: Record<string, number> = {}
-    CATS.forEach(c => { m[c] = 0 })
-    shownExpenses.forEach(e => { m[e.cat] = (m[e.cat] ?? 0) + toMonthly(e.amt, e.freq) })
-    annualExpenses.forEach(a => { m[a.cat] = (m[a.cat] ?? 0) + a.amt / 12 })
-    if (rentSettings?.enabled) {
-      m['Home'] = (m['Home'] ?? 0) + rentSettings.monthlyRent
-    }
-    return m
-  }, [shownExpenses, annualExpenses, rentSettings])
-
-  const delta = monthlyIncome - monthlyExpenses
-  const savingsRate = monthlyIncome > 0 ? delta / monthlyIncome * 100 : 0
+  const {
+    familyIncome, monthlyIncome, childcareNet,
+    shownExpenses, monthlyExpenses, catMonthly, delta, savingsRate,
+  } = useMemo(() => computeBudgetSummary({
+    expenses, annualExpenses, income, childcare,
+    rentMonthly: rentSettings?.enabled ? rentSettings.monthlyRent : null,
+    person1Days, person2Days, partnerEnabled,
+  }), [expenses, annualExpenses, income, childcare, rentSettings, person1Days, person2Days, partnerEnabled])
 
   // ── Regular expense CRUD ────────────────────────────────────────────────────
   const addExpense = useCallback(async (cat: string = 'Fun') => {

@@ -88,7 +88,7 @@ export default function SaveErrorToast() {
       role="alert"
       style={{
         position: 'fixed', left: '50%', transform: 'translateX(-50%)',
-        bottom: 'calc(16px + env(safe-area-inset-bottom, 0px))', zIndex: 1000,
+        bottom: 'calc(16px + max(var(--bottom-nav-h, 0px), env(safe-area-inset-bottom, 0px)))', zIndex: 1000,
         maxWidth: 'min(560px, calc(100vw - 32px))', width: 'max-content',
         background: 'var(--surface)', color: 'var(--t1)',
         border: '1px solid var(--red)', borderLeft: '4px solid var(--red)', borderRadius: 'var(--r)',

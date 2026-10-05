@@ -42,6 +42,6 @@ function withHsts(res: NextResponse): NextResponse {
 
 export const config = {
   // Run on everything except API routes (guarded in their handlers), Next
-  // internals, and static assets.
-  matcher: ['/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:png|ico|svg)$).*)'],
+  // internals, static assets, and the web app manifest (fetched without cookies).
+  matcher: ['/((?!api|_next/static|_next/image|favicon.ico|manifest.webmanifest|.*\\.(?:png|ico|svg)$).*)'],
 }
