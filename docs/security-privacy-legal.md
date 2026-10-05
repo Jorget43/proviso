@@ -72,7 +72,10 @@ The Australian Privacy Principles (APPs) become binding on the developer once th
 
 **Already in place:**
 - Passwords: scrypt hashing via `node:crypto`
-- Sessions: DB-backed opaque tokens in httpOnly, SameSite=Lax cookies; `Secure` flag via `COOKIE_SECURE=true` behind HTTPS (documented in README)
+- Sessions: DB-backed opaque tokens in httpOnly, SameSite=Lax cookies; `Secure` flag via `COOKIE_SECURE=true` behind HTTPS (documented in README). 7-day idle timeout, 30-day absolute limit; a password change ends the user's other sessions (Phase 21)
+- Headers: CSP, `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy: no-referrer`, `Permissions-Policy`, COOP on every response; HSTS when `COOKIE_SECURE=true` (`lib/securityHeaders.ts`, Phase 21)
+- Audit log: sign-ins, failures, lockouts, credential/2FA/passkey changes and every data write (field names, not values), kept 365 days, viewable by the CFO at `/settings/activity` (Phase 21)
+- Dependencies: Dependabot weekly PRs; CI fails on high/critical advisories in production dependencies (Phase 21)
 - Brute force: in-memory per-IP limit on `/api/auth/login` (20 req/min) plus DB account lockout after 10 failures (Phase 9)
 - Second factor: TOTP with recovery codes (Phase 9) and passkeys / WebAuthn (Phase 12)
 - SQL injection: Prisma parameterised queries (immune by design)
@@ -86,23 +89,8 @@ The Australian Privacy Principles (APPs) become binding on the developer once th
 
 | Gap | Risk | Fix |
 |---|---|---|
-| Session tokens long-lived (30 days) | Stolen session cookie | Consider 7-day default TTL + "remember me" for 30 days |
-| No audit log | Can't detect/investigate unauthorised access | `AuditLog` table: userId, action, target, ip, timestamp on write operations |
-| No Content Security Policy | XSS amplification | Add CSP header in `next.config.ts` (starter below) |
+| CSP allows inline scripts | XSS amplification if an injection is ever found | Nonce-based `script-src` (every page dynamic); React escaping is the primary defence today |
 | SQLite not encrypted at rest | Physical volume access exposes all data | Document that volume-level encryption is the user's responsibility; future: SQLCipher |
-| No HSTS header | Accidental HTTP use | `COOKIE_SECURE=true` is documented; add `Strict-Transport-Security` alongside the CSP headers |
-| No automated dependency updates | Dependency chain attack | Add Dependabot, or `npm audit` in CI; run `npm audit fix` on each dependency update |
+| No self-service session list | A lost device stays signed in until idle timeout (7 days) | "Sign out other devices" in Settings — `revokeSessions()` already exists |
 
-**Content Security Policy starter (add to `next.config.ts`):**
-```ts
-headers: async () => [{
-  source: '/(.*)',
-  headers: [
-    { key: 'X-Frame-Options', value: 'DENY' },
-    { key: 'X-Content-Type-Options', value: 'nosniff' },
-    { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
-    // Tighten script-src once Chart.js CDN situation is confirmed
-    { key: 'Content-Security-Policy', value: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:;" },
-  ]
-}]
-```
+**Content Security Policy:** see `lib/securityHeaders.ts` — the comment there explains each directive and why `script-src` still allows inline scripts.

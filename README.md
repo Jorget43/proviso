@@ -76,7 +76,7 @@ docker compose up -d --build
 
 This builds the standalone image locally and starts the `proviso` container on port 3000, backed by the named volume `proviso-db` (SQLite at `/data/proviso.db`). On first run the entrypoint applies migrations and seeds; on later starts it only applies new migrations.
 
-Behind HTTPS (e.g. Tailscale Serve) set `COOKIE_SECURE=true` so session cookies carry the `Secure` flag. Over a plain-http tailnet address leave it unset.
+Behind HTTPS (e.g. Tailscale Serve) set `COOKIE_SECURE=true` so session cookies carry the `Secure` flag and browsers get an HSTS header (remember HTTPS for this host for a year). Over a plain-http tailnet address leave it unset.
 
 ## Tabs
 

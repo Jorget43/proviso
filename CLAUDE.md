@@ -91,7 +91,7 @@ EOFY is seasonal — surfaced via May/June `◷ EOFY` pill in `TopNav`, reachabl
 - **Prisma 5** (pinned — Prisma 7 broke `url = env(...)`, requires `prisma.config.ts`)
 - **Next.js 16 params**: dynamic route handlers use `await params` — `params` is `Promise<{ id: string }>`
 - **Next.js 16 Proxy (was Middleware)**: root `proxy.ts` exporting `proxy` + `config.matcher`. `cookies()` is async (`await cookies()`). Optimistic auth gating; secure session validation is `requireSession()` in `lib/auth.ts`
-- **Auth**: self-hosted, zero external deps — `node:crypto` scrypt + opaque DB-backed session token in httpOnly cookie. `COOKIE_SECURE=true` when behind HTTPS
+- **Auth**: self-hosted, zero external deps — `node:crypto` scrypt + opaque DB-backed session token in httpOnly cookie. Sessions end after 7 days idle or 30 days total. `COOKIE_SECURE=true` when behind HTTPS (also turns on HSTS)
 - **`@/*` alias** maps to `./` (project root), not `./src/`
 - **Server vs client**: server components fetch from Prisma directly; `'use client'` for anything interactive or using Chart.js
 - **Optimistic updates**: all CRUD hits state first, then API — no loading spinners
@@ -186,7 +186,9 @@ All migrations must be **additive only** — `update.sh` (or Watchtower, if opte
 
 ## Auth & RBAC
 
-- **`lib/auth.ts`**: `getSession()`, `requireSession()` (throws redirect if unauthenticated)
+- **`lib/auth.ts`**: `getSession()`, `requireSession()` (throws redirect if unauthenticated). `Session.expiresAt` is the 7-day idle deadline, extended by `getSession()` at most once a day and capped at 30 days from sign-in; the cookie lives 30 days. `revokeSessions(userId, { keepCurrent })` ends a user's sessions — call it whenever a credential changes
+- **`lib/audit.ts`**: audit trail. `withErrors` opens a request context, `authorize()` names the actor, and the Prisma extension in `lib/db.ts` records every write (model, id, field names — never values). Auth routes call `audit({ action: 'auth.…' })` explicitly. New auth-type routes: wrap in `withErrors` and add an `audit()` call. Viewer: `/settings/activity` (CFO)
+- **`lib/securityHeaders.ts`**: CSP and hardening headers, applied to every route by `next.config.ts`; HSTS comes from `proxy.ts` when `COOKIE_SECURE=true`. Adding a third-party script, font, image host or API call from the browser needs a CSP change — check with the headless-browser pass described in Phase 21
 - **`proxy.ts`**: optimistic cookie gate (fast, not the security boundary); `requireSession()` is the real boundary
 - **`lib/rbac.ts`**: scopes `actuals:write`, `budget:write`, `users:write`, `child:write`; `authorize(action)` called at the top of all mutating handlers
 - **Roles**: CFO (all scopes), PARTNER (`actuals:write` only), CHILD (`child:write` only — `/child` pocket money page)
@@ -363,18 +365,33 @@ The assumptions watchdog (`/admin/watchdog` for the CFO when `WATCHDOG_ENABLED=t
 - `marginalRate()` ignores the LITO taper and the Medicare shade-in band (headline rate only — used for guidance figures).
 
 ### Security hardening still open
-Tracked in [`docs/security-privacy-legal.md`](docs/security-privacy-legal.md) § Cybersecurity: security headers/CSP, an audit log of writes, shorter default session lifetime, HSTS, and automated dependency updates (Dependabot / `npm audit` in CI).
+Tracked in [`docs/security-privacy-legal.md`](docs/security-privacy-legal.md) § Cybersecurity. Phase 21 closed headers/CSP, HSTS, the audit log, session lifetime and automated dependency updates. Left:
+- Nonce-based CSP (drop `'unsafe-inline'` from `script-src`) — needs every page rendered dynamically; most already are.
+- SQLite encryption at rest — volume-level encryption is the operator's job for now; SQLCipher would be the in-app route.
+- "Sign out other devices" / session list in Settings — `revokeSessions()` exists, there's no UI.
+- Dev-only advisories (eslint-config-next's globbing deps; vitest 5 is a major) — Dependabot ignores majors, so bump vitest by hand.
 
 ### Deferred (revisit only if needed)
 - `Transaction` `@@index([ym])` — premature at household scale (see Phase 15).
 - **Phase 3 — CDR bank feeds**: researched, not built; CSV import stays the core. See [`docs/phase3-cdr-research.md`](docs/phase3-cdr-research.md).
 - **Phase 7 Tier 2 (desktop app) and Tier 3 (managed hosting)**: not started.
 
+### Phase 21 — Security hardening: dependencies, headers, sessions, audit log (2026-10-05)
+
+- **Dependencies**: Next 16.2.7 → 16.3.8 (critical/high advisories, including a proxy bypass — this app's proxy is only the optimistic check, but patched anyway); node-cron 3 → 4; `npm audit fix` for the rest. Production dependencies audit clean. Docker base and CI moved from Node 20 (end-of-life) to Node 24 (`node:24-bookworm-slim`, same Debian release).
+- **Automatic updates**: `.github/dependabot.yml` — weekly grouped minor/patch PRs for npm, GitHub Actions and the Docker base; majors ignored (do them deliberately). CI now runs the privacy scan and tests on pull requests (no image publish) and fails on high/critical advisories in production dependencies (`npm audit --omit=dev --audit-level=high`). Dev-only advisories (eslint-config-next's globbing deps, vitest < 5) remain; they never reach the image. Enable Dependabot alerts + security updates in the repo's Settings → Code security.
+- **Security headers** (`lib/securityHeaders.ts`): CSP (self-only scripts/styles/connections/workers, no framing, no `<object>`/`<base>`, forms post only to the app), `X-Frame-Options`, `nosniff`, `Referrer-Policy: no-referrer` (reset tokens live in URLs), `Permissions-Policy`, COOP; `X-Powered-By` removed. `script-src` keeps `'unsafe-inline'` — Next's hydration needs it unless every page goes nonce-based dynamic. HSTS (1 year, no subdomains) from the proxy when `COOKIE_SECURE=true`. Verified by driving headless Edge over the DevTools protocol against a production build: all pages hydrate and draw charts with no CSP violations, the pdf.js worker loads, an injected cross-origin fetch is blocked.
+- **Sessions**: 7-day idle timeout, 30-day absolute limit (was a flat 30 days). Pre-existing sessions are clamped on next use. Changing a user's password in Settings ends their other sessions (the reset-password flow already did).
+- **Audit log**: `AuditEvent` (migration `0002_audit_log`), 365-day retention. Buffered per request and written after the handler returns — an insert from inside a `$transaction` would deadlock on the single SQLite connection. Failed requests' writes and zero-row bulk writes are dropped; unknown usernames from failed sign-ins aren't stored (could be a mistyped password). `/settings/activity` lists it for the CFO.
+
 ## Security checklist for new features
 
 > When designing features that handle user data, add new routes, or touch auth — read [`docs/security-privacy-legal.md`](docs/security-privacy-legal.md) for the full legal, privacy, and cybersecurity context first.
 
-- [ ] Writes to DB → has `authorize()` guard; wrap the handler in `withErrors` (`lib/apiHandler.ts`)
+- [ ] Writes to DB → has `authorize()` guard; wrap the handler in `withErrors` (`lib/apiHandler.ts`) — that's also what puts the write in the audit log
+- [ ] Security-relevant action outside `authorize()` (sign-in, credentials, 2FA, passkeys) → `audit({ action: 'auth.…' })`, and add a label in `app/settings/activity/page.tsx`
+- [ ] Changes a credential → `revokeSessions(userId, { keepCurrent: true })`
+- [ ] Loads anything in the browser from another origin → update the CSP in `lib/securityHeaders.ts`
 - [ ] Reads household/sensitive data → GET behind `requireAdultRead()` (`lib/rbac.ts`); adult pages use `requireAdult()`
 - [ ] Accepts user input → `parseBody(req, schema)` with a zod schema in `lib/schemas.ts` (`.partial()` for updates, `.finite()` on numbers, ranges on everything) — never `await req.json()` into Prisma
 - [ ] Client save → check `res.ok` before using the response; failures surface via SaveErrorToast (or send `X-Handles-Errors: 1` and show the error inline)
