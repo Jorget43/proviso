@@ -61,6 +61,8 @@ const ALLOWED_EMAIL = [
   /^noreply@anthropic\.com$/i,
   /^onboarding@resend\.dev$/i,
   /^git@github\.com$/i,
+  // Dependabot signs its commits off with GitHub's public support address.
+  /^support@github\.com$/i,
 ]
 const AU_PHONE = /(?<![\d.])(?:\+61\s?|0)[2-478](?:[\s-]?\d){8}(?!\d)/g
 const PRIVATE_NET = /\b(?:192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|100\.(?:6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.\d{1,3}\.\d{1,3}|[a-z0-9-]+\.[a-z0-9-]+\.ts\.net)\b/gi
