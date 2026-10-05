@@ -8,6 +8,8 @@
 
 Personal finance dashboard. Next.js 16 app, SQLite via Prisma 5, self-hosted via Docker.
 
+> **Direction (agreed 2026-10-06): app first, local-first.** [`docs/architecture.md`](docs/architecture.md) is the target architecture: one Expo client (iOS, Android, web), data on each device (Drizzle + SQLite), end-to-end encrypted sync through a relay (hosted Proviso Sync or self-hosted). The Next.js app below is what runs today and is retired in stages. **Read that document before any structural change** — new code must move towards it, not away.
+
 ## ⚠️ Privacy rule — read before writing any code
 
 **All code must be written for a generic end user, not for the developer's household.**
