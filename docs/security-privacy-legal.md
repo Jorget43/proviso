@@ -74,14 +74,14 @@ The Australian Privacy Principles (APPs) become binding on the developer once th
 - Passwords: scrypt hashing via `node:crypto`
 - Sessions: DB-backed opaque tokens in httpOnly, SameSite=Lax cookies; `Secure` flag via `COOKIE_SECURE=true` behind HTTPS (documented in README). 7-day idle timeout, 30-day absolute limit; a password change ends the user's other sessions (Phase 21). Only a SHA-256 of each token is stored, so a database copy can't sign anyone in; Settings → Your devices lists every signed-in device and signs any of them out (Phase 24)
 - Native app tokens: bearer tokens (30-day idle, 90-day limit), never accepted as cookies and vice versa; shown and revocable under Your devices like any browser (Phase 24)
-- Headers: CSP with a per-request nonce for scripts — no inline scripts or event handlers can run (Phase 24), `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy: no-referrer`, `Permissions-Policy`, COOP on every response; HSTS when `COOKIE_SECURE=true` (`lib/securityHeaders.ts`, Phase 21)
+- Headers: CSP with a per-request nonce for scripts — no inline scripts or event handlers can run (Phase 24), `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy: no-referrer`, `Permissions-Policy`, COOP on every response; HSTS when `COOKIE_SECURE=true` (`apps/web/lib/securityHeaders.ts`, Phase 21)
 - Audit log: sign-ins, failures, lockouts, credential/2FA/passkey changes and every data write (field names, not values), kept 365 days, viewable by the CFO at `/settings/activity` (Phase 21)
 - Dependencies: Dependabot weekly PRs; CI fails on high/critical advisories in production dependencies (Phase 21)
 - Brute force: in-memory per-IP limit on `/api/auth/login` (20 req/min) plus DB account lockout after 10 failures (Phase 9)
 - Second factor: TOTP with recovery codes (Phase 9) and passkeys / WebAuthn (Phase 12)
 - SQL injection: Prisma parameterised queries (immune by design)
 - XSS: React JSX escaping (`dangerouslySetInnerHTML` is unused)
-- Input validation: every mutating route parses its body with a zod schema (`lib/schemas.ts`) — unknown fields stripped, ranges enforced (Phase 19)
+- Input validation: every mutating route parses its body with a zod schema (`packages/core/src/schemas.ts`) — unknown fields stripped, ranges enforced (Phase 19)
 - Transport: TLS via Tailscale Serve or external reverse proxy
 - Auth gating: `requireSession()` on all data pages; `authorize()` on all mutating API routes; read-path checks via `requireAdultRead()` (Phase 14)
 - Repo hygiene: the repository is public, so a privacy scanner runs in git hooks and CI to keep personal data out (see `CLAUDE.md` § Privacy guardrails)
@@ -92,4 +92,4 @@ The Australian Privacy Principles (APPs) become binding on the developer once th
 |---|---|---|
 | SQLite not encrypted at rest | Physical volume access exposes the household figures (passwords and session tokens are hashed) | By decision: drive/volume encryption, documented in README § "Protecting the data on disk". In-app encryption isn't planned — its key would live on the same host |
 
-**Content Security Policy:** see `lib/securityHeaders.ts` — the comment there explains each directive and how the per-request nonce works.
+**Content Security Policy:** see `apps/web/lib/securityHeaders.ts` — the comment there explains each directive and how the per-request nonce works.

@@ -15,13 +15,17 @@ Your data never leaves your own hardware. Proviso runs on your box (e.g. Unraid)
 
 ## Development
 
+The repo is an npm workspace (see [`docs/architecture.md`](docs/architecture.md)): `apps/web` is the Next.js app, `packages/core` holds the calculations and data rules.
+
 ```bash
-npm install
-npx prisma migrate deploy   # apply schema to a local SQLite db
+npm install                 # from the repo root — installs and links every workspace
+npx prisma migrate deploy   # apply the schema (apps/web/prisma) to a local SQLite db
 npm run dev                 # http://localhost:3000
+npm test                    # tests for every workspace
+npm run typecheck
 ```
 
-Set `DATABASE_URL` (e.g. `file:./prisma/dev.db`) in `.env` for local work.
+Set `DATABASE_URL` (e.g. `file:./dev.db`, relative to `apps/web/prisma/`) in `apps/web/.env` for local work — Next.js reads `.env` from the app's own folder.
 
 ## Quick start (pre-built image)
 

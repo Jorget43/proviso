@@ -10,7 +10,7 @@ description: How Proviso ships across its streams — the NAS Docker image (rela
 - **Ask before every push.** A push to `master` publishes `ghcr.io/…/proviso:latest`, and NAS installs pick it up automatically.
 - Tags (`vX.Y.Z`) drive the in-app "update available" banner; tag user-visible releases only.
 - The privacy-scan hook runs on commit and push. Never bypass it.
-- Test against scratch databases only, never `prisma/household.db`.
+- Test against scratch databases only, never `apps/web/prisma/household.db`.
 
 ## Streams
 

@@ -44,8 +44,10 @@ const FORBIDDEN_PATHS = [
   [/(^|\/)\.proviso-private(\/|$)/i, 'private denylist directory'],
   [/(^|\/)denylist\.txt$/i, 'denylist file'],
   // Images can't be text-scanned and screenshots of the running app show real
-  // data. App assets belong in public/ (or app/ for the favicon).
-  [/^(?!public\/|app\/)(.*\/)?[^/]+\.(png|jpe?g|gif|webp|heic|bmp|tiff?)$/i, 'image outside public/ (screenshots can show real data)'],
+  // data. App assets belong in an app's public/ (or app/ for the favicon) —
+  // apps/<name>/public/ since the workspace layout (Phase 25); the root
+  // public/ and app/ are still accepted so older commits scan clean.
+  [/^(?!(apps\/[^/]+\/)?(public|app)\/)(.*\/)?[^/]+\.(png|jpe?g|gif|webp|heic|bmp|tiff?)$/i, 'image outside public/ (screenshots can show real data)'],
 ]
 const ALLOWED_PATHS = [/(^|\/)\.env\.example$/i]
 

@@ -27,7 +27,7 @@ Households who aren't finance people. Every screen should answer a plain questio
 
 ## Styling
 
-- **Use design tokens only** (`packages/tokens`; `app/globals.css` variables in the legacy web app). No hard-coded colours, spacing or font sizes.
+- **Use design tokens only** (`packages/tokens`; `apps/web/app/globals.css` variables in the legacy web app). No hard-coded colours, spacing or font sizes.
 - **Light and dark themes** both work.
 - **Touch targets at least 44px**; text inputs at least 16px on phones (stops iOS zooming on focus).
 - **Respect safe areas** (notch, home indicator) and the bottom tab bar's height.

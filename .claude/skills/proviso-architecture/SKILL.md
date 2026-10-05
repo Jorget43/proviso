@@ -18,7 +18,7 @@ The agreed target is `docs/architecture.md` (read it if you haven't this session
 | `apps/relay` | Sync relay (hosted and self-hosted are the same code); static host for the web build | Anything that reads household data — it only ever sees ciphertext |
 | `apps/web` | **Legacy** Next.js app, kept until the Expo web build reaches parity | New features that aren't also planned for `apps/client` |
 
-Until Phase 1 of `docs/architecture.md` lands, the repo is still a single Next.js app (`lib/`, `app/`, `components/`). Apply the same rules to its folders: `lib/*` pure calculation modules are future `packages/core`.
+Today (Phase 25) the repo has `apps/web` and `packages/core`; `packages/sync`, `packages/tokens`, `apps/client` and `apps/relay` are created when their phase starts. A new pure calculation goes in `packages/core` now, never in `apps/web/lib`.
 
 ## Dependency direction
 

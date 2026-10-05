@@ -2,8 +2,10 @@ name: Build and push Docker image
 
 on:
   push:
+    # Every branch is built and smoke-tested; only master and release tags
+    # publish an image (see build-and-push).
     branches:
-      - master
+      - '**'
     tags:
       - 'v*'
   # Dependabot (and any other) pull requests: run the checks, never publish.
@@ -60,12 +62,59 @@ jobs:
       - name: Check the production prune resolves
         run: npm prune --omit=dev --dry-run
 
-      - name: Run engine tests
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: Typecheck all workspaces
+        run: npm run typecheck
+
+      - name: Run tests (packages/core and apps/web)
         run: npm test
 
+  # Builds the image and runs it the way a NAS does: a fresh volume (migrate +
+  # seed), then a restart (backup + migrate an existing database). Nothing is
+  # published unless this passes.
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build image (not pushed)
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          load: true
+          tags: proviso:smoke
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Start, restart, and check it answers
+        run: |
+          wait_up() {
+            for i in $(seq 1 60); do
+              code=$(curl -sL -o /dev/null -w '%{http_code}' http://localhost:3000/login || true)
+              [ "$code" = "200" ] && return 0
+              sleep 2
+            done
+            echo "App did not answer"; docker logs smoke; return 1
+          }
+          docker run -d --name smoke -p 3000:3000 -v smoke-data:/data proviso:smoke
+          wait_up
+          docker logs smoke | grep -q "Database seeded" || { echo "Seed did not run"; docker logs smoke; exit 1; }
+          curl -fsS http://localhost:3000/api/version
+          docker restart smoke
+          wait_up
+          docker logs smoke | grep -q "Database exists" || { echo "Restart path not taken"; docker logs smoke; exit 1; }
+          if docker logs smoke 2>&1 | grep -q "migrate deploy FAILED"; then docker logs smoke; exit 1; fi
+          echo "Smoke test passed"
+
   build-and-push:
-    needs: [privacy, test]
-    if: github.event_name == 'push'
+    needs: [privacy, test, smoke]
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v'))
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -101,11 +150,15 @@ jobs:
             echo "version=$(git describe --tags --always)" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v4
+
       - name: Build and push
         uses: docker/build-push-action@v7
         with:
           context: .
           push: true
+          cache-from: type=gha
           build-args: |
             PROVISO_VERSION=${{ steps.meta.outputs.version }}
             BUILD_DATE=${{ github.event.head_commit.timestamp }}

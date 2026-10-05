@@ -1,0 +1,6 @@
+{
+  // Tests may use Node (fixtures, vitest); the package source may not.
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "types": ["node"] },
+  "include": ["src/**/*.ts", "tests/**/*.ts"]
+}

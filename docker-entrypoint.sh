@@ -25,7 +25,7 @@ backup_db() {
 
 run_migrations() {
   echo "[entrypoint] Running migrations (prisma migrate deploy)..."
-  if npx prisma migrate deploy; then
+  if prisma migrate deploy; then
     echo "[entrypoint] Migrations applied."
     return 0
   fi
@@ -35,8 +35,8 @@ run_migrations() {
   echo "[entrypoint]    Pages that need a missing table may error until resolved."
   echo "[entrypoint]"
   echo "[entrypoint]    Common cause: a failed/inconsistent migration history (P3009)."
-  echo "[entrypoint]    Inspect:  docker exec <container> npx prisma migrate status"
-  echo "[entrypoint]    Resolve:  docker exec <container> npx prisma migrate resolve --applied <name>"
+  echo "[entrypoint]    Inspect:  docker exec <container> prisma migrate status"
+  echo "[entrypoint]    Resolve:  docker exec <container> prisma migrate resolve --applied <name>"
   echo "[entrypoint] =============================================================="
   return 1
 }
@@ -45,7 +45,7 @@ if [ ! -f "$DB_PATH" ]; then
   echo "[entrypoint] No database at $DB_PATH — first run."
   if run_migrations; then
     echo "[entrypoint] Seeding initial data..."
-    if npx prisma db seed; then
+    if prisma db seed; then
       echo "[entrypoint] Database seeded."
     else
       echo "[entrypoint] ⚠  WARNING: seed failed — continuing without seed data."

@@ -32,7 +32,7 @@ Data lives on every device and syncs as end-to-end encrypted, per-field change m
 
 ## While the legacy Next.js app is still running
 
-Until `apps/web` retires, it still uses Prisma (`prisma/schema.prisma`, migrations in `prisma/migrations`, applied by `docker-entrypoint.sh` on the NAS):
+Until `apps/web` retires, it still uses Prisma (`apps/web/prisma/schema.prisma`, migrations in `apps/web/prisma/migrations`, applied by `docker-entrypoint.sh` on the NAS):
 - A change that both apps need lands in **both schemas in the same commit**, and the Prisma → messages exporter test covers it.
-- Prisma migrations run against people's live databases on container start: keep them additive too, and test against a scratch copy, never `prisma/household.db`.
+- Prisma migrations run against people's live databases on container start: keep them additive too, and test against a scratch copy, never `apps/web/prisma/household.db`.
 - Don't add a Prisma-only table for a new feature unless the user agreed that feature stays legacy.
