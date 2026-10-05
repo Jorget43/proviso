@@ -100,9 +100,10 @@ EOFY is seasonal — surfaced via May/June `◷ EOFY` pill in `TopNav`, reachabl
 - **Server vs client**: server components fetch from Prisma directly; `'use client'` for anything interactive or using Chart.js
 - **Optimistic updates**: all CRUD hits state first, then API — no loading spinners
 - **Tax engine** (`lib/tax.ts`): FY2026-27 (`TAX_FY = 2027`) — resident brackets with the 15% bottom rate, LITO, Medicare levy with the single low-income shade-in, marginal HELP repayments (15c/17c bands, 10% of total income at the top). All figures are watchdog-tracked; update them together and bump `TAX_FY`. Applied flat across all projection years (not indexed). The 15% rate drops to 14% from 1 Jul 2027.
-- **Projection engine** (`lib/projections.ts`): 20-year dual simulation (with/without school fees), stepped inflation, monthly mortgage loop with live offset; renter mode with compound rent growth and optional purchase plan (deposit from cash/investments with ~12% CGT haircut, then mortgage via `computeMonthlyRepayment`)
+- **Projection engine** (`lib/projections.ts`): dual simulation over the user's horizon (5–40 years) (with/without school fees), stepped inflation, monthly mortgage loop with live offset; renter mode with compound rent growth and optional purchase plan (deposit from cash/investments with ~12% CGT haircut, then mortgage via `computeMonthlyRepayment`)
   - **Mortgage repayments are modelled, not budgeted**: `baseMonthlyExpenses` passed to the engine EXCLUDES the Budget's mortgage line(s) (`cat === 'Home'` and name matching /mortgage/i — `ProjectionsClient` subtracts `budgetMortgageMonthly` while a loan is modelled). `simulateMortgageYear` pays `mortPayment` out of cash each month, never inflated, and stops the month the loan clears (partial final payment); `annualPaid` is added back into reported `expArr`. Don't put repayments back into the inflating expense base — that was the "phantom mortgage after payoff" bug. If `mortPayment` is 0 the Budget line is used as the scheduled payment.
   - **HELP for both people**, from real balances on the Debts tab (`findHelpDebt`), indexed yearly, repayment capped at the residual, outstanding balance subtracted from net worth. Results: `person1HelpClearedYr` / `person2HelpClearedYr`.
+  - **Net worth** each year = home equity + cash + investments + crypto − HELP − `otherDebts`. The starting investment balance is `investmentsValue` (shares and other non-offset assets, grown at the investment return); `otherDebts` (car loans etc.) are held flat. Both come from `computeCurrentNetWorth()`, so year 0 equals the net worth shown on Home and Own & owe.
   - **PPL** comes from `PPL_TOTAL` (`lib/constants.ts`, FY2026-27: 26 weeks × $1,004.70) and is taxed via `calcAfterTax`, indexed for later leave years. Watchdog entry `ppl-rate`.
 - **Super engine** (`lib/super.ts`): per-person `runSuperProjection` + household `runHouseholdProjection`; accumulation (15%/30% tax) → drawdown (tax-free pension phase); Div 293 at $250k. Concessional cap comes from `lib/superHistory.ts`'s `legislativeCap()` (single source, see Phase 15) — `super.ts` does not maintain its own cap model. First-year cap can be topped up by `firstYearCapBonus` (carry-forward headroom, wired from `ConcessionalCarryForward` via `SuperClient`).
 - **HELP indexation engine** (`lib/help.ts`): indexable base, 1-June countdown/window, marginal-rate equivalence
@@ -110,9 +111,9 @@ EOFY is seasonal — surfaced via May/June `◷ EOFY` pill in `TopNav`, reachabl
 - **Inflation anchors — two kinds, do not conflate them**: `MODEL_BASE_YEAR` (`lib/constants.ts`, currently 2026) is a **data-vintage** anchor — the year `lib/schoolFees.ts`'s `SF_BASE` and the life-phase dollar figures (`lib/lifephases.ts`) are denominated in; inflation compounds *from* it regardless of the wall clock, so it must never be `new Date().getFullYear()`. `SuperInputs.startYear`/`startFyEnding` (`lib/super.ts`) are the opposite — a **run-start** anchor that genuinely is "now" and must be *injected* per call (optional params defaulting to the wall clock), not hardcoded, so it stays testable with `vi.setSystemTime`. Before Phase 15 these were conflated: `schoolFeesForYear` read the wall clock directly (numbers drifted every 1 January) and `super.ts`'s run-start year was captured at module load (untestable).
 - **EOFY engine** (`lib/eofy.ts`): May/June season gate + salary-sacrifice / marginal-rate optimisation
 - **CGT engine** (`lib/cgt.ts`): per-parcel cost base, 12-month 50% discount eligibility, estimated CGT at owner's marginal rate
-- **Childcare engine** (`lib/childcare.ts`): ATO 2024–25 CCS subsidy taper; syncs to managed `Childcare` expense line
+- **Childcare engine** (`lib/childcare.ts`): FY2026-27 CCS (`CCS_PARAMS_FY`), standard and higher-rate income tests; syncs to the managed `Childcare` expense line
 - **PDF import** (`lib/pdfExtract.ts`, `lib/pdfStatement.ts`): client-side `pdf.js` — no data leaves the device
-- **Net worth baseline** (`lib/netWorth.ts`): `computeCurrentNetWorth()` — the house/cash/crypto/mortgage heuristic shared by the Projections page's year-0 baseline and the monthly `NetWorthSnapshot` auto-capture, so "actual" stays scope-consistent with the projected line
+- **Net worth** (`lib/netWorth.ts`): the single definition — everything on Own & owe minus what's owed, the home counted once as equity (a "mortgage" debt row isn't subtracted on top of a house-equity asset), super excluded. `netPositionOf()` (live, Own & owe panel) and `computeCurrentNetWorth()` (Home, Projections' starting point and "today", monthly `NetWorthSnapshot`) share it, so every screen shows the same figure. Snapshots before `NET_WORTH_DEFINED_FROM` used an older, narrower scope.
 
 ## DB singleton
 
@@ -204,7 +205,7 @@ All migrations must be **additive only** — `update.sh` (or Watchtower, if opte
 
 ### Phase 4.3 — Child role (shipped 2026-06-14)
 
-- `/child` route — CHILD-only; CFO/PARTNER redirected to `/budget`
+- `/child` route — CHILD-only; CFO/PARTNER redirected to `/` (Home)
 - `child:write` scope — CHILD can add own spends; CFO can add any transaction (credits + spends)
 - Models: `AllowanceSchedule` (userId unique, amount, dayOfWeek), `PocketMoneyTx` (userId, amount, description, date, category)
 - `PUT /api/allowance` (budget:write), `POST /api/pocket-money` (child:write), `DELETE /api/pocket-money/[id]` (budget:write)
@@ -380,8 +381,8 @@ Tracked in [`docs/security-privacy-legal.md`](docs/security-privacy-legal.md) §
 
 ### Mobile & ease of use (after Phase 22)
 - ~~Two "net worth" figures disagree~~ — done: one definition in `lib/netWorth.ts` (everything on Own & owe, home counted once as equity, super excluded), used by Home, Own & owe, Projections and the monthly snapshots. Snapshots before `NET_WORTH_DEFINED_FROM` used the narrower old definition, so the Projections "actual" history line may step at the switch.
-- ~~Onboarding doesn't ask the "Your situation" questions~~ — done (v1.11.0+): Own/Rent on step 5, new step 6 for childcare, school fees, parental leave.
-- ~~Small-text desktop layouts on phones~~ — checked at 390px after v1.11.0: Own & owe rows restacked, Investments labels/dropdowns fixed, work-pattern wording plain; EOFY, Super and the school-fee controls were already fine. Remaining polish is cosmetic (parcel cards are dense).
+- ~~Onboarding doesn't ask the "Your situation" questions~~ — done (v1.12.0): Own/Rent on step 5, new step 6 for childcare, school fees, parental leave.
+- ~~Small-text desktop layouts on phones~~ — done (v1.12.0), checked at 390px: Own & owe rows restacked, Investments labels/dropdowns fixed, work-pattern wording plain; EOFY, Super and the school-fee controls were already fine. Remaining polish is cosmetic (parcel cards are dense).
 - Native app: the API (`app/api/*`, zod-validated, cookie auth) is already separate from the pages; a native client would need token auth alongside the cookie session.
 
 ### Deferred (revisit only if needed)
@@ -397,7 +398,7 @@ Tracked in [`docs/security-privacy-legal.md`](docs/security-privacy-legal.md) §
 - **Sessions**: 7-day idle timeout, 30-day absolute limit (was a flat 30 days). Pre-existing sessions are clamped on next use. Changing a user's password in Settings ends their other sessions (the reset-password flow already did).
 - **Audit log**: `AuditEvent` (migration `0002_audit_log`), 365-day retention. Buffered per request and written after the handler returns — an insert from inside a `$transaction` would deadlock on the single SQLite connection. Failed requests' writes and zero-row bulk writes are dropped; unknown usernames from failed sign-ins aren't stored (could be a mistyped password). `/settings/activity` lists it for the CFO.
 
-### Phase 22 — Mobile-first: four hubs, Home overview, phone Budget, scrubbable charts, "Your situation" (2026-10-05)
+### Phase 22 — Mobile-first: four hubs, Home overview, phone Budget, scrubbable charts, "Your situation" (2026-10-05, `v1.11.0`)
 
 - **Why**: most use is on a phone (NAS-hosted, opened over the home network), desktop second, and a native app may follow. The audience is non-finance users, so fewer destinations and plainer words.
 - **Navigation** (`lib/navigation.ts`, `components/layout/TopNav.tsx`): seven tabs → Home / Spending / Wealth / Future; bottom tab bar on phones, top tabs on desktop, segmented sub-nav per hub; account menu (name, role, Sign out). `/` is now the Home overview instead of a redirect to `/budget`.
@@ -409,6 +410,13 @@ Tracked in [`docs/security-privacy-legal.md`](docs/security-privacy-legal.md) §
 - **Add to Home Screen**: `app/manifest.ts` (public in the proxy matcher — fetched without cookies), icons in `public/icons/`, theme colour, `viewport-fit=cover` with safe-area padding.
 - **Fixes found on the way**: `overflow-x: hidden` on html/body/.page made them scroll containers, so `position: sticky` (the top bar) never worked → `clip`. `.two-col`/`.sidebar-layout` children lacked `min-width: 0`, so wide tables (Actuals review) widened the page instead of scrolling.
 - **Verified** with a headless-Edge DevTools harness at 390px and 1280px against a scratch DB: sheet add/edit/convert/delete, scrubbing, legend toggles, live slider updates, situation switches, and a view-only partner account. Zero migrations. 246 tests (12 new: navigation, budget summary).
+
+### Phase 23 — Setup wizard situation step, phone polish, one net worth (2026-10-05, `v1.12.0`)
+
+- **Setup wizard**: step 5 "Cash & home" asks Own / Rent (rent amount, or the existing home-loan questions); new step 6 "Your situation" (childcare, school fees, parental leave — the last only with a partner). Optional `renting`/`monthlyRent`/`payChildcare`/`schoolFees` on `onboardingSchema`; omitted answers leave settings alone. Finishing — and any adult hitting `/onboarding` or `/child` — lands on Home.
+- **Phone polish**: Own & owe rows put the name on its own line; Investments' Owner / "Plan to sell" dropdowns used the old top-bar `.nav-select` class (`display: none` on desktop until v1.11.0 — they were invisible there) and are now normal inputs; work-pattern wording plain; the What-if drawer keeps the chart readout on one row.
+- **One net worth** (see "Net worth" under Key architecture decisions): the engine gained optional `investmentsValue` and `otherDebts`; Home's card and the Own & owe panel are both titled "Net worth". Verified: $25k cash + $40k shares − $18k HELP − $12k car loan shows $35k on Home, Own & owe and Projections.
+- 253 tests (schema, net-worth definition, engine starting point). Zero migrations.
 
 ## Security checklist for new features
 

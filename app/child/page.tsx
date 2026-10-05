@@ -8,7 +8,7 @@ export default async function ChildPage() {
   const session = await requireSession()
 
   // CFO/PARTNER have no pocket money — redirect to their home
-  if (session.role !== 'CHILD') redirect('/budget')
+  if (session.role !== 'CHILD') redirect('/')
 
   const [txs, schedule] = await Promise.all([
     prisma.pocketMoneyTx.findMany({
