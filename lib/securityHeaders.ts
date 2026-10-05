@@ -1,0 +1,52 @@
+// HTTP security headers (Phase 21). Applied to every route by next.config.ts;
+// HSTS is added separately in proxy.ts because it depends on COOKIE_SECURE,
+// a runtime setting, while next.config is evaluated when the image is built.
+//
+// The CSP keeps script-src 'unsafe-inline': Next's App Router hydrates with
+// inline scripts, and the alternative (a per-request nonce) forces every page
+// to be dynamic. What the policy does buy: no third-party scripts, no
+// requests to other hosts (connect-src 'self' — the browser can't exfiltrate
+// data anywhere), no framing (clickjacking), no <base>/<object> injection,
+// and forms can only post back to this app.
+
+export function contentSecurityPolicy(dev: boolean): string {
+  const directives: Record<string, string[]> = {
+    'default-src':     ["'self'"],
+    // React's dev overlay / fast refresh evaluates code; production doesn't.
+    'script-src':      ["'self'", "'unsafe-inline'", ...(dev ? ["'unsafe-eval'"] : [])],
+    // React `style={…}` props and Tailwind's injected styles.
+    'style-src':       ["'self'", "'unsafe-inline'"],
+    // data: for the TOTP QR code; blob: for chart / PDF canvases.
+    'img-src':         ["'self'", 'data:', 'blob:'],
+    'font-src':        ["'self'", 'data:'],
+    // Dev needs the HMR websocket.
+    'connect-src':     ["'self'", ...(dev ? ['ws:', 'wss:'] : [])],
+    // pdf.js runs its text extraction in a worker served from /_next/static.
+    'worker-src':      ["'self'", 'blob:'],
+    'manifest-src':    ["'self'"],
+    'object-src':      ["'none'"],
+    'base-uri':        ["'self'"],
+    'form-action':     ["'self'"],
+    'frame-ancestors': ["'none'"],
+  }
+  return Object.entries(directives).map(([k, v]) => `${k} ${v.join(' ')}`).join('; ')
+}
+
+export function securityHeaders(dev: boolean): { key: string; value: string }[] {
+  return [
+    { key: 'Content-Security-Policy', value: contentSecurityPolicy(dev) },
+    // Older browsers that ignore frame-ancestors.
+    { key: 'X-Frame-Options',         value: 'DENY' },
+    { key: 'X-Content-Type-Options',  value: 'nosniff' },
+    // Reset-password links carry a token in the URL — never leak it in a Referer.
+    { key: 'Referrer-Policy',         value: 'no-referrer' },
+    // Passkeys need publickey-credentials-*; nothing here uses the rest.
+    { key: 'Permissions-Policy',      value: 'camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()' },
+    { key: 'Cross-Origin-Opener-Policy', value: 'same-origin' },
+  ]
+}
+
+// One year. No includeSubDomains/preload: the app is usually one host on a
+// tailnet or behind a home reverse proxy, and HSTS on a parent domain would
+// reach unrelated services.
+export const HSTS_VALUE = 'max-age=31536000'

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { HSTS_VALUE } from './lib/securityHeaders'
 
 // Next.js 16 renames Middleware → Proxy. This does the *optimistic* auth check
 // only: is a session cookie present? The secure DB-backed validation happens in
@@ -12,6 +13,10 @@ const SESSION_COOKIE = 'proviso_session'
 const PUBLIC_PATHS = ['/login', '/setup', '/forgot-password', '/reset-password']
 
 export function proxy(req: NextRequest) {
+  return withHsts(route(req))
+}
+
+function route(req: NextRequest): NextResponse {
   const { pathname } = req.nextUrl
 
   if (PUBLIC_PATHS.includes(pathname)) return NextResponse.next()
@@ -24,6 +29,15 @@ export function proxy(req: NextRequest) {
   }
 
   return NextResponse.next()
+}
+
+// HSTS only when the deployment says it's behind HTTPS (the same switch as the
+// Secure cookie flag). Read here at request time rather than in next.config,
+// which is evaluated when the image is built. Sent on pages only (API routes
+// skip the proxy) — the browser applies it to the whole host either way.
+function withHsts(res: NextResponse): NextResponse {
+  if (process.env.COOKIE_SECURE === 'true') res.headers.set('Strict-Transport-Security', HSTS_VALUE)
+  return res
 }
 
 export const config = {
