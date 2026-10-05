@@ -2,7 +2,7 @@
 
 > Most apps tell you what you spent yesterday. Proviso models what you will be worth tomorrow.
 
-A self-hosted personal finance dashboard for Australian households — budget, cashflow, debts & assets, 20-year projections, superannuation, EOFY tax planning, and CGT-aware investments. Built for the household CFO: wealth building, tax efficiency, and retirement planning, not day-to-day expense tracking.
+A self-hosted personal finance dashboard for Australian households — budget, cashflow, debts & assets, long-term projections, superannuation, EOFY tax planning, and CGT-aware investments. Built for the household CFO: wealth building, tax efficiency, and retirement planning, not day-to-day expense tracking.
 
 Your data never leaves your own hardware. Proviso runs on your box (e.g. Unraid) and is reachable privately over Tailscale.
 
@@ -78,6 +78,13 @@ This builds the standalone image locally and starts the `proviso` container on p
 
 Behind HTTPS (e.g. Tailscale Serve) set `COOKIE_SECURE=true` so session cookies carry the `Secure` flag and browsers get an HSTS header (remember HTTPS for this host for a year). Over a plain-http tailnet address leave it unset.
 
-## Tabs
+## What's inside
 
-Budget · Actuals · Debts & Assets · Cashflow · Projections · Super · Investments — plus a seasonal EOFY view (May/June). See `CLAUDE.md` for architecture and engine details.
+Built for phones first (Add to Home Screen opens it like an app), with the same layout on desktop:
+
+- **Home** — what's left over each month, things worth a look, where you stand, bills coming up
+- **Spending** — Budget · Actual spending (bank/card statement import)
+- **Wealth** — Own & owe · Super · Investments
+- **Future** — Long term (projections with "What if?") · Next 2 years (cashflow)
+
+Plus a seasonal EOFY view (May/June) and Settings, where "Your situation" switches on renting, childcare, school fees and parental leave. See `CLAUDE.md` for architecture and engine details.
