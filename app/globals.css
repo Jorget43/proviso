@@ -1109,6 +1109,8 @@ input[type=range] { width: 100%; accent-color: var(--t3); }
   .proj.whatif-open .scrub-hint,
   .proj.whatif-open .whatif-fab { display: none; }
   .proj.whatif-open .scrub-area { height: 180px !important; }
+  .proj.whatif-open .scrub-items { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  .proj.whatif-open .scrub-item { flex-shrink: 0; }
   .proj.whatif-open .explorer .panel-body { padding-top: 10px; padding-bottom: 10px; }
 }
 
@@ -1255,7 +1257,11 @@ input[type=range] { width: 100%; accent-color: var(--t3); }
   .nav-readonly { display: none; }
   .panel-head { flex-wrap: wrap; gap: 6px 1rem; }
   .da-label { min-width: 0; flex: 0 0 38%; }
-  .da-row > .da-input:not(.narrow):not(.wide) { min-width: 0; flex: 1; width: auto; }
+  /* Own & owe rows: name on its own line, amount + controls beneath */
+  .da-row:has(> .da-input.name) { flex-wrap: wrap; row-gap: 6px; padding: 6px 0; }
+  .da-row:has(> .da-input.name) + .da-row:has(> .da-input.name) { border-top: 1px solid var(--border); }
+  .da-row > .da-input.name { flex: 1 1 100%; height: 36px; }
+  .da-row > .da-input:not(.narrow):not(.wide):not(.name) { min-width: 0; flex: 1; width: auto; }
   /* Super projection table: drop secondary columns so the essentials
      (age, balance, contribution/drawdown, present value) fit without a
      cramped 11-column horizontal scroll. */

@@ -37,9 +37,9 @@ export default function WorkPhaseTimeline({
 
   return (
     <>
-      <div style={{ fontSize: '0.69rem', color: 'var(--t3)', marginBottom: '0.65rem', lineHeight: 1.5 }}>
-        FTE base: <strong style={{ color: 'var(--t1)' }}>${fte.toLocaleString()}/yr</strong>
-        {' · '}3d=${Math.round(fte * 0.6 / 1000)}k · 4d=${Math.round(fte * 0.8 / 1000)}k · 5d=${kStr}k
+      <div style={{ fontSize: '0.78rem', color: 'var(--t2)', marginBottom: '0.65rem', lineHeight: 1.5 }}>
+        Full-time salary <strong style={{ color: 'var(--t1)' }}>${fte.toLocaleString()}/yr</strong>.
+        {' '}3 days a week ≈ ${Math.round(fte * 0.6 / 1000)}k, 4 days ≈ ${Math.round(fte * 0.8 / 1000)}k, 5 days = ${kStr}k.
       </div>
       <div style={{ overflowX: 'auto' }}>
         <table className="tl-table">

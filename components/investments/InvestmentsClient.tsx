@@ -132,7 +132,7 @@ export default function InvestmentsClient({ canEdit, initialParcels, members, ma
                     <input className="da-input name" defaultValue={p.name} onBlur={e => update(p.id, 'name', e.target.value)} style={{ width: '100%' }} />
                   </Field>
                   <Field label="Owner" width={120}>
-                    <select value={p.member} onChange={e => update(p.id, 'member', e.target.value)} className="nav-select" style={{ width: '100%' }}>
+                    <select value={p.member} onChange={e => update(p.id, 'member', e.target.value)} className="da-input" style={{ width: '100%', height: 32 }}>
                       {members.map(m => <option key={m} value={m}>{m}</option>)}
                     </select>
                   </Field>
@@ -151,7 +151,7 @@ export default function InvestmentsClient({ canEdit, initialParcels, members, ma
                       <input type="number" step="any" defaultValue={p.currentPrice} onBlur={e => update(p.id, 'currentPrice', parseFloat(e.target.value) || 0)} style={{ textAlign: 'right', width: '100%' }} /></div>
                   </Field>
                   <Field label="Plan to sell" width={110}>
-                    <select value={p.sellYear ?? ''} onChange={e => update(p.id, 'sellYear', e.target.value ? parseInt(e.target.value) : null)} className="nav-select" style={{ width: '100%' }}>
+                    <select value={p.sellYear ?? ''} onChange={e => update(p.id, 'sellYear', e.target.value ? parseInt(e.target.value) : null)} className="da-input" style={{ width: '100%', height: 32 }}>
                       <option value="">—</option>
                       {sellYears.map(y => <option key={y} value={y}>{y}</option>)}
                     </select>
@@ -200,7 +200,7 @@ const fieldInput: React.CSSProperties = { width: '100%', textAlign: 'left' }
 function Field({ label, width, children }: { label: string; width: number; children: React.ReactNode }) {
   return (
     <div style={{ width, display: 'flex', flexDirection: 'column', gap: 3 }}>
-      <span style={{ fontSize: '0.64rem', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--t3)' }}>{label}</span>
+      <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--t3)' }}>{label}</span>
       {children}
     </div>
   )
@@ -209,7 +209,7 @@ function Field({ label, width, children }: { label: string; width: number; child
 function Stat({ label, value, color }: { label: string; value: string; color?: string }) {
   return (
     <span style={{ display: 'inline-flex', flexDirection: 'column' }}>
-      <span style={{ fontSize: '0.62rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--t3)' }}>{label}</span>
+      <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--t3)' }}>{label}</span>
       <span style={{ fontWeight: 500, color: color ?? 'var(--t1)' }}>{value}</span>
     </span>
   )
