@@ -9,6 +9,9 @@ import ExpenseTable, { type Expense, type AnnualExpense } from './ExpenseTable'
 import ChildcarePanel, { type ChildcareSettings } from './ChildcarePanel'
 import SpendDonut from './SpendDonut'
 import MonthlySummary from './MonthlySummary'
+import ExpenseList from './ExpenseList'
+import ExpenseSheet, { kindOf, type SheetTarget, type LineDraft, type LineKind } from './ExpenseSheet'
+import Panel from '@/components/ui/Panel'
 
 interface RentSettings {
   id:                    number
@@ -61,7 +64,7 @@ export default function BudgetClient({
   const [rentSettings, setRentSettings] = useState<RentSettings | null>(initialRentSettings)
 
   const {
-    familyIncome, monthlyIncome, childcareNet,
+    familyIncome, person1Net, person2Net, monthlyIncome, childcareNet,
     shownExpenses, monthlyExpenses, catMonthly, delta, savingsRate,
   } = useMemo(() => computeBudgetSummary({
     expenses, annualExpenses, income, childcare,
@@ -155,6 +158,64 @@ export default function BudgetClient({
     })
   }, [rentSettings])
 
+  // ── Edit sheet (phone layout) ───────────────────────────────────────────────
+  // The sheet shows its own error message, so these requests opt out of the
+  // global SaveErrorToast and throw instead.
+  const [sheet, setSheet] = useState<SheetTarget | null>(null)
+
+  const sheetRequest = useCallback(async <T,>(url: string, method: string, body?: unknown): Promise<T | null> => {
+    const res = await fetch(url, {
+      method,
+      headers: { 'Content-Type': 'application/json', 'X-Handles-Errors': '1' },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    })
+    if (!res.ok) {
+      let msg = 'Couldn’t save that — please try again.'
+      try { msg = (await res.json()).error ?? msg } catch { /* no body */ }
+      throw new Error(msg)
+    }
+    return res.status === 204 ? null : res.json()
+  }, [])
+
+  const removeLine = useCallback(async (kind: LineKind, id: number) => {
+    if (kind === 'annual') {
+      await sheetRequest(`/api/annual-expenses/${id}`, 'DELETE')
+      setAnnualExpenses(prev => prev.filter(a => a.id !== id))
+    } else {
+      await sheetRequest(`/api/expenses/${id}`, 'DELETE')
+      setExpenses(prev => prev.filter(e => e.id !== id))
+    }
+  }, [sheetRequest])
+
+  // Picking "Yearly" + a due month turns a regular line into an annual bill
+  // (and back) — a different record, so that's create-new then delete-old.
+  const saveLine = useCallback(async (target: SheetTarget, d: LineDraft) => {
+    const amt = parseFloat(d.amt) || 0
+    if (target.kind === 'rent') { await updateRentMonthly(amt); return }
+    const name = d.name.trim()
+    const kind = kindOf(d)
+    if (kind === 'annual') {
+      const body = { name, cat: d.cat, amt, month: d.month }
+      if (target.kind === 'annual' && target.id !== null) {
+        const updated = await sheetRequest<AnnualExpense>(`/api/annual-expenses/${target.id}`, 'PUT', body)
+        if (updated) setAnnualExpenses(prev => prev.map(a => (a.id === updated.id ? updated : a)))
+        return
+      }
+      const created = await sheetRequest<AnnualExpense>('/api/annual-expenses', 'POST', body)
+      if (created) setAnnualExpenses(prev => [...prev, created].sort((a, b) => a.month - b.month))
+    } else {
+      const body = { name, cat: d.cat, freq: d.freq, amt }
+      if (target.kind === 'regular' && target.id !== null) {
+        const updated = await sheetRequest<Expense>(`/api/expenses/${target.id}`, 'PUT', body)
+        if (updated) setExpenses(prev => prev.map(e => (e.id === updated.id ? updated : e)))
+        return
+      }
+      const created = await sheetRequest<Expense>('/api/expenses', 'POST', body)
+      if (created) setExpenses(prev => [...prev, created])
+    }
+    if (target.id !== null) await removeLine(target.kind, target.id)
+  }, [sheetRequest, removeLine, updateRentMonthly])
+
   // ── Childcare managed budget line: persist ──────────────────────────────────
   // Saves the derived line (see shownExpenses). State is only updated once the
   // server answers, so this never triggers a synchronous re-render.
@@ -185,6 +246,8 @@ export default function BudgetClient({
     }
   }, [canEdit, childcareNet, expenses])
 
+  const rentMonthly = rentSettings?.enabled ? rentSettings.monthlyRent : undefined
+
   return (
     <div className="page">
       <ReadOnlyFence canEdit={canEdit}>
@@ -196,10 +259,19 @@ export default function BudgetClient({
           onUpdate={updateIncome}
           person1Name={person1Name}
           person2Name={person2Name}
+          person1Net={person1Net}
+          person2Net={person2Net}
         />
       </ReadOnlyFence>
 
-      <div className="metrics">
+      {/* Phones: one pinned line instead of five metric cards */}
+      <div className={`budget-bar ${delta >= 0 ? 'good' : 'bad'}`} aria-label="Monthly summary">
+        <span><small>In</small>{fmt(monthlyIncome)}</span>
+        <span><small>Out</small>{fmt(monthlyExpenses)}</span>
+        <span className="budget-bar-left"><small>{delta >= 0 ? 'Left over' : 'Short'}</small>{fmt(Math.abs(delta))}</span>
+      </div>
+
+      <div className="metrics budget-metrics">
         <MetricCard
           label="Monthly income"
           value={fmt(monthlyIncome)}
@@ -210,43 +282,67 @@ export default function BudgetClient({
           label="Monthly expenses"
           value={fmt(monthlyExpenses)}
           color="red"
-          sub="amortised"
+          sub="yearly bills spread out"
         />
         <MetricCard
-          label="Monthly delta"
+          label="Left over each month"
           value={fmtS(delta)}
           color={delta >= 0 ? 'green' : 'red'}
-          sub="surplus / deficit"
+          sub={delta >= 0 ? 'surplus' : 'shortfall'}
         />
         <MetricCard
-          label="Annual surplus"
+          label="Left over each year"
           value={fmtS(delta * 12)}
           color={delta >= 0 ? 'green' : 'red'}
-          sub="if unchanged"
+          sub="if nothing changes"
         />
         <MetricCard
           label="Savings rate"
           value={`${savingsRate.toFixed(1)}%`}
           color={savingsRate >= 20 ? 'green' : savingsRate >= 0 ? 'blue' : 'red'}
-          sub="of income"
+          sub="of take-home pay"
         />
       </div>
 
-      <ReadOnlyFence canEdit={canEdit}>
-        <ExpenseTable
-          expenses={shownExpenses}
-          onAdd={addExpense}
-          onUpdate={updateExpense}
-          onDelete={deleteExpense}
-          annualExpenses={annualExpenses}
-          canEdit={canEdit}
-          onAnnualAdd={createAnnualExpense}
-          onAnnualUpdate={updateAnnualExpense}
-          onAnnualDelete={deleteAnnualExpense}
-          rentMonthly={rentSettings?.enabled ? rentSettings.monthlyRent : undefined}
-          onRentUpdate={updateRentMonthly}
-        />
-      </ReadOnlyFence>
+      <div className="exp-desktop">
+        <ReadOnlyFence canEdit={canEdit}>
+          <ExpenseTable
+            expenses={shownExpenses}
+            onAdd={addExpense}
+            onUpdate={updateExpense}
+            onDelete={deleteExpense}
+            annualExpenses={annualExpenses}
+            canEdit={canEdit}
+            onAnnualAdd={createAnnualExpense}
+            onAnnualUpdate={updateAnnualExpense}
+            onAnnualDelete={deleteAnnualExpense}
+            rentMonthly={rentMonthly}
+            onRentUpdate={updateRentMonthly}
+          />
+        </ReadOnlyFence>
+      </div>
+
+      {/* Not inside ReadOnlyFence: view-only members still open categories and
+          lines to read them; the sheet itself is locked for them. */}
+      <div className="exp-mobile">
+        <Panel title="Where it goes" dotColor="var(--red)" rawBody>
+          <ExpenseList
+            expenses={shownExpenses}
+            annualExpenses={annualExpenses}
+            rentMonthly={rentMonthly}
+            monthlyTotal={monthlyExpenses}
+            canEdit={canEdit}
+            onOpen={setSheet}
+          />
+        </Panel>
+      </div>
+      <ExpenseSheet
+        target={sheet}
+        canEdit={canEdit}
+        onClose={() => setSheet(null)}
+        onSave={saveLine}
+        onDelete={t => (t.id === null || t.kind === 'rent' ? Promise.resolve() : removeLine(t.kind, t.id))}
+      />
 
       <ReadOnlyFence canEdit={canEdit}>
         <ChildcarePanel
@@ -258,12 +354,14 @@ export default function BudgetClient({
 
       <div className="two-col">
         <SpendDonut catMonthly={catMonthly} />
-        <MonthlySummary
-          catMonthly={catMonthly}
-          monthlyIncome={monthlyIncome}
-          monthlyExpenses={monthlyExpenses}
-          cashOnHand={cashOnHand}
-        />
+        <div className="budget-summary-panel">
+          <MonthlySummary
+            catMonthly={catMonthly}
+            monthlyIncome={monthlyIncome}
+            monthlyExpenses={monthlyExpenses}
+            cashOnHand={cashOnHand}
+          />
+        </div>
       </div>
     </div>
   )

@@ -1,4 +1,5 @@
 'use client'
+import { useState } from 'react'
 import {
   calcIncomeTax,
   calcMedicare,
@@ -29,6 +30,8 @@ interface IncomePanelProps {
   onUpdate: (patch: Partial<IncomeSettings>) => void
   person1Name: string
   person2Name: string
+  person1Net: number   // monthly take-home, as the Budget computes it
+  person2Net: number
 }
 
 // Visual ceiling for the bracket bar — the Div 293 threshold.
@@ -166,10 +169,36 @@ function PersonCard({
   )
 }
 
-export default function IncomePanel({ income, person1Days, person2Days, partnerEnabled, onUpdate, person1Name, person2Name }: IncomePanelProps) {
+export default function IncomePanel({ income, person1Days, person2Days, partnerEnabled, onUpdate, person1Name, person2Name, person1Net, person2Net }: IncomePanelProps) {
+  // Folded to a one-line summary once income is set, so the budget itself is
+  // what you see first; open straight away when there's nothing entered yet.
+  const [open, setOpen] = useState(person1Net + person2Net <= 0)
+
+  if (!open) {
+    const nets = [
+      { name: person1Name, net: person1Net, days: person1Days },
+      ...(partnerEnabled ? [{ name: person2Name, net: person2Net, days: person2Days }] : []),
+    ]
+    return (
+      <Panel title="Income" dotColor="var(--green)" right={
+        <button type="button" className="panel-action" onClick={() => setOpen(true)}>Edit</button>
+      }>
+        <div className="inc-summary">
+          {nets.map(p => (
+            <div key={p.name} className="inc-summary-row">
+              <span>{p.name}{p.days !== 5 && <small> · {p.days} days a week</small>}</span>
+              <strong>{fmt(p.net)}<small>/mo</small></strong>
+            </div>
+          ))}
+          <div className="inc-summary-note">Take-home pay, after tax{income.taxMode ? ' (worked out for you)' : ''}</div>
+        </div>
+      </Panel>
+    )
+  }
+
   const toggle = (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.72rem', color: 'var(--t2)' }}>
-      ATO brackets
+      Work out tax for me
       <label className="toggle-switch">
         <input
           type="checkbox"
@@ -181,6 +210,7 @@ export default function IncomePanel({ income, person1Days, person2Days, partnerE
       <span style={{ color: income.taxMode ? 'var(--teal)' : 'var(--t3)', fontWeight: 500 }}>
         {income.taxMode ? 'On' : 'Off'}
       </span>
+      <button type="button" className="panel-action" onClick={() => setOpen(false)}>Done</button>
     </div>
   )
 
@@ -202,17 +232,19 @@ export default function IncomePanel({ income, person1Days, person2Days, partnerE
             return (
               <PersonCard key={p.key} name={p.name} gross={working} hasHELP={p.hasHELP} nameColor={p.color}>
                 <div className="input-prefix">
-                  <span>FTE/yr</span>
+                  <span>Salary</span>
                   <input
                     type="number"
+                    inputMode="decimal"
+                    aria-label={`${p.name}'s full-time salary before tax, per year`}
                     defaultValue={p.fte}
                     onBlur={e => onUpdate({ [`${p.key}FTE`]: parseFloat(e.target.value) || 0 })}
                   />
                 </div>
                 <div style={{ fontSize: '0.68rem', color: 'var(--teal)', fontWeight: 500, marginTop: 3 }}>
                   {p.days === 5
-                    ? '5d/wk · Full time'
-                    : `${p.days}d/wk = ${fmt(working)}/yr (${Math.round(p.days / 5 * 100)}% FTE)`}
+                    ? 'Full-time, before tax, per year'
+                    : `Full-time salary · ${p.days} days a week = ${fmt(working)}/yr`}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
                   <input
@@ -238,9 +270,10 @@ export default function IncomePanel({ income, person1Days, person2Days, partnerE
                 {p.days !== 5 && <span style={{ color: p.color, fontWeight: 500, fontSize: '0.7rem' }}> {p.days}d/wk</span>}
               </label>
               <div className="input-prefix">
-                <span>$/mo net</span>
+                <span>Take-home /mo</span>
                 <input
                   type="number"
+                  inputMode="decimal"
                   defaultValue={p.monthlyNet}
                   onBlur={e => onUpdate({ [`${p.key}MonthlyNet`]: parseFloat(e.target.value) || 0 })}
                 />
