@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client'
 import { ApiError } from './apiHandler'
 import { isBusyError } from './dbErrors'
+import { recordWrite } from './audit'
 
 // Force Prisma's own internal SQLite pool down to exactly one physical
 // connection. Without this, Prisma can open several concurrent handles to
@@ -82,9 +83,13 @@ function createPrismaClient() {
   return client.$extends({
     name: 'retry-on-busy',
     query: {
-      $allOperations: async ({ operation, args, query }) => {
+      $allOperations: async ({ model, operation, args, query }) => {
         await ensureBusyTimeout()
-        return withBusyRetry(operation, () => query(args))
+        const result = await withBusyRetry(operation, () => query(args))
+        // Audit trail: buffers the write in the request's context (if an
+        // authorised request is running); written after the handler ends.
+        recordWrite(model, operation, args, result)
+        return result
       },
     },
   })

@@ -1,10 +1,12 @@
 import { getSession } from '@/lib/auth'
 import { prisma } from '@/lib/db'
+import { withErrors } from '@/lib/apiHandler'
+import { audit } from '@/lib/audit'
 
-export async function DELETE(
+export const DELETE = withErrors(async (
   _req: Request,
   { params }: { params: Promise<{ id: string }> },
-) {
+) => {
   const user = await getSession()
   if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 })
 
@@ -15,5 +17,6 @@ export async function DELETE(
   if (pk.userId !== user.userId) return Response.json({ error: 'Forbidden' }, { status: 403 })
 
   await prisma.passkey.delete({ where: { id: Number(id) } })
+  audit({ action: 'auth.passkey_removed', userId: user.userId, username: user.username, target: pk.name })
   return Response.json({ ok: true })
-}
+})

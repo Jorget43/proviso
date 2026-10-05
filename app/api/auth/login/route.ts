@@ -3,6 +3,7 @@ import { credentialsSchema } from '@/lib/schemas'
 import { prisma } from '@/lib/db'
 import { verifyPassword, createSession } from '@/lib/auth'
 import { isRateLimited } from '@/lib/loginRateLimit'
+import { audit } from '@/lib/audit'
 
 const LOCKOUT_THRESHOLD = 10
 const LOCKOUT_MS = 15 * 60 * 1000 // 15 minutes
@@ -19,6 +20,7 @@ export const POST = withErrors(async (req: Request) => {
 
   if (user?.lockedUntil && user.lockedUntil > new Date()) {
     const retryAfterSecs = Math.ceil((user.lockedUntil.getTime() - Date.now()) / 1000)
+    audit({ action: 'auth.signin_failed', userId: user.id, username: user.username, detail: 'account locked' })
     return Response.json(
       { error: `Account locked. Try again in ${Math.ceil(retryAfterSecs / 60)} minute(s).` },
       { status: 429, headers: { 'Retry-After': String(retryAfterSecs) } },
@@ -29,6 +31,10 @@ export const POST = withErrors(async (req: Request) => {
   const ok = user ? await verifyPassword(password, user.passwordHash) : false
 
   if (!user || !ok) {
+    // An unknown username isn't stored: it may be a mistyped password.
+    audit(user
+      ? { action: 'auth.signin_failed', userId: user.id, username: user.username, detail: 'wrong password' }
+      : { action: 'auth.signin_failed', detail: 'unknown username' })
     if (user) {
       // A lockout that has already expired starts a fresh count — otherwise a
       // single typo after the wait would re-lock the account immediately.
@@ -41,6 +47,9 @@ export const POST = withErrors(async (req: Request) => {
           lockedUntil: attempts >= LOCKOUT_THRESHOLD ? new Date(Date.now() + LOCKOUT_MS) : null,
         },
       })
+      if (attempts >= LOCKOUT_THRESHOLD) {
+        audit({ action: 'auth.locked', userId: user.id, username: user.username, detail: `${attempts} failed attempts` })
+      }
     }
     return Response.json({ error: 'Invalid username or password' }, { status: 401 })
   }
@@ -59,5 +68,6 @@ export const POST = withErrors(async (req: Request) => {
   }
 
   await createSession(user.id)
+  audit({ action: 'auth.signin', userId: user.id, username: user.username, detail: 'password' })
   return Response.json({ ok: true })
 })

@@ -389,3 +389,21 @@ model RentSettings {
   newMortgageRate       Float   @default(6.0)
   newMortgageTermYrs    Int     @default(30)
 }
+
+// Audit log (Phase 21): who did what, when. Security events (sign-ins,
+// password/2FA/passkey changes) plus every data write made through an
+// authorised API route — model, record id and changed field *names*, never
+// values. userId has no relation on purpose: the trail outlives a deleted
+// user, and `username` keeps it readable. Pruned after 365 days.
+model AuditEvent {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  userId    Int?
+  username  String?
+  action    String
+  target    String?
+  detail    String?
+  ip        String?
+
+  @@index([createdAt])
+}

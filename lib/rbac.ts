@@ -7,6 +7,7 @@
 // Reads are not gated here (page-level requireSession covers authentication).
 
 import { getSession, type Role, type SessionUser } from './auth'
+import { setAuditActor } from './audit'
 
 export type Action = 'actuals:write' | 'budget:write' | 'users:write' | 'child:write'
 
@@ -31,6 +32,9 @@ export async function authorize(action: Action): Promise<AuthResult> {
   const user = await getSession()
   if (!user) return { ok: false, res: Response.json({ error: 'Unauthorized' }, { status: 401 }) }
   if (!can(user.role, action)) return { ok: false, res: Response.json({ error: 'Forbidden' }, { status: 403 }) }
+  // Name the actor for the audit trail: every write this request makes from
+  // here on is recorded against them.
+  setAuditActor({ userId: user.userId, username: user.username })
   return { ok: true, user }
 }
 

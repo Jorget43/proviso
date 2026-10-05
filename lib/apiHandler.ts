@@ -14,6 +14,7 @@
 import { Prisma } from '@prisma/client'
 import type { ZodType } from 'zod'
 import { isBusyError } from './dbErrors'
+import { runWithAudit } from './audit'
 
 // Thrown to short-circuit a handler with a specific status + client message.
 export class ApiError extends Error {
@@ -60,16 +61,17 @@ export function toErrorResponse(err: unknown): Response {
 // Wrap a route handler with uniform error handling. Generic over the handler's
 // exact argument list so it fits every Next 16 signature — `()`, `(req)`, and
 // `(req, { params }: { params: Promise<{ id: string }> })` — without widening.
+// Also opens the request's audit context (lib/audit.ts).
 export function withErrors<A extends unknown[]>(
   fn: (...args: A) => Promise<Response>,
 ): (...args: A) => Promise<Response> {
-  return async (...args: A) => {
+  return async (...args: A) => runWithAudit(args[0], async () => {
     try {
       return await fn(...args)
     } catch (err) {
       return toErrorResponse(err)
     }
-  }
+  })
 }
 
 // Read + validate a JSON body against a zod schema. Throws ApiError(400) on a

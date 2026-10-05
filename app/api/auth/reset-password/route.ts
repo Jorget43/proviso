@@ -2,6 +2,7 @@ import { withErrors, parseBody } from '@/lib/apiHandler'
 import { resetPasswordSchema } from '@/lib/schemas'
 import { prisma } from '@/lib/db'
 import { hashPassword } from '@/lib/auth'
+import { audit } from '@/lib/audit'
 
 export const POST = withErrors(async (req: Request) => {
   const { token, password } = await parseBody(req, resetPasswordSchema)
@@ -27,6 +28,7 @@ export const POST = withErrors(async (req: Request) => {
     // Invalidate all existing sessions so old devices are logged out.
     prisma.session.deleteMany({ where: { userId: reset.userId } }),
   ])
+  audit({ action: 'auth.reset', userId: reset.userId, username: reset.user.username, detail: 'password reset via link; all sessions ended' })
 
   return Response.json({ ok: true })
 })

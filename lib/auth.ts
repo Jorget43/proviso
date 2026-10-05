@@ -12,6 +12,7 @@ import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { cache } from 'react'
 import { prisma } from './db'
+import { pruneAuditLog } from './audit'
 
 const scryptAsync = promisify(scrypt)
 
@@ -73,8 +74,10 @@ export async function createSession(userId: number): Promise<void> {
   const now = Date.now()
   const expiresAt = sessionExpiry(now, new Date(now))
   await prisma.session.create({ data: { userId, token, expiresAt } })
-  // Housekeeping: drop rows that have already expired (any user).
+  // Housekeeping: drop rows that have already expired (any user), and audit
+  // entries past retention.
   await prisma.session.deleteMany({ where: { expiresAt: { lt: new Date(now) } } })
+  await pruneAuditLog()
 
   const cookieStore = await cookies()
   cookieStore.set(SESSION_COOKIE, token, {

@@ -129,6 +129,18 @@ export default function SettingsClient({
       )}
 
       {isCfo && (
+        <div style={{ marginTop: '1.5rem', padding: '1rem 1.25rem', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r)', display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: '0.85rem', fontWeight: 500 }}>Activity log</div>
+            <div style={{ fontSize: '0.74rem', color: 'var(--t2)' }}>
+              Sign-ins, security changes and edits to household data, kept for a year.
+            </div>
+          </div>
+          <Link href="/settings/activity" className="hint-link" style={{ fontSize: '0.78rem' }}>Open →</Link>
+        </div>
+      )}
+
+      {isCfo && (
       <div style={{ marginTop: '1.5rem', padding: '1.25rem', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r)' }}>
         <div style={{ fontSize: '0.875rem', fontWeight: 500, marginBottom: '0.4rem' }}>Re-run setup wizard</div>
         <p style={{ fontSize: '0.78rem', color: 'var(--t2)', marginBottom: '1rem', lineHeight: 1.5 }}>

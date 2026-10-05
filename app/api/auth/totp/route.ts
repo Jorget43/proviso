@@ -5,6 +5,7 @@ import QRCode from 'qrcode'
 import { randomBytes } from 'crypto'
 import { prisma } from '@/lib/db'
 import { getSession, hashPassword, verifyPassword } from '@/lib/auth'
+import { audit } from '@/lib/audit'
 
 const APP_NAME = 'Proviso'
 
@@ -37,6 +38,7 @@ export const POST = withErrors(async (req: Request) => {
     where: { id: session.userId },
     data:  { totpSecret: String(secret), totpRecoveryCodes: JSON.stringify(hashedCodes) },
   })
+  audit({ action: 'auth.2fa_on', userId: session.userId, username: session.username })
 
   return Response.json({ recoveryCodes: plainCodes })
 })
@@ -52,12 +54,16 @@ export const DELETE = withErrors(async (req: Request) => {
   if (!user) return Response.json({ error: 'User not found' }, { status: 404 })
 
   const ok = await verifyPassword(String(password), user.passwordHash)
-  if (!ok) return Response.json({ error: 'Incorrect password' }, { status: 401 })
+  if (!ok) {
+    audit({ action: 'auth.2fa_off_failed', userId: session.userId, username: session.username, detail: 'wrong password' })
+    return Response.json({ error: 'Incorrect password' }, { status: 401 })
+  }
 
   await prisma.user.update({
     where: { id: session.userId },
     data:  { totpSecret: null, totpRecoveryCodes: null },
   })
+  audit({ action: 'auth.2fa_off', userId: session.userId, username: session.username })
 
   return Response.json({ ok: true })
 })

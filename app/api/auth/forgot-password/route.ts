@@ -3,6 +3,7 @@ import { forgotPasswordSchema } from '@/lib/schemas'
 import { randomBytes } from 'crypto'
 import { prisma } from '@/lib/db'
 import { sendResetEmail } from '@/lib/resetEmail'
+import { audit } from '@/lib/audit'
 
 const TOKEN_TTL_MS = 60 * 60 * 1000 // 1 hour
 
@@ -15,6 +16,7 @@ export const POST = withErrors(async (req: Request) => {
   const user = await prisma.user.findUnique({ where: { username } })
 
   // Always return success — never reveal whether the username exists or has an email.
+  if (user) audit({ action: 'auth.reset_requested', userId: user.id, username: user.username, detail: user.email ? 'link emailed' : 'no email set: link in server log' })
   if (user?.email) {
     const token = randomBytes(32).toString('hex')
     await prisma.passwordReset.create({

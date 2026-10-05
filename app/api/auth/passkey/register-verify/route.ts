@@ -2,6 +2,7 @@ import { withErrors, ApiError } from '@/lib/apiHandler'
 import { getSession } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { verifyRegistrationResponse } from '@simplewebauthn/server'
+import { audit } from '@/lib/audit'
 
 function getRpParams(req: Request) {
   const rpID = process.env.WEBAUTHN_RP_ID
@@ -67,6 +68,7 @@ export const POST = withErrors(async (req: Request) => {
     select: { id: true, name: true, deviceType: true, backedUp: true, createdAt: true },
   })
 
+  audit({ action: 'auth.passkey_added', userId: user.userId, username: user.username, target: passkey.name })
   return Response.json({ passkey })
 })
 

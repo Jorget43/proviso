@@ -3,6 +3,7 @@ import { withErrors, ApiError } from '@/lib/apiHandler'
 import { prisma } from '@/lib/db'
 import { verifyAuthenticationResponse } from '@simplewebauthn/server'
 import { createSession } from '@/lib/auth'
+import { audit } from '@/lib/audit'
 
 function getRpParams(req: Request) {
   const rpID = process.env.WEBAUTHN_RP_ID
@@ -61,6 +62,7 @@ export const POST = withErrors(async (req: Request) => {
   })
 
   if (!verification.verified) {
+    audit({ action: 'auth.signin_failed', userId: passkey.userId, username: passkey.user.username, detail: 'passkey not verified' })
     return Response.json({ error: 'Verification failed' }, { status: 400 })
   }
 
@@ -71,6 +73,7 @@ export const POST = withErrors(async (req: Request) => {
   })
 
   await createSession(passkey.userId)
+  audit({ action: 'auth.signin', userId: passkey.userId, username: passkey.user.username, detail: 'passkey' })
   return Response.json({ ok: true })
 })
 
