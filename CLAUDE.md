@@ -418,7 +418,7 @@ Tracked in [`docs/security-privacy-legal.md`](docs/security-privacy-legal.md) §
 - **One net worth** (see "Net worth" under Key architecture decisions): the engine gained optional `investmentsValue` and `otherDebts`; Home's card and the Own & owe panel are both titled "Net worth". Verified: $25k cash + $40k shares − $18k HELP − $12k car loan shows $35k on Home, Own & owe and Projections.
 - 253 tests (schema, net-worth definition, engine starting point). Zero migrations.
 
-### Phase 24 — Your devices, app sign-in tokens, hashed session tokens, nonce CSP (2026-10-05)
+### Phase 24 — Your devices, app sign-in tokens, hashed session tokens, nonce CSP (2026-10-05, `v1.13.0`)
 
 - **Hashed tokens**: `Session.token` now stores the SHA-256 of the token, so a copy of the database (a backup, a stolen volume) can't be used to sign in. Migration `0003_session_devices` clears existing sessions — **everyone signs in once after updating**.
 - **Your devices** (Settings, every adult): each signed-in browser or app with a plain name from the user-agent (`lib/devices.ts`, "Safari on iPhone"), sign-in date and last activity; sign out one device or all others. `GET`/`DELETE /api/auth/sessions`, `DELETE /api/auth/sessions/[id]` — always scoped to the caller. Audited as `auth.sessions_revoked`.
