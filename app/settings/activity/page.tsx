@@ -21,6 +21,7 @@ const LABELS: Record<string, string> = {
   'auth.2fa_off_failed':  '2FA turn-off refused',
   'auth.passkey_added':   'Passkey added',
   'auth.passkey_removed': 'Passkey removed',
+  'auth.sessions_revoked': 'Device signed out',
 }
 const WARN = new Set(['auth.signin_failed', 'auth.locked', 'auth.2fa_off_failed'])
 

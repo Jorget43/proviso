@@ -193,13 +193,13 @@ All migrations must be **additive only** — `update.sh` (or Watchtower, if opte
 
 ## Auth & RBAC
 
-- **`lib/auth.ts`**: `getSession()`, `requireSession()` (throws redirect if unauthenticated). `Session.expiresAt` is the 7-day idle deadline, extended by `getSession()` at most once a day and capped at 30 days from sign-in; the cookie lives 30 days. `revokeSessions(userId, { keepCurrent })` ends a user's sessions — call it whenever a credential changes
+- **`lib/auth.ts`**: `getSession()`, `requireSession()` (throws redirect if unauthenticated). A session is presented as the `proviso_session` cookie (browser, kind `web`) or `Authorization: Bearer <token>` (native app, kind `app`); each kind is only accepted the way it was issued. `Session.token` holds the SHA-256 of the token (`hashToken`), never the token. `Session.expiresAt` is the idle deadline — web 7 days idle / 30 days max, app 30 / 90 — extended by `getSession()` at most once a day (which also moves `lastUsedAt`). Sign-in routes finish with `signInResponse(req, userId)`: cookie for the browser, `{ token, expiresAt }` in the body when the request sends `X-Proviso-Client: app`. `revokeSessions(userId, { keepCurrent })` ends a user's sessions — call it whenever a credential changes
 - **`lib/audit.ts`**: audit trail. `withErrors` opens a request context, `authorize()` names the actor, and the Prisma extension in `lib/db.ts` records every write (model, id, field names — never values). Auth routes call `audit({ action: 'auth.…' })` explicitly. New auth-type routes: wrap in `withErrors` and add an `audit()` call. Viewer: `/settings/activity` (CFO)
 - **`lib/securityHeaders.ts`**: CSP and hardening headers, applied to every route by `next.config.ts`; HSTS comes from `proxy.ts` when `COOKIE_SECURE=true`. Adding a third-party script, font, image host or API call from the browser needs a CSP change — check with the headless-browser pass described in Phase 21
 - **`proxy.ts`**: optimistic cookie gate (fast, not the security boundary); `requireSession()` is the real boundary
 - **`lib/rbac.ts`**: scopes `actuals:write`, `budget:write`, `users:write`, `child:write`; `authorize(action)` called at the top of all mutating handlers
 - **Roles**: CFO (all scopes), PARTNER (`actuals:write` only), CHILD (`child:write` only — `/child` pocket money page)
-- **60 mutating route handlers** have `authorize()` guards; update the count when adding routes. Passkey management routes (`register-options`, `register-verify`, DELETE `passkey/[id]`) use `getSession()` directly (all roles can manage their own passkeys) — they are auth-gated but not RBAC-gated.
+- **60 mutating route handlers** have `authorize()` guards; update the count when adding routes. Passkey management routes (`register-options`, `register-verify`, DELETE `passkey/[id]`) and the device routes (`/api/auth/sessions`, `/api/auth/sessions/[id]`, `/api/auth/me`) use `getSession()` directly (every role manages its own) — they are auth-gated but not RBAC-gated, and always scoped to the caller's userId.
 
 ## Roadmap
 
@@ -376,14 +376,14 @@ The assumptions watchdog (`/admin/watchdog` for the CFO when `WATCHDOG_ENABLED=t
 Tracked in [`docs/security-privacy-legal.md`](docs/security-privacy-legal.md) § Cybersecurity. Phase 21 closed headers/CSP, HSTS, the audit log, session lifetime and automated dependency updates. Left:
 - Nonce-based CSP (drop `'unsafe-inline'` from `script-src`) — needs every page rendered dynamically; most already are.
 - SQLite encryption at rest — volume-level encryption is the operator's job for now; SQLCipher would be the in-app route.
-- "Sign out other devices" / session list in Settings — `revokeSessions()` exists, there's no UI.
+- ~~"Sign out other devices" / session list in Settings~~ — done (Phase 24): Settings → Your devices.
 - `braces` (via eslint-config-next → fast-glob → micromatch): dev-only DoS advisory with no patched version yet; Dependabot will raise it when one exists.
 
 ### Mobile & ease of use (after Phase 22)
 - ~~Two "net worth" figures disagree~~ — done: one definition in `lib/netWorth.ts` (everything on Own & owe, home counted once as equity, super excluded), used by Home, Own & owe, Projections and the monthly snapshots. Snapshots before `NET_WORTH_DEFINED_FROM` used the narrower old definition, so the Projections "actual" history line may step at the switch.
 - ~~Onboarding doesn't ask the "Your situation" questions~~ — done (v1.12.0): Own/Rent on step 5, new step 6 for childcare, school fees, parental leave.
 - ~~Small-text desktop layouts on phones~~ — done (v1.12.0), checked at 390px: Own & owe rows restacked, Investments labels/dropdowns fixed, work-pattern wording plain; EOFY, Super and the school-fee controls were already fine. Remaining polish is cosmetic (parcel cards are dense).
-- Native app: the API (`app/api/*`, zod-validated, cookie auth) is already separate from the pages; a native client would need token auth alongside the cookie session.
+- ~~Native app: token auth alongside the cookie session~~ — done (Phase 24), see [`docs/app-api.md`](docs/app-api.md). Still open for the app: passkey sign-in (WebAuthn from a native app needs the platform APIs and an associated domain), and CORS if the app is ever a web view on another origin.
 
 ### Deferred (revisit only if needed)
 - `Transaction` `@@index([ym])` — premature at household scale (see Phase 15).
@@ -417,6 +417,13 @@ Tracked in [`docs/security-privacy-legal.md`](docs/security-privacy-legal.md) §
 - **Phone polish**: Own & owe rows put the name on its own line; Investments' Owner / "Plan to sell" dropdowns used the old top-bar `.nav-select` class (`display: none` on desktop until v1.11.0 — they were invisible there) and are now normal inputs; work-pattern wording plain; the What-if drawer keeps the chart readout on one row.
 - **One net worth** (see "Net worth" under Key architecture decisions): the engine gained optional `investmentsValue` and `otherDebts`; Home's card and the Own & owe panel are both titled "Net worth". Verified: $25k cash + $40k shares − $18k HELP − $12k car loan shows $35k on Home, Own & owe and Projections.
 - 253 tests (schema, net-worth definition, engine starting point). Zero migrations.
+
+### Phase 24 — Your devices, app sign-in tokens, hashed session tokens (2026-10-05)
+
+- **Hashed tokens**: `Session.token` now stores the SHA-256 of the token, so a copy of the database (a backup, a stolen volume) can't be used to sign in. Migration `0003_session_devices` clears existing sessions — **everyone signs in once after updating**.
+- **Your devices** (Settings, every adult): each signed-in browser or app with a plain name from the user-agent (`lib/devices.ts`, "Safari on iPhone"), sign-in date and last activity; sign out one device or all others. `GET`/`DELETE /api/auth/sessions`, `DELETE /api/auth/sessions/[id]` — always scoped to the caller. Audited as `auth.sessions_revoked`.
+- **App tokens**: sign-in with `X-Proviso-Client: app` returns `{ token, expiresAt }` instead of setting a cookie (password, password + authenticator code, passkey routes all go through `signInResponse`); every API route accepts `Authorization: Bearer`. App sessions last 30 days idle / 90 days max. `GET /api/auth/me` tells the app who's signed in. An app token is refused as a cookie and vice versa. Contract: [`docs/app-api.md`](docs/app-api.md).
+- **Verified** end to end against the scratch DB: browser vs app sign-in, bearer reads, app token refused as a cookie, signing out other devices kills the app token but keeps the browser, app logout, raw token absent from the DB, and one user can't sign out another's device (404). Settings panel checked at 390px. 259 tests.
 
 ## Security checklist for new features
 

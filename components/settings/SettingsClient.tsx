@@ -7,6 +7,8 @@ import Panel from '@/components/ui/Panel'
 import MembersPanel, { type Member } from './MembersPanel'
 import SecurityPanel from './SecurityPanel'
 import PasskeyPanel from './PasskeyPanel'
+import DevicesPanel from './DevicesPanel'
+import type { DeviceRow } from '@/lib/devices'
 import SituationPanel from './SituationPanel'
 import type { Situation } from '@/lib/situation'
 
@@ -25,6 +27,7 @@ interface Props {
   users:                Member[]
   hasTOTP:              boolean
   passkeys:             { id: number; name: string; deviceType: string; backedUp: boolean; createdAt: string }[]
+  devices:              DeviceRow[]
   watchdog:             { attention: number } | null
   buildVersion:         string
   buildDate:            string | null
@@ -35,7 +38,7 @@ export default function SettingsClient({
   person1FTE, person2FTE, mortgageBalance,
   superBalance, partnerSuperBalance,
   situation,
-  currentRole, currentUserId, users, hasTOTP, passkeys, watchdog, buildVersion, buildDate,
+  currentRole, currentUserId, users, hasTOTP, passkeys, devices, watchdog, buildVersion, buildDate,
 }: Props) {
   const isCfo = currentRole === 'CFO'
   const router   = useRouter()
@@ -125,6 +128,10 @@ export default function SettingsClient({
 
       <div style={{ marginTop: '1.5rem' }}>
         <PasskeyPanel initialPasskeys={passkeys} />
+      </div>
+
+      <div style={{ marginTop: '1.5rem' }}>
+        <DevicesPanel initialDevices={devices} />
       </div>
 
       {isCfo && (

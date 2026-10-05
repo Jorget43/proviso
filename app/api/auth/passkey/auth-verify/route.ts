@@ -2,7 +2,7 @@ import type { AuthenticatorTransportFuture } from '@simplewebauthn/server'
 import { withErrors, ApiError } from '@/lib/apiHandler'
 import { prisma } from '@/lib/db'
 import { verifyAuthenticationResponse } from '@simplewebauthn/server'
-import { createSession } from '@/lib/auth'
+import { signInResponse } from '@/lib/auth'
 import { audit } from '@/lib/audit'
 
 function getRpParams(req: Request) {
@@ -72,9 +72,8 @@ export const POST = withErrors(async (req: Request) => {
     data: { counter: verification.authenticationInfo.newCounter },
   })
 
-  await createSession(passkey.userId)
   audit({ action: 'auth.signin', userId: passkey.userId, username: passkey.user.username, detail: 'passkey' })
-  return Response.json({ ok: true })
+  return signInResponse(req, passkey.userId)
 })
 
 // Decode WebAuthn clientDataJSON; a malformed payload is a 400, not a 500.

@@ -1,7 +1,7 @@
 import { withErrors, parseBody } from '@/lib/apiHandler'
 import { credentialsSchema } from '@/lib/schemas'
 import { prisma } from '@/lib/db'
-import { verifyPassword, createSession } from '@/lib/auth'
+import { verifyPassword, signInResponse, sessionKindFor } from '@/lib/auth'
 import { isRateLimited } from '@/lib/loginRateLimit'
 import { audit } from '@/lib/audit'
 
@@ -67,7 +67,6 @@ export const POST = withErrors(async (req: Request) => {
     return Response.json({ requiresTOTP: true, nonce })
   }
 
-  await createSession(user.id)
-  audit({ action: 'auth.signin', userId: user.id, username: user.username, detail: 'password' })
-  return Response.json({ ok: true })
+  audit({ action: 'auth.signin', userId: user.id, username: user.username, detail: `password${sessionKindFor(req) === 'app' ? ' (app)' : ''}` })
+  return signInResponse(req, user.id)
 })

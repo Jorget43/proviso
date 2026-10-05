@@ -2,7 +2,7 @@ import { withErrors, parseBody } from '@/lib/apiHandler'
 import { totpVerifySchema } from '@/lib/schemas'
 import { verify as totpVerify } from 'otplib'
 import { prisma } from '@/lib/db'
-import { createSession, verifyPassword } from '@/lib/auth'
+import { signInResponse, sessionKindFor, verifyPassword } from '@/lib/auth'
 import { getPendingTotp, recordFailedTotp, consumePendingTotp } from '@/lib/totpPending'
 import { audit } from '@/lib/audit'
 
@@ -40,9 +40,9 @@ export const POST = withErrors(async (req: Request) => {
   }
 
   consumePendingTotp(String(nonce))
-  await createSession(userId)
-  audit({ action: 'auth.signin', userId, username: user.username, detail: isRecovery ? 'password + recovery code' : 'password + authenticator code' })
-  return Response.json({ ok: true })
+  const how = isRecovery ? 'password + recovery code' : 'password + authenticator code'
+  audit({ action: 'auth.signin', userId, username: user.username, detail: `${how}${sessionKindFor(req) === 'app' ? ' (app)' : ''}` })
+  return signInResponse(req, userId)
 })
 
 function failed(nonce: string, message: string): Response {

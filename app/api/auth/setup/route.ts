@@ -21,7 +21,8 @@ export const POST = withErrors(async (req: Request) => {
     },
   })
 
-  await createSession(user.id)
+  // First-run setup happens in the browser only.
+  await createSession(user.id, { userAgent: req.headers.get('user-agent') })
   audit({ action: 'auth.setup', userId: user.id, username: user.username, detail: 'first CFO account created' })
   return Response.json({ ok: true })
 })

@@ -1203,6 +1203,23 @@ input[type=range] { width: 100%; accent-color: var(--t3); }
 .btn-danger { color: var(--red); border-color: color-mix(in srgb, var(--red) 35%, transparent); margin-right: auto; }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
+/* ── Settings → Your devices ── */
+.devices-intro { font-size: 0.82rem; color: var(--t2); margin: 0 0 12px; line-height: 1.5; }
+.devices-list { list-style: none; margin: 0 0 12px; padding: 0; border: 1px solid var(--border); border-radius: var(--r); }
+.devices-row { display: flex; align-items: center; gap: 12px; padding: 10px 12px; }
+.devices-row + .devices-row { border-top: 1px solid var(--border); }
+.devices-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.devices-name { font-size: 0.9rem; font-weight: 500; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.devices-this {
+  font-size: 0.7rem; font-weight: 500; padding: 1px 7px; border-radius: 999px;
+  color: var(--green); background: color-mix(in srgb, var(--green) 12%, transparent);
+}
+.devices-sub { font-size: 0.76rem; color: var(--t3); }
+.devices-out { min-height: 36px; padding: 0 14px; font-size: 0.82rem; flex-shrink: 0; }
+.devices-all { width: 100%; color: var(--red); border-color: color-mix(in srgb, var(--red) 35%, transparent); }
+.devices-note { font-size: 0.78rem; color: var(--t3); margin: 0; }
+.devices-error { font-size: 0.78rem; color: var(--red); margin: 0 0 10px; }
+
 /* ── Responsive ── */
 :root { --bottom-nav-h: 0px; }
 

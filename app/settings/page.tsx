@@ -4,6 +4,7 @@ import { requireAdult } from '@/lib/auth'
 import { computeWatchdog } from '@/lib/watchdog'
 import SettingsClient from '@/components/settings/SettingsClient'
 import { loadSituation } from '@/lib/situation'
+import { listDevices } from '@/lib/devices'
 
 export default async function SettingsPage() {
   const me = await requireAdult()
@@ -16,7 +17,7 @@ export default async function SettingsPage() {
   ])
 
   // Member list is CFO-only (matches the users:write guard on the API).
-  const [userRows, currentUser, userPasskeys] = await Promise.all([
+  const [userRows, currentUser, userPasskeys, devices] = await Promise.all([
     me.role === 'CFO'
       ? prisma.user.findMany({ select: { id: true, name: true, username: true, role: true, email: true, totpSecret: true }, orderBy: { id: 'asc' } })
       : Promise.resolve([]),
@@ -26,6 +27,7 @@ export default async function SettingsPage() {
       select:  { id: true, name: true, deviceType: true, backedUp: true, createdAt: true },
       orderBy: { createdAt: 'desc' },
     }),
+    listDevices(me.userId),
   ])
   // Only a 2FA-enrolled flag reaches the client — never the TOTP secret itself.
   const users = userRows.map(({ totpSecret, ...u }) => ({ ...u, hasTOTP: !!totpSecret }))
@@ -56,6 +58,7 @@ export default async function SettingsPage() {
       users={users}
       hasTOTP={!!currentUser?.totpSecret}
       passkeys={userPasskeys.map(p => ({ ...p, createdAt: p.createdAt.toISOString() }))}
+      devices={devices}
       watchdog={watchdog}
       buildVersion={buildVersion}
       buildDate={buildDate}
