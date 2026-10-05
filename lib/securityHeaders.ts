@@ -2,18 +2,26 @@
 // HSTS is added separately in proxy.ts because it depends on COOKIE_SECURE,
 // a runtime setting, while next.config is evaluated when the image is built.
 //
-// The CSP keeps script-src 'unsafe-inline': Next's App Router hydrates with
-// inline scripts, and the alternative (a per-request nonce) forces every page
-// to be dynamic. What the policy does buy: no third-party scripts, no
-// requests to other hosts (connect-src 'self' — the browser can't exfiltrate
-// data anywhere), no framing (clickjacking), no <base>/<object> injection,
-// and forms can only post back to this app.
+// Pages get a per-request nonce (Phase 24): proxy.ts generates it and sends
+// the policy with it, and Next stamps the nonce on its own hydration scripts.
+// script-src is then "scripts carrying this page's nonce, plus whatever they
+// load" ('strict-dynamic') — an injected <script> or inline handler can't run.
+// Every page is already rendered per request, so the nonce costs nothing.
+// Responses the proxy doesn't see (API JSON, static files) get the baseline
+// policy from next.config.ts, without a nonce.
+//
+// Beyond scripts: no requests to other hosts (connect-src 'self' — the
+// browser can't exfiltrate data anywhere), no framing (clickjacking), no
+// <base>/<object> injection, and forms can only post back to this app.
 
-export function contentSecurityPolicy(dev: boolean): string {
+export function contentSecurityPolicy(dev: boolean, nonce?: string): string {
   const directives: Record<string, string[]> = {
     'default-src':     ["'self'"],
     // React's dev overlay / fast refresh evaluates code; production doesn't.
-    'script-src':      ["'self'", "'unsafe-inline'", ...(dev ? ["'unsafe-eval'"] : [])],
+    'script-src':      [
+      ...(nonce ? ["'self'", `'nonce-${nonce}'`, "'strict-dynamic'"] : ["'self'"]),
+      ...(dev ? ["'unsafe-eval'"] : []),
+    ],
     // React `style={…}` props and Tailwind's injected styles.
     'style-src':       ["'self'", "'unsafe-inline'"],
     // data: for the TOTP QR code; blob: for chart / PDF canvases.

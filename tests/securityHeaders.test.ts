@@ -17,6 +17,20 @@ describe('contentSecurityPolicy', () => {
     expect(csp).not.toMatch(/wss?:/)
   })
 
+  it('never allows inline scripts', () => {
+    for (const nonce of [undefined, 'abc123']) {
+      const scriptSrc = contentSecurityPolicy(false, nonce).split('; ').find(d => d.startsWith('script-src'))
+      expect(scriptSrc).not.toContain("'unsafe-inline'")
+    }
+  })
+
+  it('pages trust their nonce and what nonce-carrying scripts load', () => {
+    const csp = contentSecurityPolicy(false, 'abc123')
+    expect(csp).toContain("script-src 'self' 'nonce-abc123' 'strict-dynamic';")
+    // Styles stay inline-friendly: React style props. A nonce there would switch that off.
+    expect(csp).toContain("style-src 'self' 'unsafe-inline';")
+  })
+
   it('allows what the dev server needs', () => {
     const csp = contentSecurityPolicy(true)
     expect(csp).toContain("'unsafe-eval'")

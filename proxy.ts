@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { HSTS_VALUE } from './lib/securityHeaders'
+import { HSTS_VALUE, contentSecurityPolicy } from './lib/securityHeaders'
 
 // Next.js 16 renames Middleware → Proxy. This does the *optimistic* auth check
 // only: is a session cookie present? The secure DB-backed validation happens in
@@ -19,7 +19,7 @@ export function proxy(req: NextRequest) {
 function route(req: NextRequest): NextResponse {
   const { pathname } = req.nextUrl
 
-  if (PUBLIC_PATHS.includes(pathname)) return NextResponse.next()
+  if (PUBLIC_PATHS.includes(pathname)) return withNonce(req)
 
   const hasCookie = Boolean(req.cookies.get(SESSION_COOKIE)?.value)
   if (!hasCookie) {
@@ -28,7 +28,20 @@ function route(req: NextRequest): NextResponse {
     return NextResponse.redirect(url)
   }
 
-  return NextResponse.next()
+  return withNonce(req)
+}
+
+// A fresh nonce per page. Next reads the policy from the request headers and
+// puts the nonce on its scripts; the browser gets the same policy on the
+// response (it replaces the nonce-less baseline from next.config.ts).
+function withNonce(req: NextRequest): NextResponse {
+  const nonce = btoa(crypto.randomUUID())
+  const csp = contentSecurityPolicy(process.env.NODE_ENV !== 'production', nonce)
+  const requestHeaders = new Headers(req.headers)
+  requestHeaders.set('Content-Security-Policy', csp)
+  const res = NextResponse.next({ request: { headers: requestHeaders } })
+  res.headers.set('Content-Security-Policy', csp)
+  return res
 }
 
 // HSTS only when the deployment says it's behind HTTPS (the same switch as the
