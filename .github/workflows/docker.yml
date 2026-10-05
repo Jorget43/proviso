@@ -6,6 +6,10 @@ on:
       - master
     tags:
       - 'v*'
+  # Dependabot (and any other) pull requests: run the checks, never publish.
+  pull_request:
+    branches:
+      - master
 
 env:
   REGISTRY: ghcr.io
@@ -25,7 +29,7 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
       - name: Privacy scan (all commits)
         run: node scripts/privacy-scan.mjs --all --ci
 
@@ -38,17 +42,24 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
           cache: 'npm'
 
       - name: Install dependencies
         run: npm ci
+
+      # Fails on a high/critical advisory in anything that ships in the image.
+      # Dev-only tooling (eslint, vitest) is excluded: it never reaches
+      # production, and its advisories often have no non-breaking fix.
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
 
       - name: Run engine tests
         run: npm test
 
   build-and-push:
     needs: [privacy, test]
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
       contents: read

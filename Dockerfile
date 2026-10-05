@@ -1,11 +1,11 @@
 # ── Stage 1: deps ──────────────────────────────────────────────────────────
-FROM node:20-slim AS deps
+FROM node:24-bookworm-slim AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 
 # ── Stage 2: build ─────────────────────────────────────────────────────────
-FROM node:20-slim AS builder
+FROM node:24-bookworm-slim AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
@@ -32,7 +32,7 @@ FROM builder AS pruner
 RUN npm prune --omit=dev
 
 # ── Stage 4: runner ────────────────────────────────────────────────────────
-FROM node:20-slim AS runner
+FROM node:24-bookworm-slim AS runner
 WORKDIR /app
 
 RUN apt-get update -y && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*

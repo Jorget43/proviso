@@ -1,0 +1,46 @@
+# Automated dependency updates. Dependabot opens a pull request; CI runs the
+# privacy scan, audit and tests on it; nothing is published until it's merged.
+#
+# Minor and patch updates are grouped into one PR per ecosystem per week.
+# Major updates are ignored here — they're done deliberately (read the
+# changelog, run the app). Security updates (enabled in the repo's
+# Settings → Code security) still arrive as their own PRs.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "07:00"
+      timezone: Australia/Sydney
+    open-pull-requests-limit: 5
+    groups:
+      npm-minor-and-patch:
+        update-types: [minor, patch]
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "07:00"
+      timezone: Australia/Sydney
+    groups:
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "07:00"
+      timezone: Australia/Sydney
+    ignore:
+      # Node major versions are a deliberate move to the next LTS.
+      - dependency-name: node
+        update-types: ["version-update:semver-major"]
