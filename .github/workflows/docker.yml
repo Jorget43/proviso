@@ -54,6 +54,12 @@ jobs:
       - name: Audit production dependencies
         run: npm audit --omit=dev --audit-level=high
 
+      # The image build runs `npm prune --omit=dev`, which re-resolves the
+      # whole tree and fails on peer conflicts that `npm ci` tolerates. Pull
+      # requests don't build the image, so check it here.
+      - name: Check the production prune resolves
+        run: npm prune --omit=dev --dry-run
+
       - name: Run engine tests
         run: npm test
 
