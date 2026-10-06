@@ -25,6 +25,8 @@ interface Props {
   context:           ProjectionContext
   mortgage:          MortgageContext
   budgetAnnualSpend: number
+  /** Today's spending without the home loan and children's costs, a year (@proviso/core/future). */
+  retirementSpend:   number
   person1Name:       string
   person2Name:       string
   superHistory:      SuperHistoryItem[]
@@ -34,7 +36,7 @@ interface Props {
 
 type Field = keyof HouseholdSuperInputs
 
-export default function SuperClient({ canEdit, initial, context, mortgage, budgetAnnualSpend, person1Name, person2Name, superHistory, isRenting, rentMonthly }: Props) {
+export default function SuperClient({ canEdit, initial, context, mortgage, budgetAnnualSpend, retirementSpend, person1Name, person2Name, superHistory, isRenting, rentMonthly }: Props) {
   const [inputs, setInputs] = useState<HouseholdSuperInputs>(initial)
   const [saving, setSaving]  = useState(false)
   // Reported by ConcessionalCarryForward as the user edits their history —
@@ -92,8 +94,10 @@ export default function SuperClient({ canEdit, initial, context, mortgage, budge
   const mortgageYearsBefore  = person1RetirementYear - mortgage.mortgageEndYear
   const mortgageYearsAfter   = mortgage.mortgageEndYear - person1RetirementYear
   const mortgageAnnual       = mortgage.mortgagePaymentMonthly * 12
-  const suggestedIncome      = mortgagePaidOff && mortgageAnnual > 0
-    ? Math.max(0, Math.round((inputs.desiredRetirementIncome - mortgageAnnual) / 1000) * 1000)
+  // Once the loan is paid off, spending without it (and the children) is the
+  // natural target; suggest it while the goal is still well above it.
+  const suggestedIncome      = mortgagePaidOff && mortgageAnnual > 0 && inputs.desiredRetirementIncome > retirementSpend + 1000
+    ? retirementSpend
     : null
 
   // Inflation-adjusted nominal equivalent at person 1 retirement
@@ -275,11 +279,11 @@ export default function SuperClient({ canEdit, initial, context, mortgage, budge
             )}
 
             {/* Budget spend hint */}
-            {budgetAnnualSpend > 0 && inputs.desiredRetirementIncome !== budgetAnnualSpend && (
-              <div style={{ marginTop: 6, fontSize: '0.72rem', color: 'var(--t3)', display: 'flex', alignItems: 'center', gap: 6 }}>
-                Current annual spend: ${budgetAnnualSpend.toLocaleString('en-AU')}
-                <button className="hint-link" onClick={() => set('desiredRetirementIncome', budgetAnnualSpend)}>
-                  Use budget ↺
+            {budgetAnnualSpend > 0 && inputs.desiredRetirementIncome !== retirementSpend && (
+              <div style={{ marginTop: 6, fontSize: '0.72rem', color: 'var(--t3)', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                Spending now: ${budgetAnnualSpend.toLocaleString('en-AU')} a year, or ${retirementSpend.toLocaleString('en-AU')} without the home loan and children
+                <button className="hint-link" onClick={() => set('desiredRetirementIncome', retirementSpend)}>
+                  Use ${retirementSpend.toLocaleString('en-AU')} ↺
                 </button>
               </div>
             )}
@@ -289,7 +293,7 @@ export default function SuperClient({ canEdit, initial, context, mortgage, budge
               <div className="super-hint">
                 <span>
                   Mortgage clears {mortgage.mortgageEndYear} ({mortgageYearsBefore} yr before retirement).
-                  Without the ${Math.round(mortgage.mortgagePaymentMonthly / 1000)}k/mo repayment,
+                  Without the ${Math.round(mortgage.mortgagePaymentMonthly / 1000)}k/mo repayment (and the children&rsquo;s costs),
                   consider a lower target:
                 </span>
                 <button className="hint-link" onClick={() => set('desiredRetirementIncome', suggestedIncome)}>

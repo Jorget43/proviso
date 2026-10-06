@@ -74,6 +74,7 @@ export default async function SuperPage() {
       context={context}
       mortgage={mortgageContext}
       budgetAnnualSpend={budgetAnnualSpend}
+      retirementSpend={Math.round(spendingInRetirement(budget, expenses) * 12 / 1000) * 1000}
       person1Name={hs?.person1Name ?? 'Person 1'}
       person2Name={hs?.person2Name ?? 'Person 2'}
       superHistory={superHistory}
