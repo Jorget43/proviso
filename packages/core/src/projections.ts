@@ -8,7 +8,7 @@ import { calcAfterTax, calcHELPRepayment } from './tax';
 import { simulateMortgageYear, computeMonthlyRepayment } from './mortgage';
 import { schoolFeesForYear, type FeeSchedule } from './schoolFees';
 import { lifePhaseCostForYear } from './lifephases';
-import type { LifePhase }       from './lifephases';
+import type { LifePhaseOverlay } from './lifephases';
 import { PPL_TOTAL, NEAR_TERM_INFLATION_HORIZON } from './constants';
 
 export interface WorkPhase {
@@ -84,7 +84,7 @@ export interface ProjectionInputs {
   sfSchedule?:        FeeSchedule;
 
   // Life phase overlays (the mutable set from DB or defaults)
-  lifePhases:         LifePhase[];
+  lifePhases:         LifePhaseOverlay[];
 
   // Starting year (2026 at launch; current year used for phase lookup)
   currentYear:        number;
@@ -116,6 +116,8 @@ export interface ProjectionResult {
   phaseArr:       number[];
   deficitArr:     number[];
   cashRunningArr: number[];
+  /** Shortfalls not covered by cash or investments, carried as money owed (in net worth). */
+  owedArr:        number[];
   mortStressArr:  number[];
   sfC1Arr:        number[];
   sfC2Arr:        number[];
@@ -205,6 +207,9 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
     let pVal      = rentMode ? 0 : propValue;
     let cash      = cashOnHand;
     let invest    = Math.max(0, inputs.investmentsValue ?? 0);
+    // Spending that cash and investments couldn't cover: carried as money
+    // owed (a redraw, a card) until later surpluses repay it.
+    let owed      = 0;
     const crypto  = cryptoValue;
     const otherDebts = Math.max(0, inputs.otherDebts ?? 0);
     let p1HELP    = person1HasHELP ? Math.max(0, inputs.person1HELPBalance) : 0;
@@ -230,6 +235,7 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
     const phaseArr:       number[] = [];
     const deficitArr:     number[] = [];
     const cashRunningArr: number[] = [];
+    const owedArr:        number[] = [];
     const mortStressArr:  number[] = [];
     const sfC1Arr:        number[] = [];
     const sfC2Arr:        number[] = [];
@@ -351,21 +357,33 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
       rentArr.push(Math.round(rentAnnual));
       if (isRenting) rentAnnual *= (1 + rentIncreaseRate / 100);
 
-      // Deduct one-offs (lump sum during the year)
-      cash = Math.max(0, cash - oneoffTotal);
+      // ── Shortfalls ──
+      // Months cash couldn't cover, and one-offs beyond the cash left, come
+      // out of investments first; anything more is carried as money owed.
+      // (Flooring cash at 0 alone would make a shortfall simply vanish.)
+      const fromCash = Math.min(cash, oneoffTotal);
+      cash -= fromCash;
+      const gap        = mortResult.unfunded + (oneoffTotal - fromCash);
+      const fromInvest = Math.min(invest, gap);
+      invest -= fromInvest;
+      owed   += gap - fromInvest;
 
-      // ── Invest surplus ──
+      // ── Invest surplus ── (after repaying anything owed)
+      const repaid          = Math.min(owed, cash);
+      owed -= repaid;
+      cash -= repaid;
       const surplusThisYear = annualInc - annualExp - oneoffTotal;
-      const invested        = Math.max(0, surplusThisYear) * sR;
+      const invested        = Math.max(0, surplusThisYear - repaid) * sR;
       cash    = Math.max(0, cash - invested);
       invest  = invest * (1 + iR) + invested;
 
       const equity = pVal - mb;
-      const nw     = equity + cash + invest + crypto - p1HELP - p2HELP - otherDebts;
+      const nw     = equity + cash + invest + crypto - p1HELP - p2HELP - otherDebts - owed;
 
       phaseArr.push(Math.round(phaseOverlay));
       deficitArr.push(Math.round(annualInc - annualExp));
       cashRunningArr.push(Math.round(cash));
+      owedArr.push(Math.round(owed));
 
       // Mortgage stress: annual repayments / gross household income (standard AU definition)
       const p1GrossForStress = p1GrossBase * Math.pow(1 + jG, i + 1) * (p1Phase.days / 5);
@@ -389,7 +407,7 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
 
     return {
       nwArr, incArr, expArr, mortArr, cashArr, investArr,
-      person1Arr, person2Arr, phaseArr, deficitArr, cashRunningArr, mortStressArr,
+      person1Arr, person2Arr, phaseArr, deficitArr, cashRunningArr, owedArr, mortStressArr,
       sfC1Arr, sfC2Arr, sfSibArr, sfTotalArr, leaveYrs, person1HelpClearedYr, person2HelpClearedYr,
       rentArr, purchaseYr,
     };

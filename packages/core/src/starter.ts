@@ -262,10 +262,10 @@ export interface StarterHousehold {
   mortgage:   { balance: number; rate: number; payment: number; offsetBal: number; endDate: string } | null
   projection: {
     parentalLeaveEnabled: false
-    // School fees are in the budget as lines (estimateLivingCosts), so the
-    // projection's own school-fee model stays off until the Future screen
-    // decides how the two meet. The children's start years are kept for it.
-    schoolFeesOn: false
+    // School costs are in today's budget as lines (estimateLivingCosts). The
+    // projection models the two eldest children's fees year by year instead,
+    // ending after Year 12, and leaves their lines out (core/future.ts).
+    schoolFeesOn: boolean
     sfC1Start: number; sfC2Start: number; sfPresetKey: string | null
   }
   expenses:   { cat: string; name: string; freq: Freq; amt: number }[]
@@ -315,7 +315,7 @@ export function buildStarterHousehold(a: StarterAnswers, lines: StarterLine[], n
       endDate: `${year + a.home.mortgageYears}-${String(now.getMonth() + 1).padStart(2, '0')}-01`,
     } : null,
     projection: {
-      parentalLeaveEnabled: false, schoolFeesOn: false,
+      parentalLeaveEnabled: false, schoolFeesOn: a.schoolType !== null && schooling.length > 0,
       sfC1Start: schooling[0] ? startYear(schooling[0].child.age) : year + 6,
       sfC2Start: schooling[1] ? startYear(schooling[1].child.age) : year + 9,
       sfPresetKey: a.schoolType && a.children.length ? `${loc}|${a.schoolType}` : null,

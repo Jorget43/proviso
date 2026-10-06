@@ -30,8 +30,8 @@ export default function RootLayout() {
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="welcome" />
           <Stack.Screen name="setup" />
-          {/* Forms over a tab: a cost, pay, something you own or owe, the loan, super */}
-          {['expense', 'income', 'item', 'loan', 'super'].map(name => <Stack.Screen key={name} name={name} options={sheet} />)}
+          {/* Forms over a tab */}
+          {['expense', 'income', 'item', 'loan', 'super', 'assumptions', 'oneoff'].map(name => <Stack.Screen key={name} name={name} options={sheet} />)}
         </Stack>
       </DataProvider>
     </SafeAreaProvider>

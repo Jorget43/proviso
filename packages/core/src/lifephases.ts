@@ -5,6 +5,9 @@
 
 import { MODEL_BASE_YEAR } from './constants';
 
+/** What the projection needs from a life phase (no id: the NAS and the app key them differently). */
+export type LifePhaseOverlay = Omit<LifePhase, 'id' | 'sortOrder'>
+
 export interface LifePhase {
   id:          number;
   name:        string;
@@ -31,7 +34,7 @@ export interface LifePhase {
  */
 export function lifePhaseCostForYear(
   yr:                number,
-  phases:            LifePhase[],
+  phases:            LifePhaseOverlay[],
   inflRate:          number,
   childcareInflRate: number = inflRate,
   baseYear:          number = MODEL_BASE_YEAR,

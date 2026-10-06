@@ -4,7 +4,9 @@
 
 import { computeHomeOverview, type HomeOverview } from '@proviso/core/overview'
 import { computeBudgetSummary, isManagedChildcare } from '@proviso/core/budgetSummary'
-import { workDaysForYear } from '@proviso/core/projections'
+import { workDaysForYear, runProjections } from '@proviso/core/projections'
+import { projectionBaseline, buildProjectionInputs, feeScheduleFor, superInputsFor } from '@proviso/core/future'
+import { runHouseholdProjection } from '@proviso/core/super'
 import { situationFrom, situationLabels } from '@proviso/core/situation'
 import { toMonthly } from '@proviso/core/formatting'
 import { netPositionOf, computeCashOnHand, isHomeEquity } from '@proviso/core/netWorth'
@@ -189,5 +191,96 @@ export function wealthView(h: HouseholdData, now: Date): WealthView {
       person: x.person, name: x.name,
       balance: h.superSettings[`person${x.n}Balance`], retirementAge: h.superSettings[`person${x.n}RetirementAge`],
     })),
+  }
+}
+
+// ── Future ───────────────────────────────────────────────────────────────────
+
+export interface FutureMilestone { year: number; text: string; tone: 'good' | 'neutral' | 'bad' }
+
+export interface FutureView {
+  years:          number
+  labels:         string[]
+  /** Net worth at the end of each year, in that year's dollars. */
+  netWorth:       number[]
+  netWorthToday:  number
+  endNetWorth:    number
+  /** endNetWorth in today's money (long-run inflation taken out). */
+  endNetWorthReal: number
+  /** Years when more goes out than comes in. */
+  shortYears:     string[]
+  /** When savings and investments run out and spending is borrowed: the year it starts, and what's owed at the end. */
+  borrowing:      { from: string; owedAtEnd: number } | null
+  milestones:     FutureMilestone[]
+  schoolFees:     { on: boolean; total: number }
+  retirement: {
+    people: { name: string; age: number; year: number; balanceToday: number }[]
+    /** Monthly income the goal asks for, today's dollars. */
+    goalMonthly:  number
+    /** Age (person 1) when combined super runs out; null = lasts past 100. */
+    runsOutAt:    number | null
+  }
+  assumptions: { salaryGrowth: number; inflation: number; investReturn: number; savingsRate: number; propGrowth: number }
+}
+
+export function futureView(h: HouseholdData, now: Date): FutureView {
+  const year = now.getFullYear()
+  const p = phases(h)
+  const s = h.projection
+  const baseline = projectionBaseline({
+    expenses: h.expenses, annualExpenses: h.annualExpenses, income: h.income, childcare: h.childcare,
+    rentMonthly: rentMonthly(h),
+    person1Days: workDaysForYear(p.p1, year), person2Days: workDaysForYear(p.p2, year),
+    partnerEnabled: h.settings.partnerEnabled,
+    person1Name: h.settings.person1Name, person2Name: h.settings.person2Name,
+    debts: h.debts, assets: h.assets, mortgage: h.mortgage,
+  })
+  const out = runProjections(buildProjectionInputs(baseline, {
+    income: h.income, settings: s,
+    person1Phases: p.p1, person2Phases: p.p2,
+    oneoffs: h.oneOffs, lifePhases: h.lifePhases,
+    sfSchedule: feeScheduleFor(s.sfPresetKey, h.schoolFeeLevels),
+    rent: h.rent, mortgage: { rate: h.mortgage?.rate ?? 0, payment: h.mortgage?.payment ?? 0 },
+    currentYear: year,
+  }))
+  const run = out.withFees ?? out.base
+  const end = run.nwArr[run.nwArr.length - 1] ?? baseline.netWorthToday
+  const deflate = Math.pow(1 + s.expInfl / 100, run.nwArr.length)
+
+  const milestones: FutureMilestone[] = []
+  const cleared = run.mortArr.findIndex(v => v <= 0)
+  if (baseline.mortBalance > 0 && !h.rent.enabled && cleared >= 0) milestones.push({ year: Number(out.labels[cleared]), text: 'Home loan paid off', tone: 'good' })
+  if (run.purchaseYr) milestones.push({ year: run.purchaseYr, text: 'You buy your home', tone: 'neutral' })
+  if (run.person1HelpClearedYr) milestones.push({ year: run.person1HelpClearedYr, text: `${h.settings.person1Name}’s HELP debt cleared`, tone: 'good' })
+  if (run.person2HelpClearedYr) milestones.push({ year: run.person2HelpClearedYr, text: `${h.settings.person2Name}’s HELP debt cleared`, tone: 'good' })
+  if (s.schoolFeesOn) {
+    const feeYears = out.labels.filter((_, i) => run.sfTotalArr[i] > 0)
+    if (feeYears.length) milestones.push({ year: Number(feeYears[feeYears.length - 1]), text: 'Last year of school fees', tone: 'good' })
+  }
+  milestones.sort((a, b) => a.year - b.year)
+
+  const sup = superInputsFor(h.superSettings, h.settings.partnerEnabled, baseline.retirementMonthly, h.income, s)
+  const r = runHouseholdProjection(sup.inputs, { ...sup.ctx, startYear: year })
+  const people = [
+    { name: h.settings.person1Name, age: h.superSettings.person1RetirementAge, from: h.income.person1Age, res: r.person1 },
+    ...(h.settings.partnerEnabled && r.person2 ? [{ name: h.settings.person2Name, age: h.superSettings.person2RetirementAge, from: h.income.person2Age, res: r.person2 }] : []),
+  ]
+
+  return {
+    years: run.nwArr.length, labels: out.labels, netWorth: run.nwArr,
+    netWorthToday: baseline.netWorthToday, endNetWorth: end, endNetWorthReal: end / deflate,
+    shortYears: out.labels.filter((_, i) => run.deficitArr[i] < 0),
+    borrowing: (() => {
+      const i = run.owedArr.findIndex(v => v > 0)
+      return i < 0 ? null : { from: out.labels[i], owedAtEnd: run.owedArr[run.owedArr.length - 1] }
+    })(),
+    milestones,
+    schoolFees: { on: s.schoolFeesOn, total: s.schoolFeesOn ? run.sfTotalArr.reduce((t, v) => t + v, 0) : 0 },
+    retirement: {
+      people: people.map(x => ({ name: x.name, age: x.age, year: year + (x.age - x.from), balanceToday: x.res.retirementBalancePV })),
+      goalMonthly: r.monthlyIncomeGoal,
+      runsOutAt: r.combinedDepletionAge,
+    },
+    assumptions: { salaryGrowth: s.person1Growth, inflation: s.expInfl, investReturn: s.investReturn, savingsRate: s.savingsRate, propGrowth: s.propGrowth },
   }
 }

@@ -21,7 +21,7 @@ import {
 function expectShape(r: ProjectionResult, years: number) {
   expect(Object.keys(r).sort()).toEqual([
     'cashArr', 'cashRunningArr', 'deficitArr', 'expArr', 'incArr',
-    'investArr', 'leaveYrs', 'mortArr', 'mortStressArr', 'nwArr', 'person1Arr',
+    'investArr', 'leaveYrs', 'mortArr', 'mortStressArr', 'nwArr', 'owedArr', 'person1Arr',
     'person1HelpClearedYr', 'person2Arr', 'person2HelpClearedYr', 'phaseArr', 'purchaseYr', 'rentArr', 'sfC1Arr', 'sfC2Arr',
     'sfSibArr', 'sfTotalArr',
   ])
@@ -366,5 +366,36 @@ describe('runProjections — S10 empty phase arrays (crash regression)', () => {
     expect(() => runProjections(makeProjectionInputs({ person1Phases: [] }))).not.toThrow()
     const { base } = runProjections(makeProjectionInputs({ person1Phases: [] }))
     expect(base.person1Arr).toEqual([91080, 91080, 91080, 91080, 91080])
+  })
+})
+
+describe('shortfalls', () => {
+  // A household spending more than it earns: the gap must show in net worth,
+  // not vanish when cash reaches zero.
+  const short = (over = {}) => makeProjectionInputs({
+    mortBalance: 0, propValue: 0, cashOnHand: 10_000, investmentsValue: 30_000,
+    baseMonthlyExpenses: 20_000, projYears: 5, savingsRate: 0, ...over,
+  })
+
+  it('draws on investments, then carries the rest as money owed', () => {
+    const r = runProjections(short()).base
+    const income = r.incArr[0], spent = r.expArr[0]
+    expect(spent).toBeGreaterThan(income)
+    expect(r.cashArr[0]).toBe(0)
+    expect(r.owedArr.at(-1)!).toBeGreaterThan(0)
+    // Net worth falls each year by roughly the gap (no investment growth left to offset it).
+    expect(r.nwArr.at(-1)!).toBeLessThan(r.nwArr[0])
+    expect(r.nwArr.at(-1)!).toBeLessThan(0)
+  })
+
+  it('a one-off cost lowers net worth even when cash has run out', () => {
+    const without = runProjections(short()).base
+    const withCar = runProjections(short({ oneoffs: [{ name: 'Car', amt: 40_000, year: 2028 }] })).base
+    expect(without.nwArr.at(-1)! - withCar.nwArr.at(-1)!).toBeCloseTo(40_000, -2)
+  })
+
+  it('a household with a surplus never owes anything', () => {
+    const r = runProjections(makeProjectionInputs()).base
+    expect(r.owedArr.every(v => v === 0)).toBe(true)
   })
 })

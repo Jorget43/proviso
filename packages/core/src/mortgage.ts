@@ -32,6 +32,7 @@ export interface MortgageYearResult {
   annualInterest:  number;
   annualPrincipal: number;
   annualPaid:      number;  // repayments actually made (0 once the loan is cleared)
+  unfunded:        number;  // spending cash couldn't cover (cash stops at 0); the caller funds or carries it
 }
 
 /**
@@ -57,6 +58,7 @@ export function simulateMortgageYear(
   let annualInterest  = 0;
   let annualPrincipal = 0;
   let annualPaid      = 0;
+  let unfunded        = 0;
 
   for (let mo = 0; mo < 12; mo++) {
     let paid = 0;
@@ -71,10 +73,10 @@ export function simulateMortgageYear(
     }
     annualPaid += paid;
     cash       += monthlyNetFlow - paid;
-    cash        = Math.max(0, cash);
+    if (cash < 0) { unfunded += -cash; cash = 0; }
   }
 
-  return { endBalance: mb, endCash: cash, annualInterest, annualPrincipal, annualPaid };
+  return { endBalance: mb, endCash: cash, annualInterest, annualPrincipal, annualPaid, unfunded };
 }
 
 /**

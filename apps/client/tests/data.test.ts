@@ -13,7 +13,8 @@ import { homeView, spendingView } from '@/data/views'
 import { saveCost, removeCost, kindOf, type CostDraft } from '@/data/costs'
 import { startHousehold, savePay } from '@/data/setup'
 import { saveAsset, removeAsset, saveDebt, saveLoan, saveSuper } from '@/data/wealth'
-import { wealthView } from '@/data/views'
+import { wealthView, futureView } from '@/data/views'
+import { saveAssumptions, saveOneOff, removeOneOff } from '@/data/future'
 import { estimateLivingCosts, buildStarterHousehold, type StarterAnswers } from '@proviso/core/starter'
 
 // The app's data layer against a real SQLite (node:sqlite), migrated with the
@@ -215,7 +216,7 @@ describe('setting up a new household', () => {
     const v = homeView(h, NOW)
     expect(v.noIncome).toBe(false)
     expect(v.budget.childcareNet).toBeGreaterThan(0)
-    expect(v.situation).toEqual(['With Sam', 'Own our home', 'Paying for childcare'])
+    expect(v.situation).toEqual(['With Sam', 'Own our home', 'Paying for childcare', 'Planning school fees'])
   })
 
   it('replaces a household that was started but never set up', async () => {
@@ -316,5 +317,67 @@ describe('wealth', () => {
     const db = await setUp()
     await saveSuper(db, { person1Balance: 95_000, person1RetirementAge: 65 })
     expect(wealthView(await loadHousehold(db), NOW).super[0]).toMatchObject({ balance: 95_000, retirementAge: 65 })
+  })
+})
+
+describe('future', () => {
+  const family: StarterAnswers = {
+    state: 'vic', regional: false,
+    you: { name: 'Alex', age: 38, salary: 130_000, days: 5, hasHelp: true, helpBalance: 12_000, superBalance: 120_000 },
+    partner: { name: 'Sam', age: 36, salary: 95_000, days: 4, hasHelp: false, helpBalance: 0, superBalance: 80_000 },
+    children: [{ age: 6, childcareDays: 0 }, { age: 9, childcareDays: 0 }], schoolType: 'independent',
+    home: { kind: 'mortgage', weeklyRent: 0, mortgageBalance: 600_000, mortgageRate: 6, mortgageYears: 15, homeValue: 1_100_000 },
+    cars: 2, cash: 40_000, investments: 20_000,
+  }
+  async function setUp() {
+    const { db } = await migratedTestDb()
+    await startHousehold(db, buildStarterHousehold(family, estimateLivingCosts(family), NOW))
+    return db
+  }
+
+  it('projects net worth, milestones and retirement from the household', async () => {
+    const db = await setUp()
+    const v = futureView(await loadHousehold(db), NOW)
+    expect(v.years).toBe(20)
+    expect(v.netWorth).toHaveLength(20)
+    expect(v.netWorthToday).toBe(40_000 + 20_000 + 500_000 - 12_000)
+    expect(v.schoolFees.on).toBe(true)
+    expect(v.schoolFees.total).toBeGreaterThan(0)
+    expect(v.milestones.map(m => m.text)).toEqual(expect.arrayContaining(['Home loan paid off', 'Alex’s HELP debt cleared', 'Last year of school fees']))
+    expect(v.retirement.people.map(p => p.name)).toEqual(['Alex', 'Sam'])
+    expect(v.retirement.people[0].year).toBe(2026 + 67 - 38)
+    expect(v.retirement.goalMonthly).toBeGreaterThan(0)
+  })
+
+  it('school costs aren’t counted twice: the fee model on ends higher than lines plus model', async () => {
+    const db = await setUp()
+    const on = futureView(await loadHousehold(db), NOW)
+    // Turning the model off keeps the budget lines, flat (inflated) for all 20 years.
+    const h = await loadHousehold(db)
+    await saveAssumptions(db, { person1Growth: h.projection.person1Growth, person2Growth: h.projection.person2Growth, expInfl: h.projection.expInfl,
+      investReturn: h.projection.investReturn, savingsRate: h.projection.savingsRate, propGrowth: h.projection.propGrowth, projYears: 20, schoolFeesOn: false }, 0)
+    const off = futureView(await loadHousehold(db), NOW)
+    expect(off.schoolFees.on).toBe(false)
+    expect(on.endNetWorth).not.toBe(off.endNetWorth)
+  })
+
+  it('a one-off cost lowers the end net worth; removing it restores it', async () => {
+    const db = await setUp()
+    const before = futureView(await loadHousehold(db), NOW).endNetWorth
+    const id = await saveOneOff(db, null, { name: 'New car', amt: 50_000, year: 2028 })
+    expect(futureView(await loadHousehold(db), NOW).endNetWorth).toBeLessThan(before)
+    await removeOneOff(db, id)
+    expect(futureView(await loadHousehold(db), NOW).endNetWorth).toBe(before)
+  })
+
+  it('saves the assumptions and the retirement goal', async () => {
+    const db = await setUp()
+    await saveAssumptions(db, { person1Growth: 2, person2Growth: 2, expInfl: 3, investReturn: 6, savingsRate: 80, propGrowth: 4, projYears: 30, schoolFeesOn: true }, 90_000)
+    const h = await loadHousehold(db)
+    expect(h.projection).toMatchObject({ expInfl: 3, expInflNear: 3, projYears: 30, savingsRate: 80 })
+    expect(h.superSettings.desiredRetirementIncome).toBe(90_000)
+    const v = futureView(h, NOW)
+    expect(v.years).toBe(30)
+    expect(v.retirement.goalMonthly).toBe(7_500)
   })
 })

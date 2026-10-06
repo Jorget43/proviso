@@ -1,7 +1,8 @@
 'use client'
 import { useState, useMemo, useCallback } from 'react'
 import { fmtK } from '@proviso/core/formatting'
-import { runProjections, type ProjectionInputs } from '@proviso/core/projections'
+import { runProjections } from '@proviso/core/projections'
+import { buildProjectionInputs, type ProjectionBaseline } from '@proviso/core/future'
 import { type FeeSchedule } from '@proviso/core/schoolFees'
 import { LOCATION_OPTIONS, presetScheduleFor, presetTotalFor } from '@proviso/core/educationCosts'
 
@@ -75,20 +76,10 @@ interface ProjectionsClientProps {
   initialLifePhases:    LifePhase[]
   initialFeeSchedule:   FeeRow[]
   income:               IncSettings
-  baseMonthlyExpenses:  number
-  budgetMortgageMonthly: number
-  person1HELPBalance:   number
-  person2HELPBalance:   number
-  mortBalance:          number
+  baseline:             ProjectionBaseline   // today's position, from @proviso/core/future
   mortRate:             number
   mortPayment:          number
   mortEndDate:          string
-  cashOnHand:           number
-  propValue:            number
-  cryptoValue:          number
-  investmentsValue:     number   // other assets (shares etc.) — starting investments
-  otherDebts:           number   // debts besides the mortgage and modelled HELP
-  netWorthToday:        number   // lib/netWorth — same figure as Home and Own & owe
   currentYear:          number
   person1Name:          string
   person2Name:          string
@@ -144,9 +135,7 @@ function Slider({ label, hint, min, max, step, value, cls, fmt: fmtFn = (v: numb
 export default function ProjectionsClient({
   canEdit,
   initialSettings, initialPerson1Phases, initialPerson2Phases, initialOneoffs, initialLifePhases, initialFeeSchedule,
-  income, baseMonthlyExpenses, budgetMortgageMonthly, person1HELPBalance, person2HELPBalance,
-  mortBalance, mortRate, mortPayment, mortEndDate,
-  cashOnHand, propValue, cryptoValue, investmentsValue, otherDebts, netWorthToday, currentYear,
+  income, baseline, mortRate, mortPayment, mortEndDate, currentYear,
   person1Name, person2Name, initialRentSettings, initialSnapshots,
 }: ProjectionsClientProps) {
   const [settings,       setSettings]       = useState<ProjSettings>(initialSettings)
@@ -177,70 +166,12 @@ export default function ProjectionsClient({
     })
   }, [feeRows])
 
-  // While a mortgage is modelled, the engine pays it (un-inflated, stopping at
-  // payoff), so the Budget's mortgage line comes out of the inflating expense
-  // base. If no scheduled repayment is recorded, fall back to the Budget line.
-  const modelsMortgage   = !rentSt.enabled && mortBalance > 0
-  const effectivePayment = mortPayment > 0 ? mortPayment : budgetMortgageMonthly
-  const expensesExMortgage = modelsMortgage
-    ? Math.max(0, baseMonthlyExpenses - budgetMortgageMonthly)
-    : baseMonthlyExpenses
-
-  const inputs = useMemo<ProjectionInputs>(() => ({
-    person1FTE:           income.person1FTE,
-    person2FTE:           income.person2FTE,
-    taxMode:              income.taxMode,
-    // HELP is modelled whenever a balance is recorded on the Debts tab —
-    // repayments are compulsory, whatever the Budget toggle says.
-    person1HasHELP:       person1HELPBalance > 0,
-    person1HELPBalance,
-    person2HasHELP:       person2HELPBalance > 0,
-    person2HELPBalance,
-    person1MonthlyNet:    income.person1MonthlyNet,
-    person2MonthlyNet:    income.person2MonthlyNet,
-    person1GrowthRate:    settings.person1Growth,
-    person2GrowthRate:    settings.person2Growth,
-    expInflNear:          settings.expInflNear,
-    expInfl:              settings.expInfl,
-    childcareInfl:        settings.childcareInfl,
-    propGrowth:           settings.propGrowth,
-    savingsRate:          settings.savingsRate,
-    investReturn:         settings.investReturn,
-    projYears:            settings.projYears,
-    mortBalance,
-    mortRate,
-    mortPayment:          effectivePayment,
-    cashOnHand,
-    propValue,
-    cryptoValue,
-    investmentsValue,
-    otherDebts,
-    person1Phases,
-    person2Phases,
-    baseMonthlyExpenses:  expensesExMortgage,
-    oneoffs,
-    parentalLeaveEnabled: settings.parentalLeaveEnabled,
-    schoolFeesOn:         settings.schoolFeesOn,
-    sfC1Start:            settings.sfC1Start,
-    sfC1ExitIdx:          settings.sfC1ExitIdx,
-    sfC2Start:            settings.sfC2Start,
-    sfC2ExitIdx:          settings.sfC2ExitIdx,
-    sfInfl:               settings.sfInfl,
-    sfSchedule:           sfSchedule,
-    lifePhases,
-    currentYear,
-    rentMode:              rentSt.enabled,
-    monthlyRent:           rentSt.monthlyRent,
-    rentIncreaseRate:      rentSt.annualIncreaseRate,
-    purchasePlanEnabled:   rentSt.purchasePlanEnabled,
-    targetPurchaseYear:    rentSt.targetPurchaseYear,
-    targetPropertyValue:   rentSt.targetPropertyValue,
-    depositPct:            rentSt.depositPct,
-    depositFromCash:       rentSt.depositFromCash,
-    depositFromInvestments: rentSt.depositFromInvestments,
-    newMortgageRate:       rentSt.newMortgageRate,
-    newMortgageTermYrs:    rentSt.newMortgageTermYrs,
-  }), [settings, person1Phases, person2Phases, oneoffs, lifePhases, income, sfSchedule, expensesExMortgage, mortBalance, mortRate, effectivePayment, person1HELPBalance, person2HELPBalance, cashOnHand, propValue, cryptoValue, investmentsValue, otherDebts, currentYear, rentSt])
+  // Assembled by @proviso/core/future, the same as the app's Future screen.
+  const inputs = useMemo(() => buildProjectionInputs(baseline, {
+    income, settings, person1Phases, person2Phases, oneoffs, lifePhases, sfSchedule,
+    rent: rentSt, mortgage: { rate: mortRate, payment: mortPayment }, currentYear,
+  }), [baseline, income, settings, person1Phases, person2Phases, oneoffs, lifePhases, sfSchedule, rentSt, mortRate, mortPayment, currentYear])
+  const { person1HELPBalance, person2HELPBalance, netWorthToday } = baseline
 
   const output = useMemo(() => runProjections(inputs), [inputs])
   const main   = output.withFees ?? output.base
@@ -548,7 +479,7 @@ export default function ProjectionsClient({
                 { label: `Cash in ${lastLabel}`,        val: fmtK(main.cashArr[main.cashArr.length - 1]), color: '' },
                 { label: `Investments in ${lastLabel}`, val: fmtK(finalInvest), color: 'var(--purple)' },
                 ...(hasLoan ? [{ label: `Home loan left in ${lastLabel}`, val: fmtK(main.mortArr[main.mortArr.length - 1]), color: 'var(--red)' }] : []),
-                { label: 'Spending today', val: '$' + Math.round(baseMonthlyExpenses).toLocaleString('en-AU') + '/mo', color: '' },
+                { label: 'Spending today', val: '$' + Math.round(baseline.budgetMonthlyExpenses).toLocaleString('en-AU') + '/mo', color: '' },
                 ...(main.leaveYrs.length ? [{ label: 'Parental leave', val: main.leaveYrs.join(', '), color: 'var(--pink)' }] : []),
                 ...(person1HELPBalance > 0 ? [{ label: `${person1Name}'s HELP debt cleared`, val: main.person1HelpClearedYr ? String(main.person1HelpClearedYr) : `After ${lastLabel}`, color: main.person1HelpClearedYr ? 'var(--teal)' : '' }] : []),
                 ...(person2HELPBalance > 0 ? [{ label: `${person2Name}'s HELP debt cleared`, val: main.person2HelpClearedYr ? String(main.person2HelpClearedYr) : `After ${lastLabel}`, color: main.person2HelpClearedYr ? 'var(--teal)' : '' }] : []),

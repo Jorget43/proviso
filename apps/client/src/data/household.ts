@@ -20,6 +20,9 @@ export interface HouseholdData {
   assets:         R<'asset'>[]
   workPhases:     R<'workPhase'>[]
   netWorthSnapshots: R<'netWorthSnapshot'>[]
+  oneOffs:        R<'oneOff'>[]
+  lifePhases:     R<'lifePhase'>[]
+  schoolFeeLevels: R<'schoolFeeLevel'>[]
   income:         R<'incomeSettings'>
   childcare:      R<'childcareSettings'>
   mortgage:       R<'mortgageSettings'> | null
@@ -42,18 +45,20 @@ async function one<T extends s.HouseholdTableName>(db: Db, name: T): Promise<R<T
 export async function loadHousehold(db: Db): Promise<HouseholdData> {
   const [
     settings, members, expenses, annualExpenses, debts, assets, workPhases, netWorthSnapshots,
-    income, childcare, mortgage, projection, superSettings, rent,
+    income, childcare, mortgage, projection, superSettings, rent, oneOffs, lifePhases, schoolFeeLevels,
   ] = await Promise.all([
     one(db, 'householdSettings'), live(db, 'member'), live(db, 'expense'), live(db, 'annualExpense'),
     live(db, 'debt'), live(db, 'asset'), live(db, 'workPhase'), live(db, 'netWorthSnapshot'),
     one(db, 'incomeSettings'), one(db, 'childcareSettings'), one(db, 'mortgageSettings'),
     one(db, 'projectionSettings'), one(db, 'superSettings'), one(db, 'rentSettings'),
+    live(db, 'oneOff'), live(db, 'lifePhase'), live(db, 'schoolFeeLevel'),
   ])
   const id = s.SETTINGS_ID
   return {
     exists: settings !== undefined,
     settings:      withDefaults(s.householdSettings, id.household, settings),
-    members, expenses, annualExpenses, debts, assets, workPhases, netWorthSnapshots,
+    members, expenses, annualExpenses, debts, assets, workPhases, netWorthSnapshots, oneOffs,
+    lifePhases: lifePhases.sort((a, b) => a.sortOrder - b.sortOrder), schoolFeeLevels,
     income:        withDefaults(s.incomeSettings, id.income, income),
     childcare:     withDefaults(s.childcareSettings, id.childcare, childcare),
     mortgage:      mortgage ?? null,

@@ -1,15 +1,14 @@
 export const dynamic = 'force-dynamic'
 import { prisma } from '@/lib/db'
 import { requireAdult } from '@/lib/auth'
-import { toMonthly } from '@proviso/core/formatting'
-import { computeCurrentNetWorth } from '@proviso/core/netWorth'
-import { findHelpDebt } from '@proviso/core/members'
+import { projectionBaseline } from '@proviso/core/future'
+import { workDaysForYear } from '@proviso/core/projections'
 import type { LifePhase } from '@proviso/core/lifephases'
 import ProjectionsClient from '@/components/projections/ProjectionsClient'
 
 export default async function ProjectionsPage() {
   const me = await requireAdult()
-  const [income, settings, person1Phases, person2Phases, oneoffs, lifePhases, expenses, debts, assets, mortgage, hs, feeSchedule, rentSettings, snapshots] = await Promise.all([
+  const [income, settings, person1Phases, person2Phases, oneoffs, lifePhases, expenses, debts, assets, mortgage, hs, feeSchedule, rentSettings, snapshots, annualExpenses, childcare] = await Promise.all([
     prisma.incomeSettings.findUniqueOrThrow({ where: { id: 1 } }),
     prisma.projectionSettings.findUniqueOrThrow({ where: { id: 1 } }),
     prisma.person1Phase.findMany({ orderBy: { year: 'asc' } }),
@@ -24,26 +23,26 @@ export default async function ProjectionsPage() {
     prisma.schoolFeeLevel.findMany({ orderBy: { id: 'asc' } }),
     prisma.rentSettings.findUnique({ where: { id: 1 } }),
     prisma.netWorthSnapshot.findMany({ orderBy: { takenAt: 'asc' } }),
+    prisma.annualExpense.findMany(),
+    prisma.childcareSettings.upsert({ where: { id: 1 }, update: {}, create: { id: 1 } }),
   ])
-
-  const baseMonthlyExpenses = expenses.reduce((s, e) => s + toMonthly(e.amt, e.freq), 0)
-  // The Budget's mortgage repayment line(s). The engine models repayments
-  // itself (un-inflated, stopping at payoff), so the client takes this back out
-  // of the expense base while a mortgage is being modelled.
-  const budgetMortgageMonthly = expenses
-    .filter(e => e.cat === 'Home' && /mortgage/i.test(e.name))
-    .reduce((s, e) => s + toMonthly(e.amt, e.freq), 0)
 
   const person1Name = hs?.person1Name ?? 'Person 1'
   const person2Name = hs?.person2Name ?? 'Person 2'
-  const person1HELPBalance = findHelpDebt(debts, person1Name)?.amt ?? 0
-  const person2HELPBalance = hs?.partnerEnabled ? (findHelpDebt(debts, person2Name)?.amt ?? 0) : 0
-
-  const { mortDebt, propValue, cryptoValue, cashOnHand, otherAssets, debtsOwed, netWorth } = computeCurrentNetWorth(debts, assets, mortgage)
-  // HELP balances are repaid inside the engine; any other debt is held flat.
-  const otherDebts = Math.max(0, debtsOwed - person1HELPBalance - person2HELPBalance)
-
   const currentYear = new Date().getFullYear()
+
+  // Today's position, assembled the same way as the app's Future screen
+  // (@proviso/core/future): the budget's spending (yearly bills and
+  // childcare included) less rent and modelled school costs, and the
+  // net-worth parts the engine starts from.
+  const b = projectionBaseline({
+    expenses, annualExpenses, income, childcare,
+    rentMonthly: rentSettings?.enabled ? rentSettings.monthlyRent : null,
+    person1Days: workDaysForYear(person1Phases, currentYear),
+    person2Days: workDaysForYear(person2Phases, currentYear),
+    partnerEnabled: hs?.partnerEnabled ?? false,
+    person1Name, person2Name, debts, assets, mortgage,
+  })
 
   return (
     <ProjectionsClient
@@ -55,20 +54,10 @@ export default async function ProjectionsPage() {
       initialOneoffs={oneoffs}
       initialLifePhases={lifePhases}
       income={income}
-      baseMonthlyExpenses={baseMonthlyExpenses}
-      budgetMortgageMonthly={budgetMortgageMonthly}
-      person1HELPBalance={person1HELPBalance}
-      person2HELPBalance={person2HELPBalance}
-      mortBalance={mortDebt}
+      baseline={b}
       mortRate={mortgage.rate}
       mortPayment={mortgage.payment}
       mortEndDate={mortgage.endDate}
-      cashOnHand={cashOnHand}
-      propValue={propValue}
-      cryptoValue={cryptoValue}
-      investmentsValue={otherAssets}
-      otherDebts={otherDebts}
-      netWorthToday={netWorth}
       currentYear={currentYear}
       person1Name={person1Name}
       person2Name={person2Name}

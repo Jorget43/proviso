@@ -1,13 +1,15 @@
 export const dynamic = 'force-dynamic'
 import { prisma } from '@/lib/db'
 import { requireAdult } from '@/lib/auth'
-import { toMonthly } from '@proviso/core/formatting'
+import { computeBudgetSummary } from '@proviso/core/budgetSummary'
+import { retirementIncomeGoal, spendingInRetirement } from '@proviso/core/future'
+import { workDaysForYear } from '@proviso/core/projections'
 import SuperClient from '@/components/super/SuperClient'
 import type { HouseholdSuperInputs, ProjectionContext } from '@proviso/core/super'
 
 export default async function SuperPage() {
   const me = await requireAdult()
-  const [s, inc, proj, mtg, expenses, hs, superHistory, rent] = await Promise.all([
+  const [s, inc, proj, mtg, expenses, hs, superHistory, rent, annualExpenses, childcare, person1Phases, person2Phases] = await Promise.all([
     prisma.superSettings.findFirst(),
     prisma.incomeSettings.findUniqueOrThrow({ where: { id: 1 } }),
     prisma.projectionSettings.findUniqueOrThrow({ where: { id: 1 } }),
@@ -16,21 +18,25 @@ export default async function SuperPage() {
     prisma.householdSettings.findUnique({ where: { id: 1 } }),
     prisma.superHistory.findMany({ orderBy: { financialYearEnding: 'desc' } }),
     prisma.rentSettings.findFirst(),
+    prisma.annualExpense.findMany(),
+    prisma.childcareSettings.upsert({ where: { id: 1 }, update: {}, create: { id: 1 } }),
+    prisma.person1Phase.findMany(),
+    prisma.person2Phase.findMany(),
   ])
 
-  // Budget-derived annual spend in today's dollars (rounded to nearest $1k)
-  const budgetAnnualSpend = Math.round(
-    expenses.reduce((sum, e) => sum + toMonthly(e.amt, e.freq), 0) * 12 / 1000
-  ) * 1000
-
-  // Use budget spend as the retirement income default while the DB still holds
-  // a placeholder — the schema default (80000) or the seed value (60000) —
-  // i.e. the user hasn't explicitly saved a goal.
-  const PLACEHOLDER_RETIREMENT_INCOMES = [60000, 80000]
-  const savedIncome = s?.desiredRetirementIncome ?? 0
-  const retirementIncome = !savedIncome || PLACEHOLDER_RETIREMENT_INCOMES.includes(savedIncome)
-    ? budgetAnnualSpend
-    : savedIncome
+  // Today's budget spending (yearly bills, childcare and rent included), the
+  // same figure as the Budget tab. Less the home loan and the children's
+  // costs, it stands in for the retirement income goal until one is saved
+  // (@proviso/core/future, shared with the app).
+  const year = new Date().getFullYear()
+  const budget = computeBudgetSummary({
+    expenses, annualExpenses, income: inc, childcare,
+    rentMonthly: rent?.enabled ? rent.monthlyRent : null,
+    person1Days: workDaysForYear(person1Phases, year), person2Days: workDaysForYear(person2Phases, year),
+    partnerEnabled: hs?.partnerEnabled ?? false,
+  })
+  const budgetAnnualSpend = Math.round(budget.monthlyExpenses * 12 / 1000) * 1000
+  const retirementIncome = retirementIncomeGoal(s?.desiredRetirementIncome ?? 0, spendingInRetirement(budget, expenses))
 
   const initial: HouseholdSuperInputs = {
     sgRate:                   s?.sgRate                    ?? 0.12,

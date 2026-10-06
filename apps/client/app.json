@@ -10,7 +10,6 @@
     "ios": { "supportsTablet": true },
     "android": { "edgeToEdgeEnabled": true },
     "web": { "bundler": "metro", "output": "single" },
-    "plugins": ["expo-router", "expo-sqlite", "expo-status-bar"],
-    "experiments": { "typedRoutes": true }
+    "plugins": ["expo-router", "expo-sqlite", "expo-status-bar"]
   }
 }

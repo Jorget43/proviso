@@ -137,7 +137,7 @@ describe('buildStarterHousehold', () => {
     const a = base({ children: [{ age: 2, childcareDays: 0 }, { age: 7, childcareDays: 0 }], schoolType: 'independent', regional: true })
     const h = buildStarterHousehold(a, [], now)
     // Fee schedules start at the pre-school year (age 4)
-    expect(h.projection).toMatchObject({ sfC1Start: 2023, sfC2Start: 2028, sfPresetKey: 'vic_r|independent', schoolFeesOn: false, parentalLeaveEnabled: false })
+    expect(h.projection).toMatchObject({ sfC1Start: 2023, sfC2Start: 2028, sfPresetKey: 'vic_r|independent', schoolFeesOn: true, parentalLeaveEnabled: false })
   })
 })
 
