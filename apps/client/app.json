@@ -1,0 +1,16 @@
+{
+  "expo": {
+    "name": "Proviso",
+    "slug": "proviso",
+    "scheme": "proviso",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "backgroundColor": "#F5F2EC",
+    "ios": { "supportsTablet": true },
+    "android": { "edgeToEdgeEnabled": true },
+    "web": { "bundler": "metro", "output": "single" },
+    "plugins": ["expo-router", "expo-sqlite", "expo-status-bar"],
+    "experiments": { "typedRoutes": true }
+  }
+}

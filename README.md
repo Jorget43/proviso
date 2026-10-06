@@ -23,6 +23,9 @@ npx prisma migrate deploy   # apply the schema (apps/web/prisma) to a local SQLi
 npm run dev                 # http://localhost:3000
 npm test                    # tests for every workspace
 npm run typecheck
+
+# The app (apps/client) in a browser, for development:
+npm run web -w @proviso/client   # http://localhost:8080
 ```
 
 Set `DATABASE_URL` (e.g. `file:./dev.db`, relative to `apps/web/prisma/`) in `apps/web/.env` for local work — Next.js reads `.env` from the app's own folder.

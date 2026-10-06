@@ -2,16 +2,17 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/db'
 import { requireSession } from '@/lib/auth'
-import { workDaysForYear } from '@proviso/core/projections'
-import { computeCashOnHand, computeCurrentNetWorth, NET_WORTH_DEFINED_FROM } from '@proviso/core/netWorth'
-import { computeBudgetSummary, upcomingAnnualExpenses } from '@proviso/core/budgetSummary'
-import { isEofySeason } from '@proviso/core/eofy'
+import { computeHomeOverview, type OverviewTarget } from '@proviso/core/overview'
 import { fmt, fmtK } from '@proviso/core/formatting'
-import { loadSituation, situationLabels } from '@/lib/situation'
+import { situationLabels } from '@proviso/core/situation'
+import { loadSituation } from '@/lib/situation'
 
 export const dynamic = 'force-dynamic'
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
+
+// Where Home's prompts lead on the web.
+const TARGET_HREF: Record<OverviewTarget, string> = { budget: '/budget', savings: '/debts', eofy: '/eofy' }
 
 // Home: the "are we okay?" overview, in plain language. Every figure here is
 // computed the same way as on the tab it links to.
@@ -45,50 +46,22 @@ export default async function Home() {
     prisma.netWorthSnapshot.findMany({ orderBy: { takenAt: 'asc' } }),
   ])
 
-  const now = new Date()
-  const year = now.getFullYear()
-  const budget = computeBudgetSummary({
+  // Every figure comes from the shared overview, so the app shows the same.
+  const situation = await loadSituation()
+  const o = computeHomeOverview({
+    now: new Date(),
     expenses, annualExpenses, income, childcare,
     rentMonthly: rent?.enabled ? rent.monthlyRent : null,
-    person1Days: workDaysForYear(person1Phases, year),
-    person2Days: workDaysForYear(person2Phases, year),
+    workPhases: { p1: person1Phases, p2: person2Phases },
     partnerEnabled: hs.partnerEnabled,
+    assets, debts, mortgage,
+    superBalances: { p1: superSettings?.currentBalance ?? 0, p2: superSettings?.partnerBalance ?? 0 },
+    snapshots,
   })
-
-  // Same figure as Wealth → Own & owe: everything listed as owned minus owed.
-  const { netWorth: netPosition } = computeCurrentNetWorth(debts, assets, mortgage)
-  // Change since the oldest snapshot from the last 12 months that had data —
-  // only snapshots taken under the current net-worth definition compare.
-  const yearAgo = new Date(now); yearAgo.setFullYear(year - 1)
-  const from = new Date(Math.max(yearAgo.getTime(), NET_WORTH_DEFINED_FROM.getTime()))
-  const since = snapshots.find(s => s.takenAt >= from && ((s.totalAssets ?? 0) !== 0 || (s.totalDebts ?? 0) !== 0))
-  const change = since ? netPosition - since.netWorth : null
-
-  const situation = await loadSituation()
-  const cash = computeCashOnHand(assets)
-  const coverMonths = budget.monthlyExpenses > 0 ? cash / budget.monthlyExpenses : null
-  const hasMortgageDebt = debts.some(d => /mortgage/i.test(d.name))
-  const mortgageLeft = hasMortgageDebt || situation.renting ? null : (mortgage && mortgage.balance > 0 ? mortgage.balance : null)
-  const mortgageEndYear = mortgage?.endDate ? Number(mortgage.endDate.slice(0, 4)) : null
-  const superTotal = (superSettings?.currentBalance ?? 0) + (hs.partnerEnabled ? (superSettings?.partnerBalance ?? 0) : 0)
-
-  const upcoming = upcomingAnnualExpenses(annualExpenses, now)
-  const noIncome = budget.monthlyIncome <= 0
-  const left = budget.delta
-
-  // Plain-language prompts, most important first.
-  const checks: { tone: 'red' | 'amber' | 'blue'; text: string; href: string; cta: string }[] = []
-  if (noIncome) {
-    checks.push({ tone: 'blue', text: 'Add your take-home pay so we can work out what you have left each month.', href: '/budget', cta: 'Add income' })
-  } else if (left < 0) {
-    checks.push({ tone: 'red', text: `You're spending ${fmt(-left)} more than you bring in each month.`, href: '/budget', cta: 'Review budget' })
-  }
-  if (coverMonths !== null && coverMonths < 3) {
-    checks.push({ tone: 'amber', text: `Your cash would cover about ${coverMonths < 1 ? 'less than a month' : `${coverMonths.toFixed(1)} months`} of spending. Three to six months is a common safety net.`, href: '/debts', cta: 'See savings' })
-  }
-  if (isEofySeason(now)) {
-    checks.push({ tone: 'blue', text: 'Tax time is coming up. The end-of-year checklist helps you get ready.', href: '/eofy', cta: 'Open checklist' })
-  }
+  const { budget, noIncome, left, cash, coverMonths, mortgageLeft, mortgageEndYear, superTotal, upcoming } = o
+  const netPosition = o.netWorth
+  const change = o.netWorthChange
+  const checks = o.checks.map(c => ({ ...c, href: TARGET_HREF[c.target] }))
 
   const firstName = me.name.trim().split(/\s+/)[0]
 
@@ -132,9 +105,9 @@ export default async function Home() {
           <Link href="/debts" className="home-stat">
             <span className="home-stat-label">Net worth</span>
             <span className="home-stat-value">{fmtK(netPosition)}</span>
-            {change !== null && change !== 0 && since ? (
-              <span className={`home-stat-sub ${change > 0 ? 'up' : 'down'}`}>
-                {change > 0 ? '▲' : '▼'} {fmtK(Math.abs(change))} since {MONTHS[since.takenAt.getMonth()]}
+            {change ? (
+              <span className={`home-stat-sub ${change.amount > 0 ? 'up' : 'down'}`}>
+                {change.amount > 0 ? '▲' : '▼'} {fmtK(Math.abs(change.amount))} since {MONTHS[change.since.getMonth()]}
               </span>
             ) : (
               <span className="home-stat-sub">what you own minus what you owe</span>

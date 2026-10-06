@@ -18,7 +18,9 @@ The agreed target is `docs/architecture.md` (read it if you haven't this session
 | `apps/relay` | Sync relay (hosted and self-hosted are the same code); static host for the web build | Anything that reads household data — it only ever sees ciphertext |
 | `apps/web` | **Legacy** Next.js app, kept until the Expo web build reaches parity | New features that aren't also planned for `apps/client` |
 
-Today (Phase 25) the repo has `apps/web` and `packages/core`; `packages/sync`, `packages/tokens`, `apps/client` and `apps/relay` are created when their phase starts. A new pure calculation goes in `packages/core` now, never in `apps/web/lib`.
+Today (Phase 27) the repo has `apps/web`, `apps/client`, `packages/core` and `packages/tokens`; `packages/sync` and `apps/relay` are created when their phase starts. A new pure calculation goes in `packages/core`, never in `apps/web/lib` or a screen.
+
+In `apps/client`: screens (`app/`) read through `src/data/views.ts` and change data through `src/data/mutate.ts` (or a helper built on it, like `src/data/costs.ts`). Everything in `src/data` except `open.ts` and `DataProvider.tsx` is plain TypeScript and tested in Node — keep it that way. Always `await` database calls: the driver is async on every platform.
 
 ## Dependency direction
 

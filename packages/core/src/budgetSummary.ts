@@ -10,8 +10,8 @@ import { CATS } from './constants'
 export const CHILDCARE_CAT  = 'Children'
 export const CHILDCARE_NAME = 'Childcare'
 
-export interface BudgetExpense { id: number; cat: string; name: string; freq: string; amt: number }
-export interface BudgetAnnualExpense { id: number; cat: string; name: string; amt: number; month: number }
+export interface BudgetExpense { id: number | string; cat: string; name: string; freq: string; amt: number }
+export interface BudgetAnnualExpense { id: number | string; cat: string; name: string; amt: number; month: number }
 
 export interface BudgetIncome {
   taxMode:           boolean
@@ -30,8 +30,10 @@ export interface BudgetChildcare {
   numChildren: number
 }
 
-export interface BudgetInputs {
-  expenses:       BudgetExpense[]
+// Generic over the expense row, so callers get their own row type back in
+// shownExpenses (Prisma rows on the NAS, Drizzle rows in the app).
+export interface BudgetInputs<E extends BudgetExpense = BudgetExpense> {
+  expenses:       E[]
   annualExpenses: BudgetAnnualExpense[]
   income:         BudgetIncome
   childcare:      BudgetChildcare
@@ -41,7 +43,7 @@ export interface BudgetInputs {
   partnerEnabled: boolean
 }
 
-export interface BudgetSummary {
+export interface BudgetSummary<E extends BudgetExpense = BudgetExpense> {
   person1Gross:    number
   person2Gross:    number
   familyIncome:    number
@@ -49,7 +51,7 @@ export interface BudgetSummary {
   person2Net:      number         // monthly
   monthlyIncome:   number
   childcareNet:    number | null  // CCS-adjusted monthly cost, null when off
-  shownExpenses:   BudgetExpense[]
+  shownExpenses:   E[]
   monthlyExpenses: number
   catMonthly:      Record<string, number>
   delta:           number
@@ -60,7 +62,7 @@ export function isManagedChildcare(e: { cat: string; name: string }): boolean {
   return e.cat === CHILDCARE_CAT && e.name === CHILDCARE_NAME
 }
 
-export function computeBudgetSummary(i: BudgetInputs): BudgetSummary {
+export function computeBudgetSummary<E extends BudgetExpense>(i: BudgetInputs<E>): BudgetSummary<E> {
   // Each person's gross is pro-rated by days worked this year (same rule as
   // the Projections engine); Person 2 counts only when the partner is enabled.
   const person1Gross = i.income.person1FTE * (i.person1Days / 5)

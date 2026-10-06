@@ -1,0 +1,4 @@
+.expo/
+dist/
+expo-env.d.ts
+web-build/

@@ -4,8 +4,10 @@
 FROM node:24-bookworm-slim AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
-COPY apps/web/package.json      apps/web/
-COPY packages/core/package.json packages/core/
+COPY apps/web/package.json        apps/web/
+COPY apps/client/package.json     apps/client/
+COPY packages/core/package.json   packages/core/
+COPY packages/tokens/package.json packages/tokens/
 RUN npm ci
 
 # ── Stage 2: build ─────────────────────────────────────────────────────────
@@ -33,7 +35,12 @@ RUN npm run build
 # install would not contain it. npm leaves dot-directories alone, so .prisma
 # and .bin survive the prune.
 FROM builder AS pruner
-RUN npm prune --omit=dev
+# This image serves the web app only. Dropping the phone app's workspaces
+# (apps/client, packages/tokens) first makes Expo / React Native extraneous,
+# so the prune removes them too — about 550 MB the server never uses.
+RUN rm -rf apps/client packages/tokens \
+ && npm pkg set --json workspaces='["apps/web","packages/core"]' \
+ && npm prune --omit=dev
 
 # ── Stage 4: runner ────────────────────────────────────────────────────────
 FROM node:24-bookworm-slim AS runner

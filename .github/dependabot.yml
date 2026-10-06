@@ -21,6 +21,17 @@ updates:
     ignore:
       - dependency-name: "*"
         update-types: ["version-update:semver-major"]
+      # React, React Native and the Expo packages move together, set by the
+      # Expo SDK (React Native needs an exact React version, and the whole
+      # workspace shares one copy). Upgraded deliberately with the SDK.
+      - dependency-name: "react"
+      - dependency-name: "react-dom"
+      - dependency-name: "react-native"
+      - dependency-name: "react-native-*"
+      - dependency-name: "@types/react"
+      - dependency-name: "@types/react-dom"
+      - dependency-name: "expo"
+      - dependency-name: "expo-*"
 
   - package-ecosystem: github-actions
     directory: /

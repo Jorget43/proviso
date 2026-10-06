@@ -73,8 +73,8 @@ jobs:
       - name: Check Drizzle migrations match the schema
         run: |
           npm run db:generate -w @proviso/core
-          git status --porcelain packages/core/drizzle
-          test -z "$(git status --porcelain packages/core/drizzle)"
+          git status --porcelain packages/core/drizzle packages/core/src/migrations.ts
+          test -z "$(git status --porcelain packages/core/drizzle packages/core/src/migrations.ts)"
 
       - name: Run tests (packages/core and apps/web)
         run: npm test

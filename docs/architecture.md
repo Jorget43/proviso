@@ -41,12 +41,13 @@ A server-authoritative design can't serve the app-first majority, who have no se
 - The desktop and phone web experience is the **same app built for web** (React Native Web), not a second UI. This is the single biggest protection against drift between platforms.
 - The current Next.js UI is **retired gradually**: it keeps running on the NAS while the Expo web build reaches parity, then the NAS serves the Expo web build instead.
 - Platform-specific code lives in `*.ios.tsx` / `*.android.tsx` / `*.web.tsx` files only, and only for things like biometrics or file pickers. Never `if (Platform.OS === …)` in screen code.
-- Risk: Expo's SQLite on web is alpha (it needs cross-origin isolation headers for SharedArrayBuffer). Phones come first; the web build is gated on a spike (see Phase 3).
+- Risk: Expo's SQLite on web is alpha (it needs cross-origin isolation headers for SharedArrayBuffer). Spiked in Phase 3: it works through the async API, behind COOP/COEP headers (`apps/client/scripts/web-dev.mjs` in development; the relay must send them in production).
 
 ### D2. Local-first data: SQLite on every device, Drizzle as the one schema
 - The schema is defined **once**, in Drizzle, in `packages/core/schema`. The same definitions drive SQLite on phones (`expo-sqlite`), on web (wasm), and on the relay server.
 - **Prisma is retired.** It doesn't run on devices, and keeping two schema definitions is guaranteed drift. (This also removes the pending Prisma 5 → 7 upgrade.)
-- Migrations ship inside the app and run at start-up (Drizzle `useMigrations`).
+- Migrations ship inside the app and run at start-up: `packages/core/src/migrations.ts` (generated) applied by `packages/core/src/migrate.ts`, the same on every platform.
+- **Async database access everywhere** (Drizzle's proxy driver over expo-sqlite's async API): synchronous SQLite blocks the UI thread on phones and can't work on the web.
 
 ### D3. Sync-ready data model (rules every table follows)
 - **IDs are UUIDv7 strings**, created on the device. Never autoincrement integers: two offline devices would both create record 42.
@@ -150,4 +151,5 @@ Project skills in `.claude/skills/` (written 2026-10-06). Each one points back h
 - 2026-10-06: agreed: one Expo client for iOS/Android/web (Next.js UI retired at web parity); Drizzle replaces Prisma; local-first with end-to-end encrypted sync.
 - 2026-10-06: recovery = recovery phrase plus optional key backup to iCloud Keychain / Google Password Manager.
 - 2026-10-06: sync = Proviso Sync (hosted, default) or self-hosted relay, same protocol. Google Drive / Dropbox only as backup destinations, not sync.
+- 2026-10-06 (Phase 3): one React version repo-wide, set by the Expo SDK; async SQLite on every platform; Home's figures computed once in `packages/core/src/overview.ts` and used by both the NAS web app and the app.
 - 2026-10-06 (Phase 2): natural keys → content ids (no unique constraints); row ids encrypted in sync messages; people as `p1`/`p2` keys rather than names; pocket money in its own space per child; one JSON export format for migration, backup and data download. Existing NAS data moves as an export file rather than as sync messages — the app turns an imported file into messages.

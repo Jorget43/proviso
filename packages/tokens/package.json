@@ -1,0 +1,12 @@
+{
+  "name": "@proviso/tokens",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Proviso's design tokens — colours, spacing, radii, type sizes — shared by every client.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  }
+}

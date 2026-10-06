@@ -346,4 +346,6 @@ export type PocketMoneyTableName = keyof typeof POCKET_MONEY_TABLES
 
 /** Row types, e.g. HouseholdRow<'expense'>. */
 export type HouseholdRow<T extends HouseholdTableName>   = (typeof HOUSEHOLD_TABLES)[T]['$inferSelect']
+/** What inserting a row takes (fields with defaults are optional), e.g. HouseholdInsert<'expense'>. */
+export type HouseholdInsert<T extends HouseholdTableName> = (typeof HOUSEHOLD_TABLES)[T]['$inferInsert']
 export type PocketMoneyRow<T extends PocketMoneyTableName> = (typeof POCKET_MONEY_TABLES)[T]['$inferSelect']

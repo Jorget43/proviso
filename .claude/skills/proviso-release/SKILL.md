@@ -21,6 +21,10 @@ description: How Proviso ships across its streams — the NAS Docker image (rela
 | App: native change (new native module, permissions, SDK upgrade) | EAS Build → TestFlight / Play closed track → store review | days |
 | Hosted Proviso Sync | relay image deployed by the operator | immediately |
 
+## Versions set by the Expo SDK
+
+React, React Native and every `expo-*` package move together with the Expo SDK, and the whole repo shares **one React** (root `overrides` in `package.json`; React Native refuses any other version). Upgrade them as one change: bump the SDK in `apps/client`, run `npx expo install --fix`, set the root override and `apps/web`'s react/react-dom to the SDK's React, reinstall, and run every workspace's tests plus the web build. Dependabot is told to ignore these packages.
+
 ## Compatibility rules
 
 - The **sync protocol version** and **schema version** travel in every message (see `proviso-schema-change`).
