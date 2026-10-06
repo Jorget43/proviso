@@ -11,15 +11,13 @@ import { Button, Card, Screen, T } from '@/ui/kit'
 import { space } from '@/ui/theme'
 
 export default function Welcome() {
-  const { change, importFile } = useHousehold()
+  const { importFile } = useHousehold()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [notes, setNotes] = useState<string[] | null>(null)
 
-  async function startFresh() {
-    await change((db, m) => m.saveSettings(db, 'householdSettings', { onboardingDone: false }))
-    router.replace('/')
-  }
+  // The questionnaire creates the household when it's saved.
+  const startFresh = () => router.push('/setup')
 
   async function bringIn() {
     setError(null)
@@ -63,9 +61,9 @@ export default function Welcome() {
 
       <Card>
         <T weight="600">New here?</T>
-        <T tone="t2">Start with an empty household and add your pay and regular costs.</T>
+        <T tone="t2">Answer a few questions (about two minutes) and we’ll suggest typical costs for a household like yours, ready to adjust.</T>
         <View style={{ alignItems: 'flex-start', marginTop: space.sm }}>
-          <Button title="Start fresh" onPress={startFresh} disabled={busy} />
+          <Button title="Get started" onPress={startFresh} disabled={busy} />
         </View>
       </Card>
 

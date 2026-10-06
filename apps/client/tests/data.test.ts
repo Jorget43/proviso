@@ -11,6 +11,8 @@ import { importHousehold } from '@/data/importExport'
 import { insertRow, updateRow, deleteRow, saveSettings } from '@/data/mutate'
 import { homeView, spendingView } from '@/data/views'
 import { saveCost, removeCost, kindOf, type CostDraft } from '@/data/costs'
+import { startHousehold, savePay } from '@/data/setup'
+import { estimateLivingCosts, buildStarterHousehold, type StarterAnswers } from '@proviso/core/starter'
 
 // The app's data layer against a real SQLite (node:sqlite), migrated with the
 // same bundled migrations the phone runs.
@@ -183,5 +185,65 @@ describe('saving costs', () => {
     const c = await saveCost(db, null, draft({ month: 2 }))
     await removeCost(db, c)
     expect((await loadHousehold(db)).annualExpenses).toEqual([])
+  })
+})
+
+describe('setting up a new household', () => {
+  const answers: StarterAnswers = {
+    state: 'qld', regional: false,
+    you: { name: 'Alex', age: 34, salary: 110_000, days: 5, hasHelp: true, helpBalance: 18_000, superBalance: 70_000 },
+    partner: { name: 'Sam', age: 33, salary: 90_000, days: 3, hasHelp: false, helpBalance: 0, superBalance: 50_000 },
+    children: [{ age: 2, childcareDays: 3 }, { age: 6, childcareDays: 0 }], schoolType: 'government',
+    home: { kind: 'mortgage', weeklyRent: 0, mortgageBalance: 550_000, mortgageRate: 6.2, mortgageYears: 25 },
+    cars: 2, cash: 30_000, investments: 10_000,
+  }
+
+  it('writes the questionnaire’s household, and Home shows it', async () => {
+    const { db } = await migratedTestDb()
+    const lines = estimateLivingCosts(answers)
+    await startHousehold(db, buildStarterHousehold(answers, lines, NOW))
+    const h = await loadHousehold(db)
+    expect(h.exists).toBe(true)
+    expect(h.settings).toMatchObject({ person1Name: 'Alex', person2Name: 'Sam', partnerEnabled: true, onboardingDone: true })
+    expect(h.expenses).toHaveLength(lines.length + 1)   // + the managed childcare line
+    expect(h.debts.map(d => d.name)).toEqual(['Alex HELP debt'])
+    expect(h.mortgage?.balance).toBe(550_000)
+    expect(h.childcare.enabled).toBe(true)
+    expect(h.projection.parentalLeaveEnabled).toBe(false)
+    const v = homeView(h, NOW)
+    expect(v.noIncome).toBe(false)
+    expect(v.budget.childcareNet).toBeGreaterThan(0)
+    expect(v.situation).toEqual(['With Sam', 'Own our home', 'Paying for childcare'])
+  })
+
+  it('replaces a household that was started but never set up', async () => {
+    const { db } = await migratedTestDb()
+    await saveSettings(db, 'householdSettings', { onboardingDone: false })
+    await insertRow(db, 'expense', { cat: 'Food', name: 'Old line', freq: 'monthly', amt: 1 })
+    await startHousehold(db, buildStarterHousehold(answers, [], NOW))
+    const h = await loadHousehold(db)
+    expect(h.expenses.some(e => e.name === 'Old line')).toBe(false)
+  })
+
+  it('changes pay: salary in tax mode, days for this year', async () => {
+    const { db } = await migratedTestDb()
+    await startHousehold(db, buildStarterHousehold(answers, [], NOW))
+    let h = await loadHousehold(db)
+    await savePay(db, 'p2', { amount: 95_000, days: 4, hasHelp: true, taxMode: true }, h.workPhases, 2026)
+    h = await loadHousehold(db)
+    expect(h.income).toMatchObject({ person2FTE: 95_000, person2HasHELP: true })
+    expect(h.workPhases.filter(w => w.person === 'p2')).toEqual([expect.objectContaining({ year: 2026, days: 4 })])
+    // A new year gets its own row
+    await savePay(db, 'p1', { amount: 110_000, days: 4, hasHelp: true, taxMode: true }, h.workPhases, 2027)
+    h = await loadHousehold(db)
+    expect(h.workPhases.filter(w => w.person === 'p1').map(w => w.year).sort()).toEqual([2026, 2027])
+  })
+
+  it('changes take-home pay for a household that records it', async () => {
+    const { db } = await migratedTestDb()
+    await importHousehold(db, sampleExport())
+    const h = await loadHousehold(db)
+    await savePay(db, 'p1', { amount: 5500, days: 5, hasHelp: false, taxMode: false }, h.workPhases, 2026)
+    expect((await loadHousehold(db)).income).toMatchObject({ taxMode: false, person1MonthlyNet: 5500 })
   })
 })

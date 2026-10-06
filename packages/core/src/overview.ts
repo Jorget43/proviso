@@ -9,7 +9,7 @@ import { isEofySeason } from './eofy'
 import { fmt } from './formatting'
 
 /** Where a prompt's button leads — each platform maps these to its own screens. */
-export type OverviewTarget = 'budget' | 'savings' | 'eofy'
+export type OverviewTarget = 'income' | 'budget' | 'savings' | 'eofy'
 
 export interface OverviewCheck {
   tone:   'red' | 'amber' | 'blue'
@@ -89,7 +89,7 @@ export function computeHomeOverview<E extends BudgetExpense>(i: OverviewInputs<E
   // Plain-language prompts, most important first.
   const checks: OverviewCheck[] = []
   if (noIncome) {
-    checks.push({ tone: 'blue', text: 'Add your take-home pay so we can work out what you have left each month.', target: 'budget', cta: 'Add income' })
+    checks.push({ tone: 'blue', text: 'Add your take-home pay so we can work out what you have left each month.', target: 'income', cta: 'Add income' })
   } else if (left < 0) {
     checks.push({ tone: 'red', text: `You're spending ${fmt(-left)} more than you bring in each month.`, target: 'budget', cta: 'Review budget' })
   }

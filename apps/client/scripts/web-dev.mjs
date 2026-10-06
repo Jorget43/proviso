@@ -7,12 +7,13 @@
 // answers the page itself ("/") before Metro, without them. The production
 // web host (the relay, apps/relay) sends the same two headers itself.
 //
-// Open http://localhost:8080 (Expo itself runs on 8081).
+// Open http://localhost:8080 (Expo itself runs on 8081). Both ports can be
+// changed (PORT, EXPO_PORT), e.g. to run beside `npm start` for a phone.
 import { spawn } from 'node:child_process'
 import http from 'node:http'
 import net from 'node:net'
 
-const EXPO = 8081
+const EXPO = Number(process.env.EXPO_PORT ?? 8081)
 const PORT = Number(process.env.PORT ?? 8080)
 const ISOLATION = { 'cross-origin-embedder-policy': 'credentialless', 'cross-origin-opener-policy': 'same-origin' }
 

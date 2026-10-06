@@ -13,7 +13,7 @@ import { usePalette, space, radius } from '@/ui/theme'
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
 
 // Where Home's prompts lead in the app. Savings and tax time arrive with the Wealth and EOFY screens.
-const TARGET: Record<OverviewTarget, '/spending' | '/wealth'> = { budget: '/spending', savings: '/wealth', eofy: '/wealth' }
+const TARGET: Record<OverviewTarget, '/income' | '/spending' | '/wealth'> = { income: '/income', budget: '/spending', savings: '/wealth', eofy: '/wealth' }
 
 export default function Home() {
   const { household } = useHousehold()
@@ -24,6 +24,16 @@ export default function Home() {
   return (
     <Screen>
       <T size="title" tone="t2">Hi {firstName}</T>
+
+      {!household.settings.onboardingDone && (
+        <Card>
+          <T weight="600">Finish setting up</T>
+          <T tone="t2">Answer a few questions and we’ll fill in typical costs for a household like yours, ready to adjust.</T>
+          <View style={{ alignItems: 'flex-start', marginTop: space.sm }}>
+            <Button title="Set up my household" onPress={() => router.push('/setup')} />
+          </View>
+        </Card>
+      )}
 
       <Card tone={v.noIncome ? undefined : v.left >= 0 ? 'good' : 'bad'}>
         <T size="small" tone="t2">Each month</T>
@@ -39,8 +49,9 @@ export default function Home() {
             </T>
           </>
         )}
-        <View style={{ alignItems: 'flex-start', marginTop: space.sm }}>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm, marginTop: space.sm }}>
           <Button kind="quiet" title="See spending" onPress={() => router.push('/spending')} />
+          <Button kind="quiet" title="Change pay" onPress={() => router.push('/income')} />
         </View>
       </Card>
 

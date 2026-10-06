@@ -28,6 +28,8 @@ export default function RootLayout() {
         <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: p.bg } }}>
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="welcome" />
+          <Stack.Screen name="setup" />
+          <Stack.Screen name="income" options={{ presentation: 'modal', headerShown: true, title: '', headerStyle: { backgroundColor: p.surface }, headerTintColor: p.t1 }} />
           <Stack.Screen name="expense" options={{ presentation: 'modal', headerShown: true, title: '', headerStyle: { backgroundColor: p.surface }, headerTintColor: p.t1 }} />
         </Stack>
       </DataProvider>

@@ -35,7 +35,7 @@ describe('computeHomeOverview', () => {
   it('asks for income first, then flags a shortfall', () => {
     const none = computeHomeOverview(base({ income: { ...base().income, person1MonthlyNet: 0 } }))
     expect(none.noIncome).toBe(true)
-    expect(none.checks[0]).toMatchObject({ tone: 'blue', target: 'budget', cta: 'Add income' })
+    expect(none.checks[0]).toMatchObject({ tone: 'blue', target: 'income', cta: 'Add income' })
     const short = computeHomeOverview(base({ income: { ...base().income, person1MonthlyNet: 1600 } }))
     expect(short.checks[0]).toMatchObject({ tone: 'red', text: 'You\'re spending $500 more than you bring in each month.' })
   })

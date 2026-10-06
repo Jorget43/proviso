@@ -12,7 +12,7 @@ export const dynamic = 'force-dynamic'
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
 
 // Where Home's prompts lead on the web.
-const TARGET_HREF: Record<OverviewTarget, string> = { budget: '/budget', savings: '/debts', eofy: '/eofy' }
+const TARGET_HREF: Record<OverviewTarget, string> = { income: '/budget', budget: '/budget', savings: '/debts', eofy: '/eofy' }
 
 // Home: the "are we okay?" overview, in plain language. Every figure here is
 // computed the same way as on the tab it links to.
