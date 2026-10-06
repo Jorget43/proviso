@@ -9,7 +9,11 @@ Data lives on every device and syncs as end-to-end encrypted, per-field change m
 
 ## Hard rules
 
-1. **IDs are UUIDv7 strings created on the device.** No autoincrement. Single-row settings tables use a fixed named id (e.g. `'household'`).
+1. **IDs are UUIDs created on the device** (`packages/core/src/ids.ts`). No autoincrement.
+   - Ordinary records: `newId()` (UUIDv7).
+   - Records with a natural key: `contentId(table, ...key)`, so two devices creating the same row get the same id. **Never add a unique index**: offline devices can't both honour it.
+   - Single-row settings tables: the fixed id in `SETTINGS_ID`.
+   - Records about a person store `person: 'p1' | 'p2'`, never a name.
 2. **Never hard-delete.** Set `deletedAt`; every query filters `deletedAt IS NULL`.
 3. **Additive only.**
    - Add new columns as nullable or with a default.
@@ -23,16 +27,17 @@ Data lives on every device and syncs as end-to-end encrypted, per-field change m
 
 ## Checklist
 
-- [ ] Schema edited in `packages/core` (Drizzle) — the one definition.
-- [ ] Migration generated with drizzle-kit and bundled for the client; it runs at app start.
+- [ ] Schema edited in `packages/core/src/schema.ts` (Drizzle) — the one definition; `SCHEMA_VERSION` bumped.
+- [ ] Migration generated with `npm run db:generate -w @proviso/core` and committed (CI regenerates and fails if anything new appears). Never edit a generated migration.
+- [ ] `packages/core/tests/schema.test.ts` passes (migrations build exactly the schema; sync rules hold).
 - [ ] Sync: schema version bumped; the merge code handles the new field; a test feeds **messages from the previous schema version** and from a **newer** one (unknown column) and checks nothing is lost.
 - [ ] Loaders and core calculations updated; tests in core.
 - [ ] Relay unaffected (it stores ciphertext). If table names or permissions changed, update the relay's write-permission map.
-- [ ] Export (CSV/JSON) includes the new field.
+- [ ] The export format picks the field up automatically (it validates against the schema); update `apps/web/lib/householdExport.ts` if the NAS app has the data, and its test.
 
 ## While the legacy Next.js app is still running
 
 Until `apps/web` retires, it still uses Prisma (`apps/web/prisma/schema.prisma`, migrations in `apps/web/prisma/migrations`, applied by `docker-entrypoint.sh` on the NAS):
-- A change that both apps need lands in **both schemas in the same commit**, and the Prisma → messages exporter test covers it.
+- A change that both apps need lands in **both schemas in the same commit**, and `apps/web/tests/householdExport.test.ts` covers the mapping.
 - Prisma migrations run against people's live databases on container start: keep them additive too, and test against a scratch copy, never `apps/web/prisma/household.db`.
 - Don't add a Prisma-only table for a new feature unless the user agreed that feature stays legacy.

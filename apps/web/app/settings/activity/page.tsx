@@ -22,6 +22,7 @@ const LABELS: Record<string, string> = {
   'auth.passkey_added':   'Passkey added',
   'auth.passkey_removed': 'Passkey removed',
   'auth.sessions_revoked': 'Device signed out',
+  'data.export':          'Household data downloaded',
 }
 const WARN = new Set(['auth.signin_failed', 'auth.locked', 'auth.2fa_off_failed'])
 

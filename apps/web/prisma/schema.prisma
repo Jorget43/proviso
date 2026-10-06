@@ -166,6 +166,10 @@ model HouseholdSettings {
   person2Name    String  @default("Partner")
   partnerEnabled Boolean @default(false)
   onboardingDone Boolean @default(false)
+  // Stable id for this household in the local-first format (Phase 26). Set on
+  // the first export; seeds the deterministic row ids, so exporting twice
+  // gives the same ids and an import never duplicates.
+  householdId    String?
 }
 
 model SchoolFeeLevel {

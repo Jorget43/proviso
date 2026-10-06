@@ -50,6 +50,7 @@ A server-authoritative design can't serve the app-first majority, who have no se
 
 ### D3. Sync-ready data model (rules every table follows)
 - **IDs are UUIDv7 strings**, created on the device. Never autoincrement integers: two offline devices would both create record 42.
+- **Natural keys become content IDs, not unique constraints.** A row that has a natural key (a bank transaction's date + description + amount, a categorisation rule's pattern, a person's HELP record for a year) gets an id calculated from that key (`contentId` in `packages/core/src/ids.ts`). Two devices that create the same row independently produce the same id, and sync merges them. Unique indexes other than `id` are not allowed: offline devices can't both honour them.
 - **Single-row settings tables** use a fixed, named id (e.g. `'household'`), not `1`.
 - **No hard deletes.** A row is deleted by setting `deletedAt`; queries filter it out.
 - **Changes are recorded per field**: each message is *(table, row id, column, value, timestamp)*.
@@ -58,7 +59,7 @@ A server-authoritative design can't serve the app-first majority, who have no se
 - **Schema changes are additive.** Add columns with defaults; never rename or repurpose a column, because older app versions still send messages naming it. Removing a column takes two releases: stop using it, then drop it.
 
 ### D4. Encryption
-- **Sync messages are end-to-end encrypted** with a household key (AES-GCM). Relays and cloud drives only ever store ciphertext. Proviso's makers never hold anyone's financial data, and the hosted options never see it.
+- **Sync messages are end-to-end encrypted** with a household key (AES-GCM). Row ids travel inside the ciphertext (only table names are in clear), so a content id can't be used to guess what a row contains. Relays and cloud drives only ever store ciphertext. Proviso's makers never hold anyone's financial data, and the hosted options never see it.
 - The household key lives in the device's secure storage (iOS Keychain / Android Keystore). New devices get it by scanning a QR code on an existing device, or by entering a recovery phrase.
 - **Recovery has two routes, and setup offers both:**
   - a recovery phrase the user writes down or prints
@@ -123,7 +124,7 @@ packages/tokens  colours, spacing, type scale → generated for web CSS and nati
 | Phase | Work | Visible change |
 |---|---|---|
 | **1. Restructure** | Split into a workspace repo; move the calculation code into `packages/core` unchanged; the Next app imports it from there. | None |
-| **2. Data model** | Drizzle schema in `packages/core` following D3; an exporter that turns today's Prisma database into change messages (the migration for existing NAS users). | None |
+| **2. Data model** | Drizzle schema in `packages/core` following D3; the household export file format; a NAS exporter that writes today's database in it (the migration path for existing NAS users, and "Download all your data"). | Settings → Download all your data |
 | **3. Client MVP** | Expo app, single device (no sync): onboarding, Home, Spending, Wealth, Future, recovery phrase. Spike Expo SQLite on web. | Household TestFlight / Android test |
 | **4. Sync** | `packages/sync` and `apps/relay`; dogfood the self-hosted relay on your NAS; import your current data. | Phones and desktop sync |
 | **5. Web parity** | Expo web build reaches the Next app's features; the NAS image serves it; the Next app is removed. | Desktop moves to the new client |
@@ -149,3 +150,4 @@ Project skills in `.claude/skills/` (written 2026-10-06). Each one points back h
 - 2026-10-06: agreed: one Expo client for iOS/Android/web (Next.js UI retired at web parity); Drizzle replaces Prisma; local-first with end-to-end encrypted sync.
 - 2026-10-06: recovery = recovery phrase plus optional key backup to iCloud Keychain / Google Password Manager.
 - 2026-10-06: sync = Proviso Sync (hosted, default) or self-hosted relay, same protocol. Google Drive / Dropbox only as backup destinations, not sync.
+- 2026-10-06 (Phase 2): natural keys → content ids (no unique constraints); row ids encrypted in sync messages; people as `p1`/`p2` keys rather than names; pocket money in its own space per child; one JSON export format for migration, backup and data download. Existing NAS data moves as an export file rather than as sync messages — the app turns an imported file into messages.

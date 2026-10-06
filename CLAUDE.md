@@ -440,6 +440,16 @@ Tracked in [`docs/security-privacy-legal.md`](docs/security-privacy-legal.md) §
 - CI: typecheck for every workspace, and a new smoke test that runs the built image twice (fresh, then restarted) before anything is published; branches build and test but never publish.
 - No behaviour change: 261 tests (184 core + 77 web), lint and production build unchanged. The local dev database moved with the folder to `apps/web/prisma/`; local `.env` belongs in `apps/web/`.
 
+### Phase 26 — Local-first data model, household export (2026-10-06)
+
+- Phase 2 of [`docs/architecture.md`](docs/architecture.md). Nothing in the running app changes except one new Settings panel.
+- **`packages/core/src/schema.ts`**: the Drizzle schema for the app — 26 household tables plus a separate pocket-money space (2 tables) per child. Text UUID ids, `deletedAt` instead of deletes, no unique indexes, ISO dates, column names = TS keys. Cleaned up on the way: the two work-pattern tables are one `workPhase` with `person`; HELP, super history and investment parcels point at `p1`/`p2` instead of a display name (so the rename cascade in `members.ts` isn't needed there); super settings lose three unused fields and their duplicate partner switch; `CategoriationRule` is spelled `categorisationRule`. Migration `packages/core/drizzle/0000_baseline.sql` (drizzle-kit, `npm run db:generate -w @proviso/core`); CI fails if the schema changes without a migration.
+- **`packages/core/src/ids.ts`**: `newId()` (UUIDv7) and `contentId()` (UUIDv8 from a natural key via MurmurHash3 x86-128, checked against a reference implementation). Transactions, rules, suggestion states, school-fee levels, HELP and super history rows use content ids — they replace the old unique constraints.
+- **`packages/core/src/householdExport.ts`**: the export file format and `parseHouseholdExport()`, which validates every row against the Drizzle column definitions (types, enums, required fields, settings ids, duplicates) with messages that name the table, row and field.
+- **`apps/web/lib/householdExport.ts`**: reads the Prisma tables and maps them (pure `mapLegacyHousehold`). Ids are stable across exports: natural-key rows use content ids; others derive from `HouseholdSettings.householdId` (new, migration `0004_household_id`, set on first export) and the legacy id. Names that match neither person go to p1, with a plain-language note in the file. Never includes sign-in data.
+- **Settings → Download all your data** (CFO): `GET /api/export`, audited as `data.export`.
+- **Verified**: 290 tests (203 core + 87 web), including migrations building exactly the schema in `node:sqlite` and every exported row inserting into it; on the scratch household, two downloads gave a valid file with identical ids, and Partner / signed-out requests were refused.
+
 ### Phase 24 — Your devices, app sign-in tokens, hashed session tokens, nonce CSP (2026-10-05, `v1.13.0`)
 
 - **Hashed tokens**: `Session.token` now stores the SHA-256 of the token, so a copy of the database (a backup, a stolen volume) can't be used to sign in. Migration `0003_session_devices` clears existing sessions — **everyone signs in once after updating**.

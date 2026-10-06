@@ -2,15 +2,20 @@
   "name": "@proviso/core",
   "version": "0.1.0",
   "private": true,
-  "description": "Proviso's data rules and calculations: tax, super, projections, budget, schemas. Pure TypeScript \u2014 runs in Node, browsers and React Native.",
+  "description": "Proviso's data rules and calculations: tax, super, projections, budget, schemas. Pure TypeScript \u00e2\u20ac\u201d runs in Node, browsers and React Native.",
   "exports": {
     "./*": "./src/*.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
-    "test": "vitest run"
+    "test": "vitest run",
+    "db:generate": "drizzle-kit generate"
   },
   "dependencies": {
+    "drizzle-orm": "^0.45.3",
     "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "drizzle-kit": "^0.31.11"
   }
 }

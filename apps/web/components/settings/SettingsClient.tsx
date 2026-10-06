@@ -153,6 +153,19 @@ export default function SettingsClient({
       )}
 
       {isCfo && (
+        <div style={{ marginTop: '1.5rem', padding: '1rem 1.25rem', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r)', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          <div style={{ flex: '1 1 220px' }}>
+            <div style={{ fontSize: '0.85rem', fontWeight: 500 }}>Download all your data</div>
+            <div style={{ fontSize: '0.74rem', color: 'var(--t2)', lineHeight: 1.5 }}>
+              Everything in your household as one file — for a backup, or to move into the Proviso app later.
+              It isn&rsquo;t encrypted, so keep it somewhere private.
+            </div>
+          </div>
+          <a href="/api/export" download className="hint-link" style={{ fontSize: '0.78rem' }}>Download →</a>
+        </div>
+      )}
+
+      {isCfo && (
       <div id="rerun" style={{ marginTop: '1.5rem', padding: '1.25rem', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r)' }}>
         <div style={{ fontSize: '0.875rem', fontWeight: 500, marginBottom: '0.4rem' }}>Re-run setup wizard</div>
         <p style={{ fontSize: '0.78rem', color: 'var(--t2)', marginBottom: '1rem', lineHeight: 1.5 }}>
