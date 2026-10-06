@@ -50,17 +50,13 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # Fails on a high/critical advisory in anything that ships in the image.
-      # Dev-only tooling (eslint, vitest) is excluded: it never reaches
-      # production, and its advisories often have no non-breaking fix.
-      - name: Audit production dependencies
-        run: npm audit --omit=dev --audit-level=high
-
-      # The image build runs `npm prune --omit=dev`, which re-resolves the
-      # whole tree and fails on peer conflicts that `npm ci` tolerates. Pull
-      # requests don't build the image, so check it here.
-      - name: Check the production prune resolves
-        run: npm prune --omit=dev --dry-run
+      # The phone app's packages (apps/client) are mostly Expo's build and
+      # dev-server tools, which run on a developer's machine, not on a NAS or
+      # inside the app. Several of their advisories have no fixed version yet,
+      # so only a critical one fails here. What the NAS image ships is audited
+      # strictly at the end of this job.
+      - name: Audit the app's dependencies (critical only)
+        run: npm audit --omit=dev --audit-level=critical
 
       - name: Generate Prisma client
         run: npx prisma generate
@@ -76,8 +72,19 @@ jobs:
           git status --porcelain packages/core/drizzle packages/core/src/migrations.ts
           test -z "$(git status --porcelain packages/core/drizzle packages/core/src/migrations.ts)"
 
-      - name: Run tests (packages/core and apps/web)
+      - name: Run tests (every workspace)
         run: npm test
+
+      # Last, because it removes the dev tools the steps above need. Prunes
+      # exactly as the Dockerfile's pruner stage does (dropping the app's
+      # workspaces), which also proves the prune resolves, then fails on a
+      # high/critical advisory in what remains: what the image ships.
+      - name: Prune as the image does, and audit what it ships
+        run: |
+          rm -rf apps/client packages/tokens
+          npm pkg set --json workspaces='["apps/web","packages/core"]'
+          npm prune --omit=dev
+          npm audit --omit=dev --audit-level=high
 
   # Builds the image and runs it the way a NAS does: a fresh volume (migrate +
   # seed), then a restart (backup + migrate an existing database). Nothing is
