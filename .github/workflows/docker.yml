@@ -76,13 +76,14 @@ jobs:
         run: npm test
 
       # Last, because it removes the dev tools the steps above need. Prunes
-      # exactly as the Dockerfile's pruner stage does (dropping the app's
+      # exactly as the Dockerfile's pruner stage does (twice: see there) (dropping the app's
       # workspaces), which also proves the prune resolves, then fails on a
       # high/critical advisory in what remains: what the image ships.
       - name: Prune as the image does, and audit what it ships
         run: |
           rm -rf apps/client packages/tokens
           npm pkg set --json workspaces='["apps/web","packages/core"]'
+          npm prune --omit=dev
           npm prune --omit=dev
           npm audit --omit=dev --audit-level=high
 

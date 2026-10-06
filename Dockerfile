@@ -37,9 +37,13 @@ RUN npm run build
 FROM builder AS pruner
 # This image serves the web app only. Dropping the phone app's workspaces
 # (apps/client, packages/tokens) first makes Expo / React Native extraneous,
-# so the prune removes them too — about 550 MB the server never uses.
+# so the prune removes them too — about 550 MB the server never uses. The
+# first prune keeps packages the app's tree had marked "dev or optional"
+# (e.g. micromatch); the second, reading the lockfile the first rewrote,
+# removes them. CI's audit step prunes the same way.
 RUN rm -rf apps/client packages/tokens \
  && npm pkg set --json workspaces='["apps/web","packages/core"]' \
+ && npm prune --omit=dev \
  && npm prune --omit=dev
 
 # ── Stage 4: runner ────────────────────────────────────────────────────────
