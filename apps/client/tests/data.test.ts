@@ -7,7 +7,10 @@ import { SCHEMA_VERSION, SETTINGS_ID } from '@proviso/core/schema'
 import { contentId } from '@proviso/core/ids'
 import type { Db } from '@/data/db'
 import { loadHousehold } from '@/data/household'
-import { importHousehold } from '@/data/importExport'
+import { importHousehold, exportHousehold, restoreHousehold, eraseHousehold } from '@/data/importExport'
+import { savePeople, saveRent, saveChildcare } from '@/data/settings'
+import { encryptBackup, decryptBackup, newHouseholdKey } from '@proviso/core/backup'
+import { parseHouseholdExport } from '@proviso/core/householdExport'
 import { insertRow, updateRow, deleteRow, saveSettings } from '@/data/mutate'
 import { homeView, spendingView } from '@/data/views'
 import { saveCost, removeCost, kindOf, type CostDraft } from '@/data/costs'
@@ -84,7 +87,7 @@ describe('client data layer', () => {
 
   it('imports an export file and shows the same figures as the NAS would', async () => {
     const r = await importHousehold(db, JSON.parse(JSON.stringify(sampleExport())))
-    expect(r).toEqual({ rows: 8, notes: ['A sample note'] })
+    expect(r).toEqual({ rows: 8, notes: ['A sample note'], householdId: sampleExport().householdId })
     const h = await loadHousehold(db)
     expect(h.exists).toBe(true)
     const home = homeView(h, NOW)
@@ -379,5 +382,86 @@ describe('future', () => {
     const v = futureView(h, NOW)
     expect(v.years).toBe(30)
     expect(v.retirement.goalMonthly).toBe(7_500)
+  })
+})
+
+describe('settings and backups', () => {
+  const answers: StarterAnswers = {
+    state: 'wa', regional: true,
+    you: { name: 'Alex', age: 30, salary: 90_000, days: 5, hasHelp: true, helpBalance: 20_000, superBalance: 40_000 },
+    partner: { name: 'Sam', age: 31, salary: 70_000, days: 5, hasHelp: false, helpBalance: 0, superBalance: 30_000 },
+    children: [], schoolType: null,
+    home: { kind: 'rent', weeklyRent: 500, mortgageBalance: 0, mortgageRate: 0, mortgageYears: 0, homeValue: 0 },
+    cars: 1, cash: 15_000, investments: 0,
+  }
+  async function setUp() {
+    const { db } = await migratedTestDb()
+    await startHousehold(db, buildStarterHousehold(answers, estimateLivingCosts(answers), NOW))
+    return db
+  }
+
+  it('renames people, and their HELP debt follows', async () => {
+    const db = await setUp()
+    expect(await savePeople(db, { person1Name: 'Alexandra', person2Name: 'Sam', partnerEnabled: true })).toBeNull()
+    const h = await loadHousehold(db)
+    expect(h.settings.person1Name).toBe('Alexandra')
+    expect(h.debts.map(d => d.name)).toEqual(['Alexandra HELP debt'])
+    expect(wealthView(h, NOW).help[0]).toMatchObject({ name: 'Alexandra', balance: 20_000 })
+  })
+
+  it('refuses names that can’t be told apart', async () => {
+    const db = await setUp()
+    expect(await savePeople(db, { person1Name: 'Sam', person2Name: 'sam', partnerEnabled: true })).toMatch(/different names/)
+    expect(await savePeople(db, { person1Name: ' ', person2Name: 'Sam', partnerEnabled: true })).toMatch(/needs a name/)
+  })
+
+  it('rent: changes the amount, and turning it off leaves the budget', async () => {
+    const db = await setUp()
+    await saveRent(db, { enabled: true, monthlyRent: 2400, annualIncreaseRate: 4 })
+    expect(spendingView(await loadHousehold(db), NOW).categories.find(c => c.cat === 'Home')?.lines.find(l => l.kind === 'rent')?.monthly).toBe(2400)
+    await saveRent(db, { enabled: false, monthlyRent: 2400, annualIncreaseRate: 4 })
+    expect(spendingView(await loadHousehold(db), NOW).categories.flatMap(c => c.lines).some(l => l.kind === 'rent')).toBe(false)
+  })
+
+  it('childcare: switching it on adds the after-subsidy line once', async () => {
+    const db = await setUp()
+    await saveChildcare(db, { enabled: true, costPerDay: 140, daysPerWeek: 3, numChildren: 1 })
+    await saveChildcare(db, { enabled: true, costPerDay: 150, daysPerWeek: 4, numChildren: 1 })
+    const h = await loadHousehold(db)
+    expect(h.expenses.filter(e => e.name === 'Childcare')).toHaveLength(1)
+    expect(homeView(h, NOW).budget.childcareNet).toBeGreaterThan(0)
+  })
+
+  it('a backup restores the household exactly, removed rows included', async () => {
+    const db = await setUp()
+    const gone = await insertRow(db, 'expense', { cat: 'Fun', name: 'Old hobby', freq: 'monthly', amt: 50 })
+    await deleteRow(db, 'expense', gone, NOW)
+    const key = newHouseholdKey()
+    const doc = await exportHousehold(db, 'hh-1', { includeRemoved: true, appVersion: 'test', now: NOW })
+    expect(parseHouseholdExport(JSON.parse(JSON.stringify(doc)))).toEqual(doc)   // valid by the shared format
+    const file = JSON.parse(JSON.stringify(encryptBackup(doc, key, NOW)))
+
+    const other = (await migratedTestDb()).db
+    const r = await restoreHousehold(other, decryptBackup(file, key))
+    expect(r.householdId).toBe('hh-1')
+    const before = await loadHousehold(db), after = await loadHousehold(other)
+    expect(after.expenses).toEqual(before.expenses)
+    expect(homeView(after, NOW).left).toBe(homeView(before, NOW).left)
+    const again = await exportHousehold(other, 'hh-1', { includeRemoved: true, appVersion: 'test', now: NOW })
+    expect(again.household.expense.find(e => e.id === gone)?.deletedAt).toBe(NOW.toISOString())
+  })
+
+  it('a readable copy leaves removed rows out', async () => {
+    const db = await setUp()
+    const gone = await insertRow(db, 'expense', { cat: 'Fun', name: 'Old hobby', freq: 'monthly', amt: 50 })
+    await deleteRow(db, 'expense', gone, NOW)
+    const doc = await exportHousehold(db, 'hh-1', { includeRemoved: false, appVersion: 'test' })
+    expect(doc.household.expense.some(e => e.id === gone)).toBe(false)
+  })
+
+  it('start again empties the device', async () => {
+    const db = await setUp()
+    await eraseHousehold(db)
+    expect((await loadHousehold(db)).exists).toBe(false)
   })
 })

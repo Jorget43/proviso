@@ -7,13 +7,22 @@ import type { Db } from './db'
 import { openHouseholdDb } from './open'
 import { loadHousehold, type HouseholdData } from './household'
 import * as mutate from './mutate'
-import { importHousehold, type ImportResult } from './importExport'
+import { importHousehold, restoreHousehold, eraseHousehold, type ImportResult } from './importExport'
+import { decryptBackup, keyFromPhrase } from '@proviso/core/backup'
+import { freshIdentity, saveIdentity, forgetIdentity } from './identity'
 
 interface DataContext {
   household: HouseholdData
   /** Runs a change against the database, then reloads. */
   change:    (fn: (db: Db, m: typeof mutate) => Promise<unknown>) => Promise<void>
+  /** Reads from the database without changing anything (e.g. to export). */
+  read:      <T>(fn: (db: Db) => Promise<T>) => Promise<T>
+  /** Brings in an export file (e.g. from the NAS). It becomes a new household on this device, with its own key. */
   importFile: (json: unknown) => Promise<ImportResult>
+  /** Restores an encrypted backup with its recovery phrase. Throws a readable error if either is wrong. */
+  restoreBackup: (file: unknown, phrase: string) => Promise<ImportResult>
+  /** Removes the household and its key from this device. */
+  erase: () => Promise<void>
 }
 
 const Ctx = createContext<DataContext | null>(null)
@@ -46,7 +55,26 @@ export function DataProvider({ children, loading, failed }: {
   const value = useMemo<DataContext | null>(() => (db && household ? {
     household,
     change: async fn => { await fn(db, mutate); await reload(db) },
-    importFile: async json => { const r = await importHousehold(db, json); await reload(db); return r },
+    read: fn => fn(db),
+    importFile: async json => {
+      const r = await importHousehold(db, json)
+      await saveIdentity(freshIdentity(r.householdId))
+      await reload(db)
+      return r
+    },
+    restoreBackup: async (file, phrase) => {
+      const key = keyFromPhrase(phrase)            // checks the words first
+      const doc = decryptBackup(file, key)         // then that they open this backup
+      const r = await restoreHousehold(db, doc)
+      await saveIdentity({ householdId: r.householdId, key, phraseSaved: true })
+      await reload(db)
+      return r
+    },
+    erase: async () => {
+      await eraseHousehold(db)
+      await forgetIdentity()
+      await reload(db)
+    },
   } : null), [db, household, reload])
 
   if (error) return <>{failed(error)}</>

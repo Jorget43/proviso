@@ -13,6 +13,7 @@ function Centered({ children }: { children: React.ReactNode }) {
 
 export default function RootLayout() {
   const p = usePalette()
+  const page = { headerShown: true, title: '', headerStyle: { backgroundColor: p.bar }, headerTintColor: p.barText }
   const sheet = { presentation: 'modal' as const, headerShown: true, title: '', headerStyle: { backgroundColor: p.surface }, headerTintColor: p.t1 }
   return (
     <SafeAreaProvider>
@@ -30,8 +31,10 @@ export default function RootLayout() {
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="welcome" />
           <Stack.Screen name="setup" />
+          {/* Full pages with a back button */}
+          {['settings', 'recovery', 'restore'].map(name => <Stack.Screen key={name} name={name} options={page} />)}
           {/* Forms over a tab */}
-          {['expense', 'income', 'item', 'loan', 'super', 'assumptions', 'oneoff'].map(name => <Stack.Screen key={name} name={name} options={sheet} />)}
+          {['expense', 'income', 'item', 'loan', 'super', 'assumptions', 'oneoff', 'people', 'rent', 'childcare'].map(name => <Stack.Screen key={name} name={name} options={sheet} />)}
         </Stack>
       </DataProvider>
     </SafeAreaProvider>

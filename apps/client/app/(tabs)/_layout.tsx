@@ -1,7 +1,8 @@
 // The four destinations, as a bottom tab bar (the proviso-ui skill: Home,
 // Spending, Wealth, Future — no fifth without asking).
 
-import { Redirect, Tabs } from 'expo-router'
+import { Redirect, Tabs, router } from 'expo-router'
+import { Pressable } from 'react-native'
 import Ionicons from '@expo/vector-icons/Ionicons'
 import type { ColorValue } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -29,6 +30,13 @@ export default function TabsLayout() {
       tabBarStyle: { backgroundColor: p.surface, borderTopColor: p.border, height: TAB_BAR + insets.bottom },
       tabBarActiveTintColor: p.t1, tabBarInactiveTintColor: p.t3,
       tabBarLabelStyle: { fontSize: 11, lineHeight: 14, fontWeight: '500' },
+      // Settings sits behind the gear on every tab (the proviso-ui skill: no fifth tab).
+      headerRight: () => (
+        <Pressable accessibilityRole="button" accessibilityLabel="Settings" onPress={() => router.push('/settings')}
+          hitSlop={8} style={{ minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center', marginRight: 4 }}>
+          <Ionicons name="settings-outline" size={22} color={p.barText} />
+        </Pressable>
+      ),
     }}>
       <Tabs.Screen name="index"    options={{ title: 'Home',     headerTitle: 'Proviso', tabBarIcon: icon('home-outline') }} />
       <Tabs.Screen name="spending" options={{ title: 'Spending', tabBarIcon: icon('card-outline') }} />

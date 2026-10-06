@@ -6,6 +6,7 @@ import { router } from 'expo-router'
 import { fmt, fmtK } from '@proviso/core/formatting'
 import type { OverviewTarget } from '@proviso/core/overview'
 import { useHousehold } from '@/data/DataProvider'
+import { useIdentity } from '@/data/useIdentity'
 import { homeView } from '@/data/views'
 import { Card, H2, Screen, T, Button } from '@/ui/kit'
 import { usePalette, space, radius } from '@/ui/theme'
@@ -17,6 +18,7 @@ const TARGET: Record<OverviewTarget, '/income' | '/spending' | '/wealth'> = { in
 
 export default function Home() {
   const { household } = useHousehold()
+  const identity = useIdentity()
   const p = usePalette()
   const v = homeView(household, new Date())
   const firstName = v.person1Name.trim().split(/\s+/)[0]
@@ -54,6 +56,15 @@ export default function Home() {
           <Button kind="quiet" title="Change pay" onPress={() => router.push('/income')} />
         </View>
       </Card>
+
+      {household.settings.onboardingDone && identity && !identity.phraseSaved && (
+        <View style={{ backgroundColor: p.amberLt, borderRadius: radius.md, padding: space.md, gap: space.sm }}>
+          <T>Your data lives only on this phone. Set up your recovery phrase so you can get it back if the phone is lost.</T>
+          <View style={{ alignItems: 'flex-start' }}>
+            <Button kind="quiet" title="Set it up" onPress={() => router.push('/recovery')} />
+          </View>
+        </View>
+      )}
 
       {v.checks.length > 0 && (
         <View style={{ gap: space.sm }}>

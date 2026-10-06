@@ -15,6 +15,7 @@ import { CATS } from '@proviso/core/constants'
 import { fmt, toMonthly } from '@proviso/core/formatting'
 import { useHousehold } from '@/data/DataProvider'
 import { startHousehold } from '@/data/setup'
+import { freshIdentity, saveIdentity } from '@/data/identity'
 import { Button, Card, Choice, Field, H2, Input, NumberField, Screen, T, TextField, parseAmount } from '@/ui/kit'
 import { usePalette, space, radius, touch } from '@/ui/theme'
 
@@ -102,6 +103,8 @@ export default function Setup() {
     try {
       const plan = buildStarterHousehold(answers(), lines, new Date())
       await change(db => startHousehold(db, plan))
+      // A new household gets its own key (and recovery phrase).
+      await saveIdentity(freshIdentity())
       router.replace('/')
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Something went wrong saving that.')

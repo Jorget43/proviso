@@ -97,11 +97,14 @@ function Line({ line: l }: { line: SpendingLine }) {
       <T weight="600">{fmt(l.monthly)}/mo</T>
     </View>
   )
-  if (!l.editable) return <View style={{ borderBottomWidth: 1, borderBottomColor: p.border }}>{body}</View>
+  // Rent and childcare are worked out from their own settings; tapping opens those.
+  const open = l.kind === 'rent' ? () => router.push('/rent')
+    : l.kind === 'childcare' ? () => router.push('/childcare')
+    : () => router.push({ pathname: '/expense', params: { id: l.id, kind: l.kind } })
   return (
     <Pressable
       accessibilityRole="button" accessibilityLabel={`${l.name}, ${fmt(l.monthly)} a month. Change`}
-      onPress={() => router.push({ pathname: '/expense', params: { id: l.id, kind: l.kind } })}
+      onPress={open}
       style={({ pressed }) => ({ borderBottomWidth: 1, borderBottomColor: p.border, backgroundColor: pressed ? p.surface2 : 'transparent' })}
     >
       {body}
