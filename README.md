@@ -28,6 +28,12 @@ npm run typecheck
 npm run web -w @proviso/client   # http://localhost:8080
 ```
 
+### The app (`apps/client`)
+
+The new Expo app for iOS, Android and the web, local-first (data on the device), being built towards the plan in [`docs/architecture.md`](docs/architecture.md). Today it's single-device: a setup questionnaire that fills in typical costs, Home, Spending, Wealth, Future, and Settings with a 24-word recovery phrase and encrypted backups. Sync between devices comes next.
+
+To try it on a phone, install **Expo Go**, run `npm run start -w @proviso/client` and scan the QR code (same Wi-Fi; add `-- --tunnel` if the phone can't connect). If Expo Go is signed in to an Expo account, sign the CLI in to the same one first (`npx expo login`; on Windows with a Google sign-in use `$env:BROWSER="none"; npx expo login --browser`). To bring your NAS data across, use Settings → Download all your data on the NAS, then *Choose the file* on the app's welcome screen.
+
 Set `DATABASE_URL` (e.g. `file:./dev.db`, relative to `apps/web/prisma/`) in `apps/web/.env` for local work — Next.js reads `.env` from the app's own folder.
 
 ## Quick start (pre-built image)
@@ -104,5 +110,7 @@ Built for phones first (Add to Home Screen opens it like an app), with the same 
 - **Spending** — Budget · Actual spending (bank/card statement import)
 - **Wealth** — Own & owe · Super · Investments
 - **Future** — Long term (projections with "What if?") · Next 2 years (cashflow)
+
+The NAS web app is the full product today; the app (above) has Home, Spending, Wealth and Future so far.
 
 Plus a seasonal EOFY view (May/June) and Settings, where "Your situation" switches on renting, childcare, school fees and parental leave. See `CLAUDE.md` for architecture and engine details.

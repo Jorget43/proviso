@@ -126,7 +126,7 @@ packages/tokens  colours, spacing, type scale → generated for web CSS and nati
 |---|---|---|
 | **1. Restructure** | Split into a workspace repo; move the calculation code into `packages/core` unchanged; the Next app imports it from there. | None |
 | **2. Data model** | Drizzle schema in `packages/core` following D3; the household export file format; a NAS exporter that writes today's database in it (the migration path for existing NAS users, and "Download all your data"). | Settings → Download all your data |
-| **3. Client MVP** | Expo app, single device (no sync): onboarding, Home, Spending, Wealth, Future, recovery phrase. Spike Expo SQLite on web. | Household TestFlight / Android test |
+| **3. Client MVP** | Expo app, single device (no sync): onboarding, Home, Spending, Wealth, Future, recovery phrase. Spike Expo SQLite on web. **Built 2026-10-06 (Phases 27–30) except the store build and the password-manager key backup.** | Household TestFlight / Android test |
 | **4. Sync** | `packages/sync` and `apps/relay`; dogfood the self-hosted relay on your NAS; import your current data. | Phones and desktop sync |
 | **5. Web parity** | Expo web build reaches the Next app's features; the NAS image serves it; the Next app is removed. | Desktop moves to the new client |
 | **6. Public release** | Hosted Proviso Sync (Australian region, privacy policy), store listings, privacy labels, help pages, closed testing (Google requires 12 testers for 14 days on new personal accounts). | Public |
