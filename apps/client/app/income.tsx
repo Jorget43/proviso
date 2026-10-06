@@ -3,15 +3,15 @@
 // NAS); households that record take-home pay directly edit that instead.
 
 import { useState } from 'react'
-import { ScrollView, View } from 'react-native'
+import { View } from 'react-native'
 import { router, Stack } from 'expo-router'
 import { calcAfterTax } from '@proviso/core/tax'
 import { workDaysForYear } from '@proviso/core/projections'
 import { fmt } from '@proviso/core/formatting'
 import { useHousehold } from '@/data/DataProvider'
 import { savePay } from '@/data/setup'
-import { Button, Card, Choice, Field, NumberField, T, parseAmount } from '@/ui/kit'
-import { usePalette, space } from '@/ui/theme'
+import { Button, Card, Choice, Field, NumberField, Sheet, T, parseAmount } from '@/ui/kit'
+import { space } from '@/ui/theme'
 import { TYPICAL } from '@proviso/core/starter'
 
 const DAYS = [{ key: '0', label: 'Not working' }, ...[1, 2, 3, 4, 5].map(d => ({ key: String(d), label: String(d) }))]
@@ -21,7 +21,6 @@ interface PayForm { amount: string; days: string; hasHelp: boolean }
 
 export default function Income() {
   const { household: h, change } = useHousehold()
-  const p = usePalette()
   const year = new Date().getFullYear()
   const taxMode = h.income.taxMode
   const people = [
@@ -54,7 +53,7 @@ export default function Income() {
   }
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: p.bg }} contentContainerStyle={{ padding: space.lg, gap: space.lg, maxWidth: 560, width: '100%', alignSelf: 'center' }} keyboardShouldPersistTaps="handled">
+    <Sheet>
       <Stack.Screen options={{ title: 'Pay' }} />
       {people.map(x => {
         const f = forms[x.key]
@@ -88,6 +87,6 @@ export default function Income() {
         <Button title="Save" onPress={save} />
         <Button kind="quiet" title="Cancel" onPress={() => router.back()} />
       </View>
-    </ScrollView>
+    </Sheet>
   )
 }

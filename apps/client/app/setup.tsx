@@ -3,7 +3,7 @@
 // and the rows they become live in @proviso/core/starter; this screen only asks.
 
 import { useState } from 'react'
-import { Pressable, TextInput, View } from 'react-native'
+import { Pressable, View } from 'react-native'
 import { router } from 'expo-router'
 import {
   STATES, TYPICAL, typicalSuper, typicalWeeklyRent, typicalChildcareDay, estimateLivingCosts, buildStarterHousehold,
@@ -15,7 +15,7 @@ import { CATS } from '@proviso/core/constants'
 import { fmt, toMonthly } from '@proviso/core/formatting'
 import { useHousehold } from '@/data/DataProvider'
 import { startHousehold } from '@/data/setup'
-import { Button, Card, Choice, Field, H2, NumberField, Screen, T, TextField, parseAmount, useInputStyle } from '@/ui/kit'
+import { Button, Card, Choice, Field, H2, Input, NumberField, Screen, T, TextField, parseAmount } from '@/ui/kit'
 import { usePalette, space, radius, touch } from '@/ui/theme'
 
 const STEPS = ['where', 'you', 'partner', 'kids', 'home', 'money', 'review'] as const
@@ -293,8 +293,6 @@ function Review({ answers, edits, setEdits, removed, setRemoved, replacing, savi
   replacing: boolean; saving: boolean; error: string | null
   onSave: (lines: StarterLine[]) => void
 }) {
-  const p = usePalette()
-  const input = useInputStyle()
   const estimated = estimateLivingCosts(answers)
   const lines = estimated
     .filter(l => !removed.has(l.key))
@@ -340,8 +338,8 @@ function Review({ answers, edits, setEdits, removed, setRemoved, replacing, savi
                   {!off && (
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
                       <T tone="t2">$</T>
-                      <TextInput value={value} onChangeText={v => setEdits(e => ({ ...e, [l.key]: v }))} keyboardType="decimal-pad"
-                        style={[input, { flex: 1, maxWidth: 160 }]} accessibilityLabel={`${l.name}, dollars ${FREQ_LABEL[l.freq]}`} placeholderTextColor={p.t3} />
+                      <Input value={value} onChangeText={v => setEdits(e => ({ ...e, [l.key]: v }))} keyboardType="decimal-pad"
+                        style={{ flex: 1, maxWidth: 160 }} accessibilityLabel={`${l.name}, dollars ${FREQ_LABEL[l.freq]}`} />
                       <T tone="t2">{FREQ_LABEL[l.freq]}</T>
                       {l.freq !== 'monthly' && <T size="small" tone="t3">≈ {fmt(toMonthly(Math.max(0, parseAmount(value) || 0), l.freq))}/mo</T>}
                     </View>

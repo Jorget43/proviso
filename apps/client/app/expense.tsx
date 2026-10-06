@@ -2,14 +2,14 @@
 // cost is saved as, and moving it between kinds, are in src/data/costs.ts.
 
 import { useState } from 'react'
-import { Alert, Platform, ScrollView, TextInput, View } from 'react-native'
+import { Alert, Platform, View } from 'react-native'
 import { router, Stack, useLocalSearchParams } from 'expo-router'
 import { CATS } from '@proviso/core/constants'
 import { toMonthly, fmt } from '@proviso/core/formatting'
 import { useHousehold } from '@/data/DataProvider'
 import { saveCost, removeCost, kindOf, type Freq } from '@/data/costs'
-import { Button, Choice, Field, T, parseAmount, useInputStyle } from '@/ui/kit'
-import { usePalette, space } from '@/ui/theme'
+import { Button, Choice, Field, Input, Sheet, T, parseAmount } from '@/ui/kit'
+import { space } from '@/ui/theme'
 
 const FREQS: { key: Freq; label: string }[] = [
   { key: 'weekly', label: 'Weekly' }, { key: 'monthly', label: 'Monthly' },
@@ -20,7 +20,6 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 export default function ExpenseSheet() {
   const params = useLocalSearchParams<{ id?: string; kind?: string; cat?: string }>()
   const { household, change } = useHousehold()
-  const p = usePalette()
 
   const existing = params.id
     ? (params.kind === 'annual'
@@ -57,18 +56,17 @@ export default function ExpenseSheet() {
     Alert.alert(`Remove “${existing.name}”?`, undefined, [{ text: 'Cancel', style: 'cancel' }, { text: 'Remove', style: 'destructive', onPress: go }])
   }
 
-  const input = useInputStyle()
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: p.bg }} contentContainerStyle={{ padding: space.lg, gap: space.lg, maxWidth: 560, width: '100%', alignSelf: 'center' }} keyboardShouldPersistTaps="handled">
+    <Sheet>
       <Stack.Screen options={{ title: existing ? 'Change a cost' : 'Add a cost' }} />
 
       <Field label="What is it?">
-        <TextInput value={name} onChangeText={setName} placeholder="e.g. Groceries" placeholderTextColor={p.t3} style={input} accessibilityLabel="What is it?" />
+        <Input value={name} onChangeText={setName} placeholder="e.g. Groceries" accessibilityLabel="What is it?" />
       </Field>
 
       <Field label="How much?">
-        <TextInput value={amt} onChangeText={setAmt} keyboardType="decimal-pad" placeholder="0" placeholderTextColor={p.t3} style={input} accessibilityLabel="How much, in dollars" />
+        <Input value={amt} onChangeText={setAmt} keyboardType="decimal-pad" placeholder="0" accessibilityLabel="How much, in dollars" />
       </Field>
 
       <Field label="How often?">
@@ -95,6 +93,6 @@ export default function ExpenseSheet() {
         <Button kind="quiet" title="Cancel" onPress={() => router.back()} />
         {existing && <Button kind="danger" title="Remove" onPress={remove} />}
       </View>
-    </ScrollView>
+    </Sheet>
   )
 }
