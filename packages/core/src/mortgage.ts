@@ -76,3 +76,18 @@ export function simulateMortgageYear(
 
   return { endBalance: mb, endCash: cash, annualInterest, annualPrincipal, annualPaid };
 }
+
+/**
+ * Months until a loan is repaid at this monthly payment (interest monthly,
+ * ignoring any offset). null when the payment doesn't cover the interest,
+ * or the loan would run past 50 years.
+ */
+export function monthsToRepay(balance: number, ratePct: number, payment: number): number | null {
+  if (balance <= 0) return 0;
+  if (payment <= 0) return null;
+  const r = ratePct / 100 / 12;
+  if (r === 0) return Math.ceil(balance / payment);
+  if (payment <= balance * r) return null;
+  const months = Math.ceil(-Math.log(1 - (r * balance) / payment) / Math.log(1 + r));
+  return months > 600 ? null : months;
+}

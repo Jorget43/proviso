@@ -13,7 +13,7 @@ const person = (over: Partial<StarterPerson> = {}): StarterPerson => ({
 
 const base = (over: Partial<StarterAnswers> = {}): StarterAnswers => ({
   state: 'vic', regional: false, you: person(), partner: null, children: [], schoolType: null,
-  home: { kind: 'rent', weeklyRent: 550, mortgageBalance: 0, mortgageRate: 6.2, mortgageYears: 25 },
+  home: { kind: 'rent', weeklyRent: 550, mortgageBalance: 0, mortgageRate: 6.2, mortgageYears: 25, homeValue: 0 },
   cars: 1, cash: 20_000, investments: 0, ...over,
 })
 
@@ -22,7 +22,7 @@ const names = (a: StarterAnswers) => estimateLivingCosts(a).map(l => l.name)
 
 describe('estimateLivingCosts', () => {
   it('gives every line a known category, a positive amount and a unique key', () => {
-    const a = base({ partner: person({ name: 'Sam' }), children: [{ age: 1, childcareDays: 3 }, { age: 8, childcareDays: 0 }], schoolType: 'catholic', home: { kind: 'mortgage', weeklyRent: 0, mortgageBalance: 600_000, mortgageRate: 6.2, mortgageYears: 25 }, cars: 2 })
+    const a = base({ partner: person({ name: 'Sam' }), children: [{ age: 1, childcareDays: 3 }, { age: 8, childcareDays: 0 }], schoolType: 'catholic', home: { kind: 'mortgage', weeklyRent: 0, mortgageBalance: 600_000, mortgageRate: 6.2, mortgageYears: 25, homeValue: 0 }, cars: 2 })
     const lines = estimateLivingCosts(a)
     expect(lines.length).toBeGreaterThan(15)
     for (const l of lines) {
@@ -47,7 +47,7 @@ describe('estimateLivingCosts', () => {
   })
 
   it('adds owners’ costs and the repayment for a mortgage, renters’ costs for renting', () => {
-    const owner = estimateLivingCosts(base({ home: { kind: 'mortgage', weeklyRent: 0, mortgageBalance: 500_000, mortgageRate: 6, mortgageYears: 25 } }))
+    const owner = estimateLivingCosts(base({ home: { kind: 'mortgage', weeklyRent: 0, mortgageBalance: 500_000, mortgageRate: 6, mortgageYears: 25, homeValue: 0 } }))
     expect(owner.map(l => l.name)).toEqual(expect.arrayContaining(['Mortgage', 'Council rates', 'Home & contents insurance']))
     // $500k over 25 years at 6% ≈ $3,222 a month
     expect(owner.find(l => l.name === 'Mortgage')!.amt).toBe(3222)
@@ -115,7 +115,7 @@ describe('buildStarterHousehold', () => {
   })
 
   it('sets up the mortgage, with cash as the offset', () => {
-    const a = base({ home: { kind: 'mortgage', weeklyRent: 0, mortgageBalance: 500_000, mortgageRate: 6, mortgageYears: 25 } })
+    const a = base({ home: { kind: 'mortgage', weeklyRent: 0, mortgageBalance: 500_000, mortgageRate: 6, mortgageYears: 25, homeValue: 0 } })
     const h = buildStarterHousehold(a, [], now)
     expect(h.mortgage).toEqual({ balance: 500_000, rate: 6, payment: 3222, offsetBal: 20_000, endDate: '2051-10-01' })
     expect(h.assets).toEqual([{ name: 'Cash / savings', amt: 20_000, isOffset: true }])
@@ -151,5 +151,17 @@ describe('suggestions', () => {
   it('typical super grows with age', () => {
     expect(typicalSuper(22)).toBeLessThan(typicalSuper(35))
     expect(typicalSuper(35)).toBeLessThan(typicalSuper(55))
+  })
+})
+
+describe('the home', () => {
+  const now = new Date(2026, 9, 6)
+  it('counts an owned home at its value, a mortgaged one at value less loan, and is left out when not given', () => {
+    const own = buildStarterHousehold(base({ home: { kind: 'own', weeklyRent: 0, mortgageBalance: 0, mortgageRate: 0, mortgageYears: 0, homeValue: 900_000 } }), [], now)
+    expect(own.assets).toContainEqual({ name: 'Home equity', amt: 900_000, isOffset: false })
+    const loan = buildStarterHousehold(base({ home: { kind: 'mortgage', weeklyRent: 0, mortgageBalance: 500_000, mortgageRate: 6, mortgageYears: 25, homeValue: 800_000 } }), [], now)
+    expect(loan.assets).toContainEqual({ name: 'Home equity', amt: 300_000, isOffset: false })
+    const unknown = buildStarterHousehold(base({ home: { kind: 'mortgage', weeklyRent: 0, mortgageBalance: 500_000, mortgageRate: 6, mortgageYears: 25, homeValue: 0 } }), [], now)
+    expect(unknown.assets.some(x => x.name === 'Home equity')).toBe(false)
   })
 })

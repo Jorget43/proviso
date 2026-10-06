@@ -7,6 +7,9 @@ import { computeBudgetSummary, isManagedChildcare } from '@proviso/core/budgetSu
 import { workDaysForYear } from '@proviso/core/projections'
 import { situationFrom, situationLabels } from '@proviso/core/situation'
 import { toMonthly } from '@proviso/core/formatting'
+import { netPositionOf, computeCashOnHand, isHomeEquity } from '@proviso/core/netWorth'
+import { findHelpDebt } from '@proviso/core/members'
+import { calcHELPRepayment } from '@proviso/core/tax'
 import { CATS, CAT_COLORS } from '@proviso/core/constants'
 import type { HouseholdRow } from '@proviso/core/schema'
 import type { HouseholdData } from './household'
@@ -113,5 +116,78 @@ export function spendingView(h: HouseholdData, now: Date): SpendingView {
   return {
     monthlyIncome: b.monthlyIncome, monthlyExpenses: b.monthlyExpenses, left: b.delta,
     person1Net: b.person1Net, person2Net: b.person2Net, categories,
+  }
+}
+
+// ── Wealth ───────────────────────────────────────────────────────────────────
+
+export interface WealthItem {
+  id:   string
+  name: string
+  amt:  number
+  /** Marked as cash: counts towards the safety net and offsets the home loan. */
+  cash: boolean
+  home: boolean
+}
+
+export interface WealthView {
+  netWorth:       number
+  netWorthChange: HomeView['netWorthChange']
+  totalOwned:     number
+  /** Debts counted against net worth (a "mortgage" debt is netted in the home's equity). */
+  totalOwed:      number
+  owned:          WealthItem[]   // biggest first
+  owed:           WealthItem[]
+  cash:           number
+  coverMonths:    number | null
+  /** The home loan, when there is one (not renting, balance owing). */
+  loan:           { balance: number; rate: number; payment: number; offset: number; endYear: number | null; monthlyInterest: number } | null
+  /** Owners with a loan but no "Home equity" asset: their home isn't counted yet. */
+  homeMissing:    boolean
+  help:           { person: 'p1' | 'p2'; name: string; balance: number; yearlyRepayment: number }[]
+  super:          { person: 'p1' | 'p2'; name: string; balance: number; retirementAge: number }[]
+}
+
+export function wealthView(h: HouseholdData, now: Date): WealthView {
+  const home = homeView(h, now)
+  const position = netPositionOf(h.debts, h.assets)
+  const year = now.getFullYear()
+  const p = phases(h)
+  const people = [
+    { person: 'p1' as const, name: h.settings.person1Name, n: 1 as const, days: workDaysForYear(p.p1, year) },
+    ...(h.settings.partnerEnabled ? [{ person: 'p2' as const, name: h.settings.person2Name, n: 2 as const, days: workDaysForYear(p.p2, year) }] : []),
+  ]
+  const item = (x: { id: string; name: string; amt: number; isOffset?: boolean }): WealthItem =>
+    ({ id: x.id, name: x.name, amt: x.amt, cash: x.isOffset ?? false, home: isHomeEquity(x) })
+  const byAmt = (a: WealthItem, b: WealthItem) => b.amt - a.amt
+
+  const m = h.mortgage
+  const loan = m && m.balance > 0 && !h.rent.enabled ? (() => {
+    const offset = h.assets.some(a => a.isOffset) ? computeCashOnHand(h.assets) : m.offsetBal
+    return {
+      balance: m.balance, rate: m.rate, payment: m.payment, offset,
+      endYear: home.mortgageEndYear,
+      monthlyInterest: Math.max(0, m.balance - offset) * (m.rate / 100) / 12,
+    }
+  })() : null
+
+  return {
+    netWorth: home.netWorth, netWorthChange: home.netWorthChange,
+    totalOwned: position.totalAssets, totalOwed: position.debtsOwed,
+    owned: h.assets.map(item).sort(byAmt),
+    owed: h.debts.map(item).sort(byAmt),
+    cash: home.cash, coverMonths: home.coverMonths,
+    loan,
+    homeMissing: loan !== null && !h.assets.some(isHomeEquity),
+    help: people.flatMap(x => {
+      const debt = findHelpDebt(h.debts, x.name)
+      if (!debt && !h.income[`person${x.n}HasHELP`]) return []
+      const gross = h.income.taxMode ? h.income[`person${x.n}FTE`] * x.days / 5 : 0
+      return [{ person: x.person, name: x.name, balance: debt?.amt ?? 0, yearlyRepayment: calcHELPRepayment(gross) }]
+    }),
+    super: people.map(x => ({
+      person: x.person, name: x.name,
+      balance: h.superSettings[`person${x.n}Balance`], retirementAge: h.superSettings[`person${x.n}RetirementAge`],
+    })),
   }
 }

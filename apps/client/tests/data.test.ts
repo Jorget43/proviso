@@ -12,6 +12,8 @@ import { insertRow, updateRow, deleteRow, saveSettings } from '@/data/mutate'
 import { homeView, spendingView } from '@/data/views'
 import { saveCost, removeCost, kindOf, type CostDraft } from '@/data/costs'
 import { startHousehold, savePay } from '@/data/setup'
+import { saveAsset, removeAsset, saveDebt, saveLoan, saveSuper } from '@/data/wealth'
+import { wealthView } from '@/data/views'
 import { estimateLivingCosts, buildStarterHousehold, type StarterAnswers } from '@proviso/core/starter'
 
 // The app's data layer against a real SQLite (node:sqlite), migrated with the
@@ -194,7 +196,7 @@ describe('setting up a new household', () => {
     you: { name: 'Alex', age: 34, salary: 110_000, days: 5, hasHelp: true, helpBalance: 18_000, superBalance: 70_000 },
     partner: { name: 'Sam', age: 33, salary: 90_000, days: 3, hasHelp: false, helpBalance: 0, superBalance: 50_000 },
     children: [{ age: 2, childcareDays: 3 }, { age: 6, childcareDays: 0 }], schoolType: 'government',
-    home: { kind: 'mortgage', weeklyRent: 0, mortgageBalance: 550_000, mortgageRate: 6.2, mortgageYears: 25 },
+    home: { kind: 'mortgage', weeklyRent: 0, mortgageBalance: 550_000, mortgageRate: 6.2, mortgageYears: 25, homeValue: 850_000 },
     cars: 2, cash: 30_000, investments: 10_000,
   }
 
@@ -245,5 +247,74 @@ describe('setting up a new household', () => {
     const h = await loadHousehold(db)
     await savePay(db, 'p1', { amount: 5500, days: 5, hasHelp: false, taxMode: false }, h.workPhases, 2026)
     expect((await loadHousehold(db)).income).toMatchObject({ taxMode: false, person1MonthlyNet: 5500 })
+  })
+})
+
+describe('wealth', () => {
+  const owner: StarterAnswers = {
+    state: 'nsw', regional: false,
+    you: { name: 'Alex', age: 40, salary: 120_000, days: 5, hasHelp: true, helpBalance: 15_000, superBalance: 90_000 },
+    partner: null, children: [], schoolType: null,
+    home: { kind: 'mortgage', weeklyRent: 0, mortgageBalance: 400_000, mortgageRate: 6, mortgageYears: 20, homeValue: 0 },
+    cars: 1, cash: 25_000, investments: 5_000,
+  }
+  async function setUp() {
+    const { db } = await migratedTestDb()
+    await startHousehold(db, buildStarterHousehold(owner, estimateLivingCosts(owner), NOW))
+    return db
+  }
+
+  it('shows owned, owed, loan, super and HELP, matching Home', async () => {
+    const db = await setUp()
+    const h = await loadHousehold(db)
+    const v = wealthView(h, NOW)
+    expect(v.netWorth).toBe(homeView(h, NOW).netWorth)
+    expect(v.netWorth).toBe(25_000 + 5_000 - 15_000)
+    expect(v.owned.map(o => o.name)).toEqual(['Cash / savings', 'Shares & ETFs'])
+    expect(v.owned[0].cash).toBe(true)
+    expect(v.loan).toMatchObject({ balance: 400_000, rate: 6, offset: 25_000 })
+    expect(v.loan!.monthlyInterest).toBeCloseTo(375_000 * 0.06 / 12)
+    expect(v.homeMissing).toBe(true)
+    expect(v.help).toEqual([{ person: 'p1', name: 'Alex', balance: 15_000, yearlyRepayment: expect.any(Number) }])
+    expect(v.help[0].yearlyRepayment).toBeGreaterThan(0)
+    expect(v.super).toEqual([{ person: 'p1', name: 'Alex', balance: 90_000, retirementAge: 67 }])
+  })
+
+  it('keeps the loan offset at the total of cash accounts', async () => {
+    const db = await setUp()
+    const id = await saveAsset(db, null, { name: 'Offset account', amt: 10_000, isOffset: true })
+    expect((await loadHousehold(db)).mortgage!.offsetBal).toBe(35_000)
+    await removeAsset(db, id)
+    expect((await loadHousehold(db)).mortgage!.offsetBal).toBe(25_000)
+  })
+
+  it('counts home equity once the home is added, and a mortgage debt row is not subtracted twice', async () => {
+    const db = await setUp()
+    await saveAsset(db, null, { name: 'Home equity', amt: 300_000, isOffset: false })
+    await saveDebt(db, null, { name: 'Mortgage', amt: 400_000 })
+    const v = wealthView(await loadHousehold(db), NOW)
+    expect(v.homeMissing).toBe(false)
+    expect(v.netWorth).toBe(25_000 + 5_000 + 300_000 - 15_000)
+  })
+
+  it('saving the loan updates the budget’s Mortgage line', async () => {
+    const db = await setUp()
+    await saveLoan(db, { balance: 380_000, rate: 5.8, payment: 3_100, endDate: '2045-10-01' })
+    const h = await loadHousehold(db)
+    expect(h.mortgage).toMatchObject({ balance: 380_000, rate: 5.8, payment: 3_100, offsetBal: 25_000 })
+    expect(h.expenses.filter(e => e.cat === 'Home' && e.name === 'Mortgage').map(e => e.amt)).toEqual([3_100])
+  })
+
+  it('a first home loan adds the Mortgage line', async () => {
+    const { db } = await migratedTestDb()
+    await startHousehold(db, buildStarterHousehold({ ...owner, home: { ...owner.home, kind: 'own' } }, [], NOW))
+    await saveLoan(db, { balance: 200_000, rate: 6, payment: 1_500, endDate: '2040-01-01' })
+    expect((await loadHousehold(db)).expenses.find(e => e.name === 'Mortgage')?.amt).toBe(1_500)
+  })
+
+  it('updates super', async () => {
+    const db = await setUp()
+    await saveSuper(db, { person1Balance: 95_000, person1RetirementAge: 65 })
+    expect(wealthView(await loadHousehold(db), NOW).super[0]).toMatchObject({ balance: 95_000, retirementAge: 65 })
   })
 })

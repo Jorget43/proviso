@@ -46,6 +46,7 @@ export default function Setup() {
   const [home, setHome] = useState<HomeKind | null>(null)
   const [rent, setRent] = useState('')
   const [loan, setLoan] = useState({ balance: '', rate: '', years: '' })
+  const [homeValue, setHomeValue] = useState('')
   const [cars, setCars] = useState<string | null>(null)
   const [cash, setCash] = useState('')
   const [investments, setInvestments] = useState('')
@@ -71,6 +72,7 @@ export default function Setup() {
     home: {
       kind: home ?? 'other', weeklyRent: num(rent),
       mortgageBalance: num(loan.balance), mortgageRate: num(loan.rate), mortgageYears: num(loan.years),
+      homeValue: num(homeValue),
     },
     cars: cars === null ? 0 : Number(cars), cash: num(cash), investments: num(investments),
   })
@@ -207,6 +209,11 @@ export default function Setup() {
                 <NumberField unit="years" label="Years left" value={loan.years} onChange={v => setLoan(l => ({ ...l, years: v }))} typical={TYPICAL.mortgageYears} />
               </Field>
             </>
+          )}
+          {(home === 'mortgage' || home === 'own') && (
+            <Field label="Roughly what’s your home worth?" hint="Optional. It counts towards what you own, less anything still owing on the loan.">
+              <NumberField label="Home value" value={homeValue} onChange={setHomeValue} />
+            </Field>
           )}
           <Field label="How many cars does the household run?">
             <Choice label="Cars" options={['0', '1', '2', '3'].map(k => ({ key: k, label: k === '0' ? 'None' : k === '3' ? '3+' : k }))} value={cars ?? ''} onChange={setCars} />

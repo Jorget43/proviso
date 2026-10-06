@@ -117,7 +117,8 @@ export interface StarterAnswers {
   children:   StarterChild[]
   /** Where school-age children go (or will go); null when there are none. */
   schoolType: SchoolType | null
-  home:       { kind: HomeKind; weeklyRent: number; mortgageBalance: number; mortgageRate: number; mortgageYears: number }
+  /** homeValue: what the home is worth, 0 when not given (owners only). */
+  home:       { kind: HomeKind; weeklyRent: number; mortgageBalance: number; mortgageRate: number; mortgageYears: number; homeValue: number }
   cars:       number
   cash:       number
   investments: number
@@ -242,6 +243,15 @@ export function childOrder(children: StarterChild[]): { child: StarterChild; n: 
 
 // ── The household to save ────────────────────────────────────────────────────
 
+/** The asset the home is recorded as; netWorth.ts recognises it by name. */
+export const HOME_EQUITY_NAME = 'Home equity'
+
+function homeEquity(a: StarterAnswers): number {
+  if (a.home.kind === 'own') return Math.max(0, a.home.homeValue)
+  if (a.home.kind === 'mortgage' && a.home.homeValue > 0) return Math.max(0, a.home.homeValue - a.home.mortgageBalance)
+  return 0
+}
+
 export interface StarterHousehold {
   household:  { person1Name: string; person2Name: string; partnerEnabled: boolean; onboardingDone: true }
   income:     { taxMode: true; person1FTE: number; person2FTE: number; person1HasHELP: boolean; person2HasHELP: boolean; person1Age: number; person2Age: number }
@@ -318,6 +328,8 @@ export function buildStarterHousehold(a: StarterAnswers, lines: StarterLine[], n
     assets: [
       { name: 'Cash / savings', amt: a.cash, isOffset: offset },
       { name: 'Shares & ETFs', amt: a.investments, isOffset: false },
+      // The home counts once, as equity: its value less the loan (netWorth.ts).
+      { name: HOME_EQUITY_NAME, amt: homeEquity(a), isOffset: false },
     ].filter(x => x.amt > 0),
     debts: [
       ...(a.you.hasHelp && a.you.helpBalance > 0 ? [{ name: helpDebtName(a.you.name.trim() || 'You'), amt: a.you.helpBalance }] : []),
