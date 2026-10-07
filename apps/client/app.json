@@ -8,10 +8,11 @@
     "userInterfaceStyle": "automatic",
     "backgroundColor": "#F5F2EC",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "app.proviso.dev"
     },
     "android": {
-      "edgeToEdgeEnabled": true
+      "package": "app.proviso.dev"
     },
     "web": {
       "bundler": "metro",
@@ -22,7 +23,8 @@
       "expo-sqlite",
       "expo-status-bar",
       "expo-secure-store",
-      "expo-sharing"
+      "expo-sharing",
+      "expo-dev-client"
     ]
   }
 }
