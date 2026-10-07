@@ -406,8 +406,19 @@ Tracked in [`docs/security-privacy-legal.md`](docs/security-privacy-legal.md) §
 - ~~Small-text desktop layouts on phones~~ — done (v1.12.0), checked at 390px: Own & owe rows restacked, Investments labels/dropdowns fixed, work-pattern wording plain; EOFY, Super and the school-fee controls were already fine. Investment parcel cards rebuilt in Phase 24.
 - ~~Native app: token auth alongside the cookie session~~ — done (Phase 24), see [`docs/app-api.md`](docs/app-api.md). Still open for the app: passkey sign-in (WebAuthn from a native app needs the platform APIs and an associated domain), and CORS if the app is ever a web view on another origin.
 
-### The app — next steps (as of 2026-10-06)
-In [`docs/architecture.md`](docs/architecture.md) order. Phase 3 there (the single-device app) is built except for a store build; Phase 4 (sync) is next.
+### The app — next steps (as of 2026-10-07)
+In [`docs/architecture.md`](docs/architecture.md) order. Phase 3 there (the single-device app) is built except for a store build; Phase 4 (sync) is next. Master is clean and published (`d3f2bd9`); nothing is mid-flight.
+
+**Start here next session**, in this order:
+1. **The owner checks Settings on their phone** (about 5 minutes): restart the Expo server, set up the recovery phrase, save a backup through the share sheet, then "Restore from a file" with it. Fix anything found before building on it.
+2. **Check GitHub for a Dependabot security pull request** for the Expo tooling advisories (see the last bullets below) and decide on it.
+3. **ESLint for `apps/client`** — small, and worth having before the next large piece so the app's code stays consistent.
+4. **Choose the next big piece with the owner** (decisions only they can make):
+   - **Sync (Phase 4)** — the relay, and a partner's phone sharing the household. Needs a decision on where to run the first relay: the NAS behind Tailscale Serve (HTTPS) is the documented path for dogfooding.
+   - **EAS development build first** — gets the app off Expo Go (TestFlight, the password-manager key backup). Needs an Apple Developer account (A$149 a year) for iOS; Android can start without one.
+   - **Or fill NAS gaps in the app** (list below) before either.
+
+The full list:
 - **Try on the phone what the browser couldn't test** (Phase 30): saving a backup through the share sheet, the secure key store, then restoring that backup with the phrase. Restart the Expo server first (typed routes off, new native modules).
 - **First development build with EAS** (Expo's build service): needed for TestFlight / Android testing and for anything Expo Go can't load. Needs an Expo project id in `app.json`, an `eas.json`, bundle ids, and an Apple Developer account (A$149 a year) for iOS.
 - **Key backup to iCloud Keychain / Google Password Manager** (D4's second recovery route): platform credential APIs; needs the development build.
