@@ -64,6 +64,9 @@ jobs:
       - name: Typecheck all workspaces
         run: npm run typecheck
 
+      - name: Lint (web and app)
+        run: npm run lint
+
       # The local-first schema (packages/core/src/schema.ts) must always have
       # its migration committed: regenerating must produce nothing new.
       - name: Check Drizzle migrations match the schema

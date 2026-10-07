@@ -407,24 +407,20 @@ Tracked in [`docs/security-privacy-legal.md`](docs/security-privacy-legal.md) §
 - ~~Native app: token auth alongside the cookie session~~ — done (Phase 24), see [`docs/app-api.md`](docs/app-api.md). Still open for the app: passkey sign-in (WebAuthn from a native app needs the platform APIs and an associated domain), and CORS if the app is ever a web view on another origin.
 
 ### The app — next steps (as of 2026-10-07)
-In [`docs/architecture.md`](docs/architecture.md) order. Phase 3 there (the single-device app) is built except for a store build; Phase 4 (sync) is next. Master is clean and published (`d3f2bd9`); nothing is mid-flight.
+In [`docs/architecture.md`](docs/architecture.md) order. Phase 3 there (the single-device app) is built except for a store build; Phase 4 (sync) is next. Settings passed the owner's phone check on 2026-10-07 (recovery phrase, share-sheet backup, restore), and the app now has ESLint (`npm run lint` covers web and app; CI runs it).
 
 **Start here next session**, in this order:
-1. **The owner checks Settings on their phone** (about 5 minutes): restart the Expo server, set up the recovery phrase, save a backup through the share sheet, then "Restore from a file" with it. Fix anything found before building on it.
-2. **Check GitHub for a Dependabot security pull request** for the Expo tooling advisories (see the last bullets below) and decide on it.
-3. **ESLint for `apps/client`** — small, and worth having before the next large piece so the app's code stays consistent.
-4. **Choose the next big piece with the owner** (decisions only they can make):
+1. **Check GitHub for a Dependabot security pull request** for the Expo tooling advisories (see the last bullets below) and decide on it.
+2. **Choose the next big piece with the owner** (decisions only they can make):
    - **Sync (Phase 4)** — the relay, and a partner's phone sharing the household. Needs a decision on where to run the first relay: the NAS behind Tailscale Serve (HTTPS) is the documented path for dogfooding.
    - **EAS development build first** — gets the app off Expo Go (TestFlight, the password-manager key backup). Needs an Apple Developer account (A$149 a year) for iOS; Android can start without one.
    - **Or fill NAS gaps in the app** (list below) before either.
 
 The full list:
-- **Try on the phone what the browser couldn't test** (Phase 30): saving a backup through the share sheet, the secure key store, then restoring that backup with the phrase. Restart the Expo server first (typed routes off, new native modules).
 - **First development build with EAS** (Expo's build service): needed for TestFlight / Android testing and for anything Expo Go can't load. Needs an Expo project id in `app.json`, an `eas.json`, bundle ids, and an Apple Developer account (A$149 a year) for iOS.
 - **Key backup to iCloud Keychain / Google Password Manager** (D4's second recovery route): platform credential APIs; needs the development build.
 - **Sync (architecture Phase 4)**: `packages/sync` (HLC, per-field messages, AES-GCM with the household key — `packages/core/src/backup.ts` has the primitives; give sync its own HKDF info string), `apps/relay`, adding a partner by QR code. Every write already goes through `apps/client/src/data/mutate.ts`, where messages hook in. The household id and key are in secure storage (`src/data/identity.ts`), not the database.
 - **NAS features the app doesn't have yet**: Actual spending (statement import and review; needs its own phone design), Investments (parcels and CGT), EOFY, Next 2 years (cashflow), work-pattern changes over time and parental leave, life phases, rent-then-buy plans, the HELP indexation alert, super carry-forward and extra contributions, the net-worth history line, passkey sign-in.
-- **ESLint for `apps/client`** (none yet; `apps/web` has Next's).
 - **Web build (architecture Phase 5)**: an instant reload can fail with "Access Handles cannot be created" (the previous page still holds the database file), and the household key falls back to `localStorage` there (`src/data/identity.ts`). Both need solving before the web client ships.
 - **Dependency advisories**: GitHub lists some on master, believed to be all in Expo's build and dev-server tools (`braces`, `node-forge`, `uuid` via `xcode`, `decode-uri-component`), several with no fixed version yet. They don't reach the NAS image (CI audits exactly what it ships). Dependabot was preparing a security update for them on 2026-10-06: review it carefully, because Expo pins some of them, and React / React Native / `expo*` move only with the Expo SDK (`proviso-release` skill).
 - **Starter estimates** (`packages/core/src/starter.ts`): re-check the figures yearly with the July recalibration; electricity still uses the AER's 2020 usage benchmarks (no longer updated).

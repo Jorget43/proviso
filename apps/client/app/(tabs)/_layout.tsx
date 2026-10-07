@@ -10,7 +10,9 @@ import { useHousehold } from '@/data/DataProvider'
 import { usePalette } from '@/ui/theme'
 
 type IconName = React.ComponentProps<typeof Ionicons>['name']
-const icon = (name: IconName) => ({ color }: { color: ColorValue }) => <Ionicons name={name} color={color as string} size={24} />
+const icon = (name: IconName) => function TabIcon({ color }: { color: ColorValue }) {
+  return <Ionicons name={name} color={color as string} size={24} />
+}
 
 // The library's bar is 49px with a 28px icon box, leaving the label ~11px —
 // enough for native text, but browsers clip it. 58px gives the label a full

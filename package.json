@@ -10,7 +10,7 @@
     "dev": "npm run dev -w @proviso/web",
     "build": "npm run build -w @proviso/web",
     "start": "npm run start -w @proviso/web",
-    "lint": "npm run lint -w @proviso/web",
+    "lint": "npm run lint --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present"
   },
