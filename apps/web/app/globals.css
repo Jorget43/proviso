@@ -1128,6 +1128,10 @@ input[type=range] { width: 100%; accent-color: var(--t3); }
 .proj-lede { font-family: var(--font-dm-serif, serif); font-size: 1.6rem; line-height: 1.25; }
 .proj-lede strong { color: var(--green); font-weight: 400; }
 .proj-lede strong.neg { color: var(--red); }
+.super-toggle { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; color: var(--t1); margin-bottom: 0.6rem; cursor: pointer; min-height: 36px; }
+.super-toggle input { width: 18px; height: 18px; }
+.super-toggle-text { display: flex; flex-direction: column; line-height: 1.35; }
+.super-toggle-text small { color: var(--t3); font-size: 0.8rem; }
 .proj-lede-sub { font-size: 0.95rem; color: var(--t2); margin-top: 6px; line-height: 1.45; }
 .explorer { scroll-margin-top: 64px; }
 .explorer-tabs {

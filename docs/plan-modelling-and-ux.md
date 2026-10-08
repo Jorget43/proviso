@@ -1,6 +1,6 @@
 # Plan: modelling depth, scenarios and UX (proposed 2026-10-08)
 
-**Status: agreed 2026-10-08; Step A in progress.**
+**Status: agreed 2026-10-08. Step A done (Phases 37–39, see CLAUDE.md); next: step B (the life-course engine).**
 
 **Owner's decisions (2026-10-08):**
 1. Engine changes show on the NAS charts first; new screens app-first (item 12).

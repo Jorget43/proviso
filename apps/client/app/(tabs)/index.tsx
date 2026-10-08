@@ -90,13 +90,14 @@ export default function Home() {
             sub={v.netWorthChange
               ? `${v.netWorthChange.amount > 0 ? '▲' : '▼'} ${fmtK(Math.abs(v.netWorthChange.amount))} since ${MONTHS[v.netWorthChange.since.getMonth()]}`
               : 'what you own minus what you owe'}
-            subTone={v.netWorthChange ? (v.netWorthChange.amount > 0 ? 'green' : 'red') : 't3'} />
+            subTone={v.netWorthChange ? (v.netWorthChange.amount > 0 ? 'green' : 'red') : 't3'}
+            extra={v.superTotal > 0 ? `${fmtK(v.netWorth + v.superTotal)} counting super` : undefined} />
           <Stat label="Cash safety net" value={fmtK(v.cash)}
             sub={v.coverMonths !== null ? `about ${v.coverMonths >= 12 ? '12+' : v.coverMonths.toFixed(1)} months of spending` : undefined} />
           {v.mortgageLeft !== null && (
             <Stat label="Home loan left" value={fmtK(v.mortgageLeft)} sub={v.mortgageEndYear ? `on track to finish in ${v.mortgageEndYear}` : undefined} />
           )}
-          {v.superTotal > 0 && <Stat label="Super" value={fmtK(v.superTotal)} sub="for retirement" />}
+          {v.superTotal > 0 && <Stat label="Super" value={fmtK(v.superTotal)} sub="for retirement; not in net worth, as it’s locked until about 60" />}
         </View>
       </View>
 
@@ -131,12 +132,13 @@ export default function Home() {
   )
 }
 
-function Stat({ label, value, sub, subTone = 't3' }: { label: string; value: string; sub?: string; subTone?: 't3' | 'green' | 'red' }) {
+function Stat({ label, value, sub, subTone = 't3', extra }: { label: string; value: string; sub?: string; subTone?: 't3' | 'green' | 'red'; extra?: string }) {
   return (
     <Card style={{ flexGrow: 1, flexBasis: 150, gap: space.xs }}>
       <T size="small" tone="t2">{label}</T>
       <T size="title" weight="700">{value}</T>
       {sub ? <T size="caption" tone={subTone}>{sub}</T> : null}
+      {extra ? <T size="caption" tone="t3">{extra}</T> : null}
     </Card>
   )
 }

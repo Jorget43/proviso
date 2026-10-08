@@ -19,6 +19,8 @@ export interface ScrubSeries {
   backgroundColor?: unknown
   /** false to leave a series (e.g. a fixed threshold line) out of the readout */
   readout?:         boolean
+  /** How this series' value reads (default: the chart's format, e.g. $12k). */
+  format?:          (v: number) => string
 }
 
 interface ScrubChartProps {
@@ -102,7 +104,7 @@ export default function ScrubChart({ labels, datasets, height, format = fmtK, de
                 title={off ? `Show ${d.label}` : `Hide ${d.label}`}>
                 <span className="scrub-dot" style={{ background: colorAt(d.borderColor, idx) ?? colorAt(d.backgroundColor, idx) ?? 'var(--t3)' }} />
                 <span className="scrub-label">{d.label}</span>
-                <strong>{v == null ? '—' : format(v)}</strong>
+                <strong>{v == null ? '—' : (d.format ?? format)(v)}</strong>
               </button>
             )
           })}

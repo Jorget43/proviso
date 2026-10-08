@@ -2,7 +2,8 @@
 import { useState, useMemo, useCallback } from 'react'
 import { fmtK, possessive } from '@proviso/core/formatting'
 import { runProjections } from '@proviso/core/projections'
-import { buildProjectionInputs, type ProjectionBaseline } from '@proviso/core/future'
+import { buildProjectionInputs, superInputsFor, type ProjectionBaseline, type SuperSettingsLike } from '@proviso/core/future'
+import { runHouseholdProjection } from '@proviso/core/super'
 import { type FeeSchedule } from '@proviso/core/schoolFees'
 import { LOCATION_OPTIONS, presetScheduleFor, presetTotalFor } from '@proviso/core/educationCosts'
 
@@ -10,11 +11,9 @@ interface FeeRow { id: number; level: string; tuition: number; fixed: number }
 import Panel from '@/components/ui/Panel'
 import ReadOnlyFence from '@/components/ui/ReadOnlyFence'
 import NetWorthChart      from './NetWorthChart'
-import PartnerIncomeChart from './PartnerIncomeChart'
-import IncExpProjChart    from './IncExpProjChart'
-import DeficitChart       from './DeficitChart'
-import MortStressChart    from './MortStressChart'
-import MortPaydownChart   from './MortPaydownChart'
+import MoneyInOutChart    from './MoneyInOutChart'
+import HomeChart          from './HomeChart'
+import SuperBalanceChart  from '@/components/super/SuperBalanceChart'
 import SchoolFeeChart     from './SchoolFeeChart'
 import WorkPhaseTimeline, { type WorkPhaseRow } from './WorkPhaseTimeline'
 import OneOffPanel,       { type OneOffRow }      from './OneOffPanel'
@@ -44,6 +43,8 @@ interface ProjSettings {
 }
 
 interface IncSettings {
+  person1Age:        number
+  person2Age:        number
   person1FTE:        number
   person2FTE:        number
   person2HasHELP:    boolean
@@ -85,9 +86,12 @@ interface ProjectionsClientProps {
   person2Name:          string
   initialRentSettings:  RentSettingsType | null
   initialSnapshots:     NetWorthSnapshotRow[]
+  /** Saved super settings, so Future can show retirement (and count super if asked). */
+  superSettings:        SuperSettingsLike
+  partnerEnabled:       boolean
 }
 
-type View  = 'networth' | 'inout' | 'shortfall' | 'loan' | 'stress' | 'income' | 'fees'
+type View  = 'networth' | 'inout' | 'home' | 'fees' | 'retirement'
 type Group = 'basics' | 'work' | 'home' | 'plans'
 const GROUPS: { key: Group; label: string }[] = [
   { key: 'basics', label: 'Basics' },
@@ -137,6 +141,7 @@ export default function ProjectionsClient({
   initialSettings, initialPerson1Phases, initialPerson2Phases, initialOneoffs, initialLifePhases, initialFeeSchedule,
   income, baseline, mortRate, mortPayment, mortEndDate, currentYear,
   person1Name, person2Name, initialRentSettings, initialSnapshots,
+  superSettings, partnerEnabled,
 }: ProjectionsClientProps) {
   const [settings,       setSettings]       = useState<ProjSettings>(initialSettings)
   const [person1Phases,  setPerson1Phases]  = useState<WorkPhaseRow[]>(initialPerson1Phases)
@@ -147,6 +152,7 @@ export default function ProjectionsClient({
   const [rentSt,      setRentSt]      = useState<RentSettingsType>(initialRentSettings ?? DEFAULT_RENT)
   const [snapshots,   setSnapshots]   = useState<NetWorthSnapshotRow[]>(initialSnapshots)
   const [view,        setView]        = useState<View>('networth')
+  const [includeSuper, setIncludeSuper] = useState(false)
   const [group,       setGroup]       = useState<Group>('basics')
   const [whatIfOpen,  setWhatIfOpen]  = useState(false)
 
@@ -342,51 +348,60 @@ export default function ProjectionsClient({
   const hhIncome    = main.person1Arr.map((v, i) => v + (main.person2Arr[i] ?? 0))
   const plural      = (n: number, w: string) => `${n} ${w}${n === 1 ? '' : 's'}`
 
+  // Super, year by year: the same engine and inputs as the app's Future screen
+  // (@proviso/core/future), following the pay-rise sliders here.
+  const superResult = useMemo(() => {
+    const sup = superInputsFor(superSettings, partnerEnabled, baseline.retirementMonthly,
+      { person1Age: income.person1Age, person2Age: income.person2Age, person1FTE: income.person1FTE, person2FTE: income.person2FTE },
+      { person1Growth: settings.person1Growth, person2Growth: settings.person2Growth })
+    return runHouseholdProjection(sup.inputs, { ...sup.ctx, startYear: currentYear })
+  }, [superSettings, partnerEnabled, baseline.retirementMonthly, income, settings.person1Growth, settings.person2Growth, currentYear])
+  const superByYear  = new Map(superResult.combined.map(r => [r.year, r.total]))
+  const superData    = output.labels.map(l => Math.round(superByYear.get(Number(l)) ?? 0))
+  const hasSuper     = superData.some(v => v > 0)
+  const p1RetireYear = currentYear + (superSettings.person1RetirementAge - income.person1Age)
+  const p2RetireYear = partnerEnabled ? currentYear + (superSettings.person2RetirementAge - income.person2Age) : null
+  const superAtEnd   = superData[superData.length - 1] ?? 0
+
   const views: { key: View; label: string; takeaway: string }[] = [
     {
       key: 'networth', label: 'Net worth',
       takeaway: `By ${lastLabel} you're on track to be worth ${fmtK(finalNW)} — ${growth >= 0 ? 'up' : 'down'} ${fmtK(Math.abs(growth))} on today.`
+        + (hasSuper ? (includeSuper ? ` With super counted, ${fmtK(finalNW + superAtEnd)}.` : ` Plus ${fmtK(superAtEnd)} in super, which you can't touch until about 60.`) : '')
         + (sfOn && nwFeeCost > 0 ? ` Without school fees it would be about ${fmtK(nwFeeCost)} more.` : ''),
     },
     {
       key: 'inout', label: 'Money in & out',
-      takeaway: deficitIdx.length === 0
-        ? 'Your income covers your spending in every year shown.'
-        : `You spend more than you earn in ${plural(deficitIdx.length, 'year')}, starting ${output.labels[deficitIdx[0]]}.`,
-    },
-    {
-      key: 'shortfall', label: 'Good & tight years',
       takeaway: (() => {
         const worst = Math.min(...main.deficitArr)
         const wi = main.deficitArr.indexOf(worst)
-        return worst < 0
-          ? `Most years leave money over. The tightest is ${output.labels[wi]}, when you'd be ${fmtK(-worst)} short.`
-          : `Every year leaves money over — the leanest is ${output.labels[wi]}, with ${fmtK(worst)} to spare.`
+        const range = `Take-home pay goes from ${fmtK(hhIncome[0] ?? 0)} to ${fmtK(hhIncome[hhIncome.length - 1] ?? 0)} a year.`
+        const leave = main.leaveYrs.length ? ` ${person2Name} is on parental leave in ${main.leaveYrs.join(', ')}.` : ''
+        return deficitIdx.length === 0
+          ? `${range} Your income covers your spending in every year shown; the leanest is ${output.labels[wi]}, with ${fmtK(worst)} to spare.${leave}`
+          : `${range} You'd spend more than you earn in ${plural(deficitIdx.length, 'year')}, starting ${output.labels[deficitIdx[0]]}; the tightest is ${output.labels[wi]}, ${fmtK(-worst)} short.${leave}`
       })(),
     },
-    ...(hasLoan ? [{
-      key: 'loan' as const, label: 'Home loan',
-      takeaway: clearedIdx >= 0
-        ? `Your home loan is paid off in ${mortCleared}.`
-        : `Your home loan isn't paid off within the ${settings.projYears} years shown.`,
+    ...(hasLoan || hasHousing ? [{
+      key: 'home' as const, label: 'Home',
+      takeaway: (clearedIdx >= 0 ? `Your home loan is paid off in ${mortCleared}.` : `Your home loan isn't paid off within the ${settings.projYears} years shown.`)
+        + (stressIdx.length === 0
+          ? ' Repayments stay under 30% of your income, a comfortable level.'
+          : ` Repayments take more than 30% of your income in ${plural(stressIdx.length, 'year')}, peaking at ${peakStress.toFixed(0)}% in ${output.labels[main.mortStressArr.indexOf(peakStress)]}.`),
     }] : []),
-    ...(hasHousing ? [{
-      key: 'stress' as const, label: 'Housing costs',
-      takeaway: stressIdx.length === 0
-        ? 'Home loan repayments stay under 30% of your income — a comfortable level.'
-        : `Repayments take more than 30% of your income in ${plural(stressIdx.length, 'year')}, peaking at ${peakStress.toFixed(0)}% in ${output.labels[main.mortStressArr.indexOf(peakStress)]}.`,
-    }] : []),
-    {
-      key: 'income', label: 'Income',
-      takeaway: `Household income before tax goes from ${fmtK(hhIncome[0] ?? 0)} to ${fmtK(hhIncome[hhIncome.length - 1] ?? 0)} a year.`
-        + (main.leaveYrs.length ? ` ${person2Name} is on parental leave in ${main.leaveYrs.join(', ')}.` : ''),
-    },
     ...(sfOn ? [{
       key: 'fees' as const, label: 'School fees',
       takeaway: (() => {
         const peak = Math.max(0, ...main.sfTotalArr)
         return `School fees add up to ${fmtK(totalFees)}, peaking at ${fmtK(peak)} in ${output.labels[main.sfTotalArr.indexOf(peak)]}.`
       })(),
+    }] : []),
+    ...(hasSuper ? [{
+      key: 'retirement' as const, label: 'Retirement',
+      takeaway: (superResult.combinedDepletionAge === null
+        ? `Super should pay ${fmtK(superResult.monthlyIncomeGoal)} a month (in today's money) past age 100.`
+        : `Super would pay ${fmtK(superResult.monthlyIncomeGoal)} a month (in today's money) until age ${superResult.combinedDepletionAge}.`)
+        + ` Retirement from ${p1RetireYear}${p2RetireYear ? ` and ${p2RetireYear}` : ''}. Doesn't count the Age Pension or savings outside super.`,
     }] : []),
   ]
   const current = views.find(v => v.key === view) ?? views[0]
@@ -425,35 +440,41 @@ export default function ProjectionsClient({
             <div className="panel-body">
               <p className="explorer-takeaway">{current.takeaway}</p>
               {current.key === 'networth' && (
-                <NetWorthChart
-                  labels={output.labels} nwData={main.nwArr} nwNoFees={sfOn ? output.base.nwArr : null}
-                  investData={main.investArr} cashData={main.cashArr} sfOn={sfOn}
-                  historyLabels={historyLabels} historyData={historyData}
-                />
+                <>
+                  {hasSuper && (
+                    <label className="super-toggle">
+                      <input type="checkbox" checked={includeSuper} onChange={e => setIncludeSuper(e.target.checked)} />
+                      <span className="super-toggle-text">Count super in net worth<small>You can&rsquo;t use it until about 60, so it&rsquo;s left out unless you ask.</small></span>
+                    </label>
+                  )}
+                  <NetWorthChart
+                    labels={output.labels} nwData={main.nwArr} nwNoFees={sfOn ? output.base.nwArr : null}
+                    investData={main.investArr} cashData={main.cashArr} sfOn={sfOn}
+                    historyLabels={historyLabels} historyData={historyData}
+                    superData={hasSuper ? superData : null} includeSuper={includeSuper}
+                  />
+                </>
               )}
               {current.key === 'inout' && (
-                <IncExpProjChart
-                  labels={output.labels} incData={main.incArr} expData={main.expArr}
-                  phaseData={main.phaseArr} sfTotalData={main.sfTotalArr} sfOn={sfOn}
+                <MoneyInOutChart
+                  labels={output.labels} person1Data={main.person1Arr} person2Data={main.person2Arr}
+                  person1Name={person1Name} person2Name={person2Name} showPerson2={partnerEnabled}
+                  leaveYrs={main.leaveYrs} spendData={main.expArr} sfTotalData={sfOn ? main.sfTotalArr : main.sfTotalArr.map(() => 0)}
+                  phaseData={main.phaseArr} cashData={main.cashRunningArr}
                 />
               )}
-              {current.key === 'shortfall' && (
-                <DeficitChart labels={output.labels} deficitData={main.deficitArr} cashRunningData={main.cashRunningArr} />
+              {current.key === 'home' && (
+                <HomeChart labels={output.labels} mortData={main.mortArr} stressData={main.mortStressArr} rentData={main.rentArr} endDate={mortEndDate} />
               )}
-              {current.key === 'loan' && (
-                <MortPaydownChart labels={output.labels} mortData={main.mortArr} endDate={mortEndDate} />
-              )}
-              {current.key === 'stress' && (
-                <MortStressChart labels={output.labels} stressData={main.mortStressArr} />
-              )}
-              {current.key === 'income' && (
-                <PartnerIncomeChart
-                  labels={output.labels}
-                  person1Data={main.person1Arr} person2Data={main.person2Arr}
-                  person1Name={person1Name}   person2Name={person2Name}
-                  leaveYrs={main.leaveYrs}
-                  person1FTE={income.person1FTE} person2FTE={income.person2FTE}
-                  person1Growth={settings.person1Growth} person2Growth={settings.person2Growth}
+              {current.key === 'retirement' && (
+                <SuperBalanceChart
+                  combined={superResult.combined}
+                  person1Rows={superResult.person1.rows}
+                  person2Rows={superResult.person2?.rows ?? null}
+                  person1RetirementYear={p1RetireYear}
+                  person2RetirementYear={p2RetireYear}
+                  person1Name={person1Name}
+                  person2Name={person2Name}
                 />
               )}
               {current.key === 'fees' && (

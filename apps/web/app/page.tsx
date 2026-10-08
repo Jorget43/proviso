@@ -112,6 +112,7 @@ export default async function Home() {
             ) : (
               <span className="home-stat-sub">what you own minus what you owe</span>
             )}
+            {superTotal > 0 && <span className="home-stat-sub">{fmtK(netPosition + superTotal)} counting super</span>}
           </Link>
           <Link href="/debts" className="home-stat">
             <span className="home-stat-label">Cash safety net</span>
@@ -131,7 +132,7 @@ export default async function Home() {
             <Link href="/super" className="home-stat">
               <span className="home-stat-label">Super</span>
               <span className="home-stat-value">{fmtK(superTotal)}</span>
-              <span className="home-stat-sub">for retirement</span>
+              <span className="home-stat-sub">for retirement; not in net worth, as it&rsquo;s locked until about 60</span>
             </Link>
           )}
         </div>

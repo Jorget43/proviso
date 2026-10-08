@@ -417,7 +417,7 @@ In [`docs/architecture.md`](docs/architecture.md) order. Phase 3 there (the sing
 1. **⏰ Remind the owner first — phone test still to do** (deferred 2026-10-08, "soon"). **The Android development build with Phases 34–35** (sync, camera, key backup): it built successfully on EAS on 2026-10-08 (so the key-backup Kotlin module and expo-camera compile); `npm run eas -w @proviso/client -- build:list --limit 1` shows the APK link. Install it and check on the phone: Settings → Recovery phrase → Save to Google Password Manager; Settings → Sync; Join a household (camera scan).
 2. **Run the relay on the NAS** with the owner: `docker compose --profile sync up -d` (image `ghcr.io/jorget43/proviso-relay`, published by CI from master since 2026-10-08), then `tailscale serve --bg --https=8443 http://localhost:8787` (README "Sync relay for the app"). Turn sync on in the app with the `https://<machine>.<tailnet>.ts.net:8443` address, then join from a second phone. Phones need Tailscale running to reach it.
 3. **Owner decisions pending**: the home-purchase deposit gap (below). (The NAS "Next 2 years" change in Phase 36 — rent and after-subsidy childcare now counted — was pushed with the owner's go-ahead on 2026-10-08.)
-4. **Then**: more NAS features in the app (list below), the relay enforcing roles, or the iOS build once the Apple account is ready.
+4. **Then: step B of [`docs/plan-modelling-and-ux.md`](docs/plan-modelling-and-ux.md)** — people's ages and a `child` table, then the life-course engine (retirement stops pay, super inside the projection, drawdown strategies, horizon to age 95 adjustable). Step A (dark mode, editing, chart trim) shipped as Phases 37–39. Also open: the relay enforcing roles, the iOS build once the Apple account is ready.
 
 The full list:
 - **First development build with EAS** (Expo's build service): configured (see "EAS" above); Android built 2026-10-08, not yet checked on the phone. iOS needs the Apple Developer account (A$149 a year).
@@ -501,6 +501,40 @@ The full list:
 - **School fees decided**: the questionnaire's school-cost lines stay in today's budget; the projection models the two eldest children's fees year by year (ending after Year 12) and leaves those lines out (`isModelledSchoolLine`), so nothing is counted twice. The questionnaire switches `schoolFeesOn` on when there are children.
 - Typed routes are off in `apps/client` (the generated file only existed where a dev server ran, never in CI, and misread the monorepo).
 - Verified: 356 tests; the app at 390px (a Melbourne family of four: $2.32M in today's money in 20 years, HELP cleared 2028, school fees end 2039, loan paid off 2042; a $45k car in 2029 gives $2.28M); the NAS Projections and Super pages rendered against a scratch household. The NAS Super "consider a lower target" hint was fixed on the way (it would have subtracted the mortgage twice and suggested $0).
+
+### Phases 37–39 — Plan step A: dark mode, clearer editing, fewer Future charts (2026-10-08)
+
+The owner's plan is [`docs/plan-modelling-and-ux.md`](docs/plan-modelling-and-ux.md) (decisions recorded at its top); these are step A.
+
+- **37 Dark mode.**
+  - **NAS:**
+    - `User.themePreference` (system / light / dark, migration `0005_theme_preference`) is in the session (`SessionUser.theme`) and is written as `<html data-theme>` by `app/layout.tsx`. "system" and signed-out pages follow `prefers-color-scheme`.
+    - `globals.css` carries the dark palette, kept identical to `packages/tokens` by `tests/theme.test.ts`. New variables: `--bar` / `--bar-text` (the top bar stays dark), `--on-accent` (text on filled accent buttons). Text on `var(--t1)` buttons is `var(--bg)`.
+    - Charts take colours from `useChartColors()` (`lib/chartTheme.ts`, the tokens resolved for the current theme; redraws on change) and `axisTicks(c)`. The crosshair and the donut's centre text read CSS variables when drawn. No hard-coded chart colours remain.
+    - Settings → Appearance (`AppearancePanel`), also on the child page. `PATCH /api/auth/me { theme }` works for any signed-in user.
+    - `global-error.tsx` keeps its own colours, because it renders without the stylesheet.
+  - **App:** `ThemeProvider` (`src/ui/ThemeProvider.tsx`) holds the choice (match phone / light / dark), kept per device in `src/data/devicePrefs.ts`. On phones it also calls `Appearance.setColorScheme`, so system UI matches. `usePalette()` reads the choice.
+  - `next dev` writes `apps/web/AGENTS.md` / `CLAUDE.md` (a vendor note about Next 16); committed, as the note asks.
+- **38 Editing.**
+  - **NAS Budget (desktop):** "+ Add a cost" per category plus an "Add a cost" bar, all opening the phone's `ExpenseSheet` (now a centred dialog on desktop). Yearly bills open in it too. The old "+ add" / "+ annual" buttons and the inline yearly-bill form are gone. Larger type, roomier rows.
+  - **Work patterns:** `WorkPhaseTimeline` is now cards (labelled year and days controls at 16px, the pay it means, Remove), 2–3 per row on wide screens.
+  - **`possessive()` in core:** "Your …" for the default name "You", in both clients. A negative headline net worth shows red.
+- **39 Future charts, 7 views → 5** (`ProjectionsClient`):
+  - **Net worth:** a "Count super in net worth" switch; super is otherwise shown as its own dashed line and mentioned in the takeaway.
+  - **Money in & out** (`MoneyInOutChart`): take-home pay stacked by person, pink in leave years; spending as a line, with red dots in short years; the readout shows left over or short, school fees, life stages and cash. Replaces Income and Good & tight years.
+  - **Home** (`HomeChart`): loan left; the readout shows repayments as a % of income and rent; amber dots mark years over 30%. Replaces Home loan and Housing costs.
+  - **School fees:** unchanged.
+  - **Retirement:** `SuperBalanceChart`, fed by `superInputsFor` + `runHouseholdProjection` exactly as the app's Future does, and following the pay-rise sliders.
+  - **Readout-only series:** these sit on a hidden `readout` y-axis so they don't stretch the chart. `ScrubSeries.format` gives one series its own number format.
+  - **Home (NAS and app):** net worth also says "… counting super", and the Super tile says it's left out because it's locked until about 60.
+  - The Super page keeps its own chart, since it reacts to the inputs edited there.
+  - Removed: `PartnerIncomeChart`, `IncExpProjChart`, `DeficitChart`, `MortStressChart`, `MortPaydownChart`.
+- **Verified:** 425 tests (new: palette match, `possessive`). Checked in headless Edge against a scratch NAS (port 3100, its own database):
+  - dark, light and device-following themes, plus a reload, on Home, Budget, Future and Settings
+  - Budget and the add dialog at 1280px
+  - work cards at 390px and 1280px
+  - all five Future views, and net worth with super counted
+  - App Appearance on the web build.
 
 ### Phase 36 — Next 2 years in the app; the cashflow maths moves to core (2026-10-08)
 
