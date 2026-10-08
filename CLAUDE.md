@@ -8,7 +8,7 @@
 
 Personal finance dashboard. Next.js 16 app, SQLite via Prisma 5, self-hosted via Docker. npm workspace repo since Phase 25.
 
-> **Direction (agreed 2026-10-06): app first, local-first.** [`docs/architecture.md`](docs/architecture.md) is the target architecture: one Expo client (iOS, Android, web), data on each device (Drizzle + SQLite), end-to-end encrypted sync through a relay (hosted Proviso Sync or self-hosted). The Next.js app below is what runs today and is retired in stages. **Read that document before any structural change** — new code must move towards it, not away. Project skills in `.claude/skills/` (`proviso-architecture`, `-schema-change`, `-feature`, `-release`, `-ui`) are the working checklists.
+> **Direction (agreed 2026-10-06): app first, local-first.** [`docs/architecture.md`](docs/architecture.md) is the target architecture: one Expo client (iOS, Android, web), data on each device (Drizzle + SQLite), end-to-end encrypted sync through a relay (hosted Proviso Sync or self-hosted). The Next.js app below is what runs today and is retired in stages. **Read that document before any structural change** — new code must move towards it, not away. Project skills in `.claude/skills/` (`proviso-architecture`, `-schema-change`, `-feature`, `-release`, `-ui`) are the working checklists. **Every session starts with `proviso-start-session` and ends with `proviso-close-session`**, which keep CLAUDE.md, the NAS ↔ app feature table, the README, the plan docs, the GitHub description and memory in line. `npm run session:check` (`scripts/session-check.mjs`) reports drift.
 
 ## Repo layout (npm workspaces, Phase 25)
 
