@@ -1,9 +1,9 @@
 import { Stack } from 'expo-router'
-import { StatusBar } from 'expo-status-bar'
 import { ActivityIndicator, View } from 'react-native'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { DataProvider } from '@/data/DataProvider'
 import { usePalette, space } from '@/ui/theme'
+import { ThemeProvider } from '@/ui/ThemeProvider'
 import { T } from '@/ui/kit'
 
 function Centered({ children }: { children: React.ReactNode }) {
@@ -12,12 +12,15 @@ function Centered({ children }: { children: React.ReactNode }) {
 }
 
 export default function RootLayout() {
+  return <ThemeProvider><Root /></ThemeProvider>
+}
+
+function Root() {
   const p = usePalette()
   const page = { headerShown: true, title: '', headerStyle: { backgroundColor: p.bar }, headerTintColor: p.barText }
   const sheet = { presentation: 'modal' as const, headerShown: true, title: '', headerStyle: { backgroundColor: p.surface }, headerTintColor: p.t1 }
   return (
     <SafeAreaProvider>
-      <StatusBar style="auto" />
       <DataProvider
         loading={<Centered><ActivityIndicator color={p.t2} /></Centered>}
         failed={message => (

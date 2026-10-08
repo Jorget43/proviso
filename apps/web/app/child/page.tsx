@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { requireSession } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import PocketMoneyClient from '@/components/child/PocketMoneyClient'
+import AppearancePanel from '@/components/settings/AppearancePanel'
 
 export default async function ChildPage() {
   const session = await requireSession()
@@ -21,11 +22,16 @@ export default async function ChildPage() {
   const balance = txs.reduce((sum, t) => sum + t.amount, 0)
 
   return (
+    <>
     <PocketMoneyClient
       name={session.name}
       balance={balance}
       schedule={schedule ? { amount: schedule.amount, dayOfWeek: schedule.dayOfWeek } : null}
       txs={txs.map(t => ({ id: t.id, amount: t.amount, description: t.description, date: t.date, category: t.category }))}
     />
+    <div className="page" style={{ maxWidth: 640, paddingTop: 0 }}>
+      <AppearancePanel initial={session.theme} />
+    </div>
+    </>
   )
 }

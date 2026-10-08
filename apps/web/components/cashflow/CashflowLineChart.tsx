@@ -8,7 +8,8 @@ import {
   Filler,
 } from 'chart.js'
 import { Line } from 'react-chartjs-2'
-import { crosshair, SCRUB_BASE, AXIS_TICKS, kTicks } from '@/lib/chartPlugins'
+import { crosshair, SCRUB_BASE, kTicks } from '@/lib/chartPlugins'
+import { useChartColors, axisTicks } from '@/lib/chartTheme'
 import ScrubChart from '@/components/ui/ScrubChart'
 
 ChartJS.register(LineElement, PointElement, LinearScale, CategoryScale, Filler)
@@ -16,16 +17,18 @@ ChartJS.register(LineElement, PointElement, LinearScale, CategoryScale, Filler)
 interface CashflowLineChartProps {
   labels: string[]
   data: number[]
-  color: string
+  tone: 'green' | 'pink'
   note?: string
 }
 
-export default function CashflowLineChart({ labels, data, color, note }: CashflowLineChartProps) {
+export default function CashflowLineChart({ labels, data, tone, note }: CashflowLineChartProps) {
+  const c = useChartColors()
+  const color = c[tone]
   const datasets = [{
     label: 'Cash in the bank',
     data,
     borderColor: color,
-    backgroundColor: color + '12',
+    backgroundColor: c.a(color, 0.07),
     fill: true,
     tension: 0.35,
     pointRadius: 0,
@@ -42,8 +45,8 @@ export default function CashflowLineChart({ labels, data, color, note }: Cashflo
           options={{
             ...SCRUB_BASE,
             scales: {
-              x: { ticks: AXIS_TICKS, grid: { display: false } },
-              y: { ticks: { ...AXIS_TICKS, callback: kTicks }, grid: { color: 'rgba(0,0,0,0.05)' } },
+              x: { ticks: axisTicks(c), grid: { display: false } },
+              y: { ticks: { ...axisTicks(c), callback: kTicks }, grid: { color: c.grid } },
             },
           }}
         />

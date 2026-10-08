@@ -2,7 +2,8 @@
 import { Chart as ChartJS, BarElement, LineElement, PointElement, LinearScale, CategoryScale, Filler } from 'chart.js'
 import { Chart } from 'react-chartjs-2'
 import { fmtK, fmtS } from '@proviso/core/formatting'
-import { crosshair, SCRUB_BASE, AXIS_TICKS, kTicks } from '@/lib/chartPlugins'
+import { crosshair, SCRUB_BASE, kTicks } from '@/lib/chartPlugins'
+import { useChartColors, axisTicks } from '@/lib/chartTheme'
 import ScrubChart from '@/components/ui/ScrubChart'
 ChartJS.register(BarElement, LineElement, PointElement, LinearScale, CategoryScale, Filler)
 
@@ -13,7 +14,8 @@ interface DeficitChartProps {
 }
 
 export default function DeficitChart({ labels, deficitData, cashRunningData }: DeficitChartProps) {
-  const barColors   = deficitData.map(v => v < 0 ? 'rgba(155,37,37,0.8)' : 'rgba(22,107,69,0.65)')
+  const c = useChartColors()
+  const barColors   = deficitData.map(v => v < 0 ? c.a(c.red, 0.8) : c.a(c.green, 0.65))
   const totalDef    = deficitData.filter(v => v < 0).reduce((s, v) => s + v, 0)
   const totalSur    = deficitData.filter(v => v > 0).reduce((s, v) => s + v, 0)
   const net         = totalDef + totalSur
@@ -22,7 +24,7 @@ export default function DeficitChart({ labels, deficitData, cashRunningData }: D
   const balance = [{ type: 'bar' as const, label: 'Left over that year', data: deficitData, backgroundColor: barColors, borderRadius: 3 }]
   const cash = [{
     type: 'line' as const, label: 'Cash in the bank', data: cashRunningData,
-    borderColor: 'rgba(30,95,168,0.75)', backgroundColor: 'rgba(30,95,168,0.08)',
+    borderColor: c.a(c.blue, 0.75), backgroundColor: c.a(c.blue, 0.08),
     borderDash: [3, 3], borderWidth: 1.5, pointRadius: 0, pointHoverRadius: 3, fill: true,
   }]
 
@@ -33,8 +35,8 @@ export default function DeficitChart({ labels, deficitData, cashRunningData }: D
         <Chart type="bar" plugins={[crosshair]} data={{ labels, datasets: balance }} options={{
           ...SCRUB_BASE,
           scales: {
-            x: { ticks: AXIS_TICKS, grid: { display: false } },
-            y: { ticks: { ...AXIS_TICKS, callback: kTicks }, grid: { color: 'rgba(0,0,0,0.05)' } },
+            x: { ticks: axisTicks(c), grid: { display: false } },
+            y: { ticks: { ...axisTicks(c), callback: kTicks }, grid: { color: c.grid } },
           },
         }} />
       </ScrubChart>
@@ -57,8 +59,8 @@ export default function DeficitChart({ labels, deficitData, cashRunningData }: D
         <Chart type="line" plugins={[crosshair]} data={{ labels, datasets: cash }} options={{
           ...SCRUB_BASE,
           scales: {
-            x: { ticks: AXIS_TICKS, grid: { display: false } },
-            y: { min: 0, ticks: { ...AXIS_TICKS, callback: kTicks }, grid: { color: 'rgba(0,0,0,0.04)' } },
+            x: { ticks: axisTicks(c), grid: { display: false } },
+            y: { min: 0, ticks: { ...axisTicks(c), callback: kTicks }, grid: { color: c.grid } },
           },
         }} />
       </ScrubChart>

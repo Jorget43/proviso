@@ -104,7 +104,7 @@ export default function SaveErrorToast() {
       </div>
       <button
         onClick={() => window.location.reload()}
-        style={{ background: 'var(--red)', color: '#fff', border: 'none', borderRadius: 5, padding: '5px 10px', cursor: 'pointer', fontSize: '0.76rem', whiteSpace: 'nowrap' }}
+        style={{ background: 'var(--red)', color: 'var(--on-accent)', border: 'none', borderRadius: 5, padding: '5px 10px', cursor: 'pointer', fontSize: '0.76rem', whiteSpace: 'nowrap' }}
       >
         Reload
       </button>

@@ -3,7 +3,8 @@ import { Chart as ChartJS, BarElement, LinearScale, CategoryScale } from 'chart.
 import { Bar } from 'react-chartjs-2'
 import { fmtK } from '@proviso/core/formatting'
 import { SF_LEVELS } from '@proviso/core/schoolFees'
-import { crosshair, SCRUB_BASE, AXIS_TICKS, kTicks } from '@/lib/chartPlugins'
+import { crosshair, SCRUB_BASE, kTicks } from '@/lib/chartPlugins'
+import { useChartColors, axisTicks } from '@/lib/chartTheme'
 import ScrubChart from '@/components/ui/ScrubChart'
 ChartJS.register(BarElement, LinearScale, CategoryScale)
 
@@ -20,15 +21,16 @@ interface SchoolFeeChartProps {
 }
 
 export default function SchoolFeeChart({ labels, sfC1Arr, sfC2Arr, sfSibArr, sfTotalArr, sfC1Start, sfC1ExitIdx, sfC2Start, sfC2ExitIdx }: SchoolFeeChartProps) {
+  const c = useChartColors()
   const totalC1   = sfC1Arr.reduce((s, v) => s + v, 0)
   const totalC2   = sfC2Arr.reduce((s, v) => s + v, 0)
   const totalSib  = sfSibArr.reduce((s, v) => s + v, 0)
   const grandTotal = sfTotalArr.reduce((s, v) => s + v, 0)
 
   const datasets = [
-    { label: 'Child 1',          data: sfC1Arr,  backgroundColor: 'rgba(30,95,168,0.75)',  stack: 'a', borderRadius: 3 },
-    { label: 'Child 2',          data: sfC2Arr,  backgroundColor: 'rgba(22,107,69,0.75)',  stack: 'a', borderRadius: 3 },
-    { label: 'Sibling discount', data: sfSibArr, backgroundColor: 'rgba(186,117,23,0.4)',  stack: 'a' },
+    { label: 'Child 1',          data: sfC1Arr,  backgroundColor: c.a(c.blue, 0.75),  stack: 'a', borderRadius: 3 },
+    { label: 'Child 2',          data: sfC2Arr,  backgroundColor: c.a(c.green, 0.75),  stack: 'a', borderRadius: 3 },
+    { label: 'Sibling discount', data: sfSibArr, backgroundColor: c.a(c.amber, 0.4),  stack: 'a' },
   ]
   const peakIdx = sfTotalArr.indexOf(Math.max(...sfTotalArr))
 
@@ -38,8 +40,8 @@ export default function SchoolFeeChart({ labels, sfC1Arr, sfC2Arr, sfSibArr, sfT
         <Bar plugins={[crosshair]} data={{ labels, datasets }} options={{
           ...SCRUB_BASE,
           scales: {
-            x: { stacked: true, ticks: AXIS_TICKS, grid: { display: false } },
-            y: { stacked: true, ticks: { ...AXIS_TICKS, callback: kTicks }, grid: { color: 'rgba(0,0,0,0.05)' } },
+            x: { stacked: true, ticks: axisTicks(c), grid: { display: false } },
+            y: { stacked: true, ticks: { ...axisTicks(c), callback: kTicks }, grid: { color: c.grid } },
           },
         }} />
       </ScrubChart>

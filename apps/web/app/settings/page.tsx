@@ -44,6 +44,7 @@ export default async function SettingsPage() {
 
   return (
     <SettingsClient
+      theme={me.theme}
       person1Name={hs?.person1Name ?? 'Person 1'}
       person2Name={hs?.person2Name ?? 'Person 2'}
       partnerEnabled={hs?.partnerEnabled ?? false}

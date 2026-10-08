@@ -194,7 +194,7 @@ export default function DonationsPanel({ initialDonations, fyEnding, fyLabel }: 
                 <button
                   onClick={importSelected}
                   disabled={importing || selected.size === 0}
-                  style={{ background: 'var(--teal)', color: '#fff', border: 'none', borderRadius: 5, padding: '5px 12px', fontSize: '0.75rem', cursor: 'pointer', opacity: selected.size === 0 ? 0.5 : 1 }}
+                  style={{ background: 'var(--teal)', color: 'var(--on-accent)', border: 'none', borderRadius: 5, padding: '5px 12px', fontSize: '0.75rem', cursor: 'pointer', opacity: selected.size === 0 ? 0.5 : 1 }}
                 >
                   {importing ? 'Importing…' : `Import ${selected.size} selected`}
                 </button>
@@ -245,7 +245,7 @@ export default function DonationsPanel({ initialDonations, fyEnding, fyLabel }: 
             <input className="da-input" value={fNotes} onChange={e => setFNotes(e.target.value)} placeholder="e.g. monthly direct debit" style={{ width: '100%' }} />
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={save} style={{ background: 'var(--green)', color: '#fff', border: 'none', borderRadius: 5, padding: '5px 14px', fontSize: '0.75rem', cursor: 'pointer' }}>
+            <button onClick={save} style={{ background: 'var(--green)', color: 'var(--on-accent)', border: 'none', borderRadius: 5, padding: '5px 14px', fontSize: '0.75rem', cursor: 'pointer' }}>
               {editId !== null ? 'Save changes' : 'Add donation'}
             </button>
             <button onClick={cancel} style={{ fontSize: '0.75rem', color: 'var(--t3)', background: 'none', border: '1px solid var(--border)', borderRadius: 5, padding: '5px 10px', cursor: 'pointer' }}>Cancel</button>

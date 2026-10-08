@@ -5,7 +5,8 @@ import {
 } from 'chart.js'
 import { Line } from 'react-chartjs-2'
 import type { CombinedRow, SuperRow } from '@proviso/core/super'
-import { crosshair, SCRUB_BASE, AXIS_TICKS, kTicks } from '@/lib/chartPlugins'
+import { crosshair, SCRUB_BASE, kTicks } from '@/lib/chartPlugins'
+import { useChartColors, axisTicks } from '@/lib/chartTheme'
 import ScrubChart from '@/components/ui/ScrubChart'
 
 ChartJS.register(LineElement, PointElement, LinearScale, CategoryScale, Filler)
@@ -23,6 +24,7 @@ interface Props {
 export default function SuperBalanceChart({
   combined, person1Rows, person2Rows, person1RetirementYear, person2RetirementYear, person1Name, person2Name,
 }: Props) {
+  const c = useChartColors()
   const labels    = combined.map(c => String(c.year))
   const hasPerson2  = person2Rows !== null && person2Rows.length > 0
 
@@ -37,7 +39,7 @@ export default function SuperBalanceChart({
         {
           label: person1Name,
           data: combined.map(c => Math.round(person1ByYear[c.year] ?? 0)),
-          borderColor: 'rgba(30,95,168,0.85)',
+          borderColor: c.a(c.blue, 0.85),
           borderWidth: 2,
           pointRadius: 0,
           fill: false,
@@ -46,7 +48,7 @@ export default function SuperBalanceChart({
         {
           label: person2Name,
           data: combined.map(c => Math.round(person2ByYear[c.year] ?? 0)),
-          borderColor: 'rgba(139,92,246,0.85)',
+          borderColor: c.a(c.purple, 0.85),
           borderWidth: 2,
           pointRadius: 0,
           fill: false,
@@ -55,7 +57,7 @@ export default function SuperBalanceChart({
         {
           label: 'Combined',
           data: combined.map(c => Math.round(c.total)),
-          borderColor: 'rgba(22,163,74,0.9)',
+          borderColor: c.a(c.green, 0.9),
           borderWidth: 2.5,
           pointRadius: 0,
           fill: false,
@@ -64,7 +66,7 @@ export default function SuperBalanceChart({
         {
           label: "Combined (today's $)",
           data: combined.map(c => Math.round(c.totalPV)),
-          borderColor: 'rgba(22,163,74,0.25)',
+          borderColor: c.a(c.green, 0.25),
           borderDash: [5, 4],
           borderWidth: 1.5,
           pointRadius: 0,
@@ -76,7 +78,7 @@ export default function SuperBalanceChart({
         {
           label: 'Balance',
           data: combined.map(c => Math.round(c.person1Balance)),
-          borderColor: 'rgba(30,95,168,0.85)',  // readout colour; the line is drawn per segment
+          borderColor: c.a(c.blue, 0.85),  // readout colour; the line is drawn per segment
           borderWidth: 2,
           pointRadius: 0,
           fill: false,
@@ -85,15 +87,15 @@ export default function SuperBalanceChart({
             borderColor: (ctx: { p1DataIndex: number }) => {
               const year = combined[ctx.p1DataIndex]?.year ?? 0
               return year >= person1RetirementYear
-                ? 'rgba(138,82,8,0.85)'
-                : 'rgba(30,95,168,0.85)'
+                ? c.a(c.amber, 0.85)
+                : c.a(c.blue, 0.85)
             },
           },
         },
         {
           label: "Today's dollars (PV)",
           data: combined.map(c => Math.round(c.totalPV)),
-          borderColor: 'rgba(30,95,168,0.3)',
+          borderColor: c.a(c.blue, 0.3),
           borderDash: [5, 4],
           borderWidth: 1.5,
           pointRadius: 0,
@@ -107,7 +109,7 @@ export default function SuperBalanceChart({
     scales: {
       x: {
         ticks: {
-          ...AXIS_TICKS,
+          ...axisTicks(c),
           maxTicksLimit: 12,
           callback: (_: unknown, i: number) => {
             const c = combined[i]
@@ -117,11 +119,11 @@ export default function SuperBalanceChart({
             return i % 5 === 0 ? String(c.year) : ''
           },
         },
-        grid: { color: 'rgba(50,42,28,0.06)' },
+        grid: { color: c.a(c.t2, 0.06) },
       },
       y: {
-        ticks: { ...AXIS_TICKS, callback: kTicks },
-        grid: { color: 'rgba(50,42,28,0.06)' },
+        ticks: { ...axisTicks(c), callback: kTicks },
+        grid: { color: c.a(c.t2, 0.06) },
       },
     },
   }

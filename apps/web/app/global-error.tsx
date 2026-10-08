@@ -29,7 +29,7 @@ export default function GlobalError({ reset }: { error: Error; reset: () => void
           </div>
           <button
             onClick={reset}
-            style={{ background: '#2563eb', color: '#fff', border: 'none', borderRadius: 6, padding: '0.5rem 1.25rem', fontSize: '0.9rem', cursor: 'pointer' }}
+            style={{ background: '#2563eb', color: 'var(--on-accent)', border: 'none', borderRadius: 6, padding: '0.5rem 1.25rem', fontSize: '0.9rem', cursor: 'pointer' }}
           >
             Retry
           </button>

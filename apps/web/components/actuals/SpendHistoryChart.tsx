@@ -2,7 +2,8 @@
 import { Chart as ChartJS, BarElement, LineElement, PointElement, LinearScale, CategoryScale } from 'chart.js'
 import { Chart } from 'react-chartjs-2'
 import { fmt } from '@proviso/core/formatting'
-import { crosshair, SCRUB_BASE, AXIS_TICKS, kTicks } from '@/lib/chartPlugins'
+import { crosshair, SCRUB_BASE, kTicks } from '@/lib/chartPlugins'
+import { useChartColors, axisTicks } from '@/lib/chartTheme'
 import ScrubChart from '@/components/ui/ScrubChart'
 ChartJS.register(BarElement, LineElement, PointElement, LinearScale, CategoryScale)
 
@@ -12,6 +13,7 @@ interface SpendHistoryChartProps {
 }
 
 export default function SpendHistoryChart({ spendByMonth, budgetMonthly }: SpendHistoryChartProps) {
+  const c = useChartColors()
   const sortedMonths = Object.keys(spendByMonth).sort()
   if (!sortedMonths.length) {
     return <p className="small" style={{ color: 'var(--t3)', textAlign: 'center', padding: '1rem 0' }}>No actuals data yet</p>
@@ -25,8 +27,8 @@ export default function SpendHistoryChart({ spendByMonth, budgetMonthly }: Spend
   const budLine = Array(labels.length).fill(Math.round(budgetMonthly))
 
   const datasets = [
-    { type: 'bar'  as const, label: 'Actual spend', data,    backgroundColor: 'rgba(30,95,168,0.65)', borderRadius: 3 },
-    { type: 'line' as const, label: 'Budget',        data: budLine, borderColor: 'rgba(155,37,37,0.7)', borderDash: [4, 3], borderWidth: 1.5, pointRadius: 0, pointHoverRadius: 0, fill: false },
+    { type: 'bar'  as const, label: 'Actual spend', data,    backgroundColor: c.a(c.blue, 0.65), borderRadius: 3 },
+    { type: 'line' as const, label: 'Budget',        data: budLine, borderColor: c.a(c.red, 0.7), borderDash: [4, 3], borderWidth: 1.5, pointRadius: 0, pointHoverRadius: 0, fill: false },
   ]
 
   return (
@@ -34,8 +36,8 @@ export default function SpendHistoryChart({ spendByMonth, budgetMonthly }: Spend
       <Chart type="bar" plugins={[crosshair]} data={{ labels, datasets }} options={{
         ...SCRUB_BASE,
         scales: {
-          x: { ticks: AXIS_TICKS, grid: { display: false } },
-          y: { ticks: { ...AXIS_TICKS, callback: kTicks }, grid: { color: 'rgba(0,0,0,0.05)' } },
+          x: { ticks: axisTicks(c), grid: { display: false } },
+          y: { ticks: { ...axisTicks(c), callback: kTicks }, grid: { color: c.grid } },
         },
       }} />
     </ScrubChart>

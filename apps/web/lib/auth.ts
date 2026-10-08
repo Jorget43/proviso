@@ -8,6 +8,7 @@
 // here is the secure DB-backed check used at the page/route level.
 
 import { scrypt, randomBytes, timingSafeEqual, createHash } from 'crypto'
+import { isThemeChoice, type ThemeChoice } from './theme'
 import { promisify } from 'util'
 import { cookies, headers } from 'next/headers'
 import { redirect } from 'next/navigation'
@@ -70,6 +71,8 @@ export interface SessionUser {
   name:     string
   username: string
   role:     Role
+  /** Appearance: follow the device, or always light / dark. */
+  theme:    ThemeChoice
 }
 
 // ── Password hashing ──────────────────────────────────────────────────────────
@@ -194,6 +197,7 @@ export const getSession = cache(async (): Promise<SessionUser | null> => {
     name:     session.user.name,
     username: session.user.username,
     role:     session.user.role as Role,
+    theme:    isThemeChoice(session.user.themePreference) ? session.user.themePreference : 'system',
   }
 })
 

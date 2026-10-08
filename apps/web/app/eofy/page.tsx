@@ -83,7 +83,7 @@ export default async function EofyPage() {
       {/* Print-only header */}
       <div style={{ display: 'none' }} className="print-only">
         <h2 style={{ fontFamily: 'var(--font-dm-serif)', marginBottom: 4 }}>Proviso — EOFY Accountant Report</h2>
-        <p style={{ fontSize: '0.8rem', color: '#666', marginBottom: 20 }}>{fyLabel} · Generated {new Date().toLocaleDateString('en-AU')}</p>
+        <p style={{ fontSize: '0.8rem', color: 'var(--t2)', marginBottom: 20 }}>{fyLabel} · Generated {new Date().toLocaleDateString('en-AU')}</p>
       </div>
 
       {/* Page header */}

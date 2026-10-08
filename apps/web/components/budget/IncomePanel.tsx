@@ -63,7 +63,7 @@ function BracketBar({ gross }: { gross: number }) {
               title={`${b.label}: $${(b.lo / 1000).toFixed(0)}k – $${(b.hi / 1000).toFixed(0)}k`}
               style={{
                 flex: `0 0 ${pct}%`,
-                background: 'rgba(50,42,28,0.08)',
+                background: 'var(--border)',
                 borderRadius: 2,
                 overflow: 'hidden',
                 position: 'relative',
@@ -91,7 +91,7 @@ function BracketBar({ gross }: { gross: number }) {
               style={{
                 flex: `0 0 ${pct}%`,
                 fontSize: '0.58rem',
-                color: active ? b.color : 'rgba(50,42,28,0.25)',
+                color: active ? b.color : 'var(--t3)',
                 textAlign: 'center',
                 fontWeight: active ? 600 : 400,
                 overflow: 'hidden',

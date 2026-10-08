@@ -579,7 +579,7 @@ export default function ProjectionsClient({
                     style={{
                       flex: 1, padding: '5px 0', fontSize: '0.72rem', borderRadius: 5, cursor: 'pointer',
                       background: rentSt.enabled === (mode === 'Renter') ? 'var(--blue)' : 'var(--surface2)',
-                      color: rentSt.enabled === (mode === 'Renter') ? '#fff' : 'var(--t2)',
+                      color: rentSt.enabled === (mode === 'Renter') ? 'var(--on-accent)' : 'var(--t2)',
                       border: '1px solid var(--border)',
                     }}
                   >
@@ -744,7 +744,7 @@ export default function ProjectionsClient({
                               style={{
                                 padding: '4px 10px', fontSize: '0.72rem', borderRadius: 5, cursor: 'pointer',
                                 background: !isCustom && sfType === t ? 'var(--blue)' : 'var(--surface2)',
-                                color: !isCustom && sfType === t ? '#fff' : 'var(--t2)',
+                                color: !isCustom && sfType === t ? 'var(--on-accent)' : 'var(--t2)',
                                 border: '1px solid var(--border)',
                               }}
                             >
@@ -756,7 +756,7 @@ export default function ProjectionsClient({
                             style={{
                               padding: '4px 10px', fontSize: '0.72rem', borderRadius: 5, cursor: 'pointer',
                               background: isCustom ? 'var(--blue)' : 'var(--surface2)',
-                              color: isCustom ? '#fff' : 'var(--t2)',
+                              color: isCustom ? 'var(--on-accent)' : 'var(--t2)',
                               border: '1px solid var(--border)',
                             }}
                           >

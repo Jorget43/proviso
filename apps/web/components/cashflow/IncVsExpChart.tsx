@@ -1,4 +1,5 @@
 'use client'
+import { useChartColors } from '@/lib/chartTheme'
 import {
   Chart as ChartJS,
   BarElement,
@@ -17,6 +18,7 @@ interface IncVsExpChartProps {
 }
 
 export default function IncVsExpChart({ totalInc, catMonthly }: IncVsExpChartProps) {
+  const c = useChartColors()
   return (
     <div className="chart-wrap" style={{ height: 200 }}>
       <Bar
@@ -26,7 +28,7 @@ export default function IncVsExpChart({ totalInc, catMonthly }: IncVsExpChartPro
             {
               label: 'Income',
               data: [Math.round(totalInc), 0],
-              backgroundColor: '#166B45',
+              backgroundColor: c.green,
               stack: 'a',
             },
             ...CATS.map((cat, i) => ({
@@ -54,7 +56,7 @@ export default function IncVsExpChart({ totalInc, catMonthly }: IncVsExpChartPro
           scales: {
             x: {
               stacked: true,
-              ticks: { font: { size: 11 }, color: '#A09484' },
+              ticks: { font: { size: 11 }, color: c.t3 },
               grid: { display: false },
             },
             y: {
@@ -62,9 +64,9 @@ export default function IncVsExpChart({ totalInc, catMonthly }: IncVsExpChartPro
               ticks: {
                 callback: v => '$' + Math.round(Number(v) / 1000) + 'k',
                 font: { size: 10 },
-                color: '#A09484',
+                color: c.t3,
               },
-              grid: { color: 'rgba(0,0,0,0.05)' },
+              grid: { color: c.grid },
             },
           },
         }}

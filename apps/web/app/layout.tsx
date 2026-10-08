@@ -56,7 +56,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   }
 
   return (
-    <html lang="en" className={`${dmSans.variable} ${dmSerif.variable}`}>
+    // A chosen theme is written here so the first paint is right; "system"
+    // (and signed-out pages) leave it off and follow the device (globals.css).
+    <html lang="en" className={`${dmSans.variable} ${dmSerif.variable}`}
+      data-theme={session && session.theme !== 'system' ? session.theme : undefined}>
       <body>
         <TopNav user={session ? { name: session.name, role: session.role } : null} />
         {session && <UpdateBanner currentVersion={currentVersion} latestVersion={latestVersion} />}

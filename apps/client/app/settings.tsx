@@ -13,8 +13,8 @@ import { exportHousehold } from '@/data/importExport'
 import { shareJson, datedName } from '@/data/files'
 import { keyStoreName, saveKeyToStore } from '@/data/keyBackup'
 import { keyInStore } from '@/data/identity'
-import { Button, Card, H2, Screen, T } from '@/ui/kit'
-import { usePalette, space, radius, touch } from '@/ui/theme'
+import { Button, Card, Choice, H2, Screen, T } from '@/ui/kit'
+import { usePalette, useThemeChoice, space, radius, touch, type ThemeChoice } from '@/ui/theme'
 
 const APP_VERSION = Constants.expoConfig?.version ?? '0'
 
@@ -22,6 +22,7 @@ export default function Settings() {
   const { household: h, read, erase, sync } = useHousehold()
   const identity = useIdentity()
   const p = usePalette()
+  const theme = useThemeChoice()
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [inStore, setInStore] = useState<boolean | null>(null)
@@ -78,6 +79,15 @@ export default function Settings() {
           </View>
         </View>
       )}
+
+      <View style={{ gap: space.sm }}>
+        <H2>Appearance</H2>
+        <Card>
+          <Choice label="Appearance" value={theme.choice} onChange={k => theme.setChoice(k as ThemeChoice)}
+            options={[{ key: 'system', label: 'Match phone' }, { key: 'light', label: 'Light' }, { key: 'dark', label: 'Dark' }]} />
+          <T size="small" tone="t2">On this device. “Match phone” follows your phone’s own setting.</T>
+        </Card>
+      </View>
 
       <View style={{ gap: space.sm }}>
         <H2>Household</H2>

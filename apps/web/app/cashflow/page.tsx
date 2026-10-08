@@ -68,7 +68,7 @@ export default async function CashflowPage() {
           <CashflowLineChart
             labels={labels}
             data={cfData}
-            color="#166B45"
+            tone="green"
             note="Yearly bills land in the month they're due."
           />
         </Panel>
@@ -77,7 +77,7 @@ export default async function CashflowPage() {
             <CashflowLineChart
               labels={labels}
               data={burnData}
-              color="#9B2560"
+              tone="pink"
               note={`${person2Name} on leave — PPL for ${PPL_WEEKS} wks (after tax), then ${person1Name} only.`}
             />
           </Panel>

@@ -1,4 +1,6 @@
 'use client'
+import AppearancePanel from './AppearancePanel'
+import type { ThemeChoice } from '@/lib/theme'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -31,6 +33,7 @@ interface Props {
   watchdog:             { attention: number } | null
   buildVersion:         string
   buildDate:            string | null
+  theme:                ThemeChoice
 }
 
 export default function SettingsClient({
@@ -38,7 +41,7 @@ export default function SettingsClient({
   person1FTE, person2FTE, mortgageBalance,
   superBalance, partnerSuperBalance,
   situation,
-  currentRole, currentUserId, users, hasTOTP, passkeys, devices, watchdog, buildVersion, buildDate,
+  currentRole, currentUserId, users, hasTOTP, passkeys, devices, watchdog, buildVersion, buildDate, theme,
 }: Props) {
   const isCfo = currentRole === 'CFO'
   const router   = useRouter()
@@ -80,6 +83,8 @@ export default function SettingsClient({
       <h1 style={{ fontFamily: 'var(--font-dm-serif)', fontSize: '1.6rem', fontWeight: 400, marginBottom: '1.5rem' }}>
         Household settings
       </h1>
+
+      <AppearancePanel initial={theme} />
 
       <Panel title="Household">
         <div className="da-grid" style={{ gap: '0.6rem' }}>

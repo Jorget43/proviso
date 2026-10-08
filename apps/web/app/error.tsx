@@ -15,7 +15,7 @@ export default function Error({ reset }: { error: Error; reset: () => void }) {
         </p>
         <button
           onClick={reset}
-          style={{ background: 'var(--blue, #2563eb)', color: '#fff', border: 'none', borderRadius: 6, padding: '0.45rem 1.1rem', fontSize: '0.875rem', cursor: 'pointer' }}
+          style={{ background: 'var(--blue, #2563eb)', color: 'var(--on-accent)', border: 'none', borderRadius: 6, padding: '0.45rem 1.1rem', fontSize: '0.875rem', cursor: 'pointer' }}
         >
           Retry
         </button>

@@ -304,7 +304,7 @@ export default function SuperClient({ canEdit, initial, context, mortgage, budge
 
             {/* Mortgage still running at retirement — flag higher goal */}
             {mortgageStillLive && (
-              <div className="super-hint" style={{ background: 'var(--red-lt)', border: '1px solid rgba(180,30,30,0.2)', borderLeft: '3px solid var(--red)' }}>
+              <div className="super-hint" style={{ background: 'var(--red-lt)', border: '1px solid var(--border-md)', borderLeft: '3px solid var(--red)' }}>
                 <span>
                   ⚠ Mortgage continues until {mortgage.mortgageEndYear}
                   {' '}({mortgageYearsAfter} yr past retirement). Income goal must cover the

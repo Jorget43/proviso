@@ -1,7 +1,8 @@
 'use client'
 import { Chart as ChartJS, LineElement, PointElement, LinearScale, CategoryScale, Filler } from 'chart.js'
 import { Line } from 'react-chartjs-2'
-import { crosshair, SCRUB_BASE, AXIS_TICKS, kTicks } from '@/lib/chartPlugins'
+import { crosshair, SCRUB_BASE, kTicks } from '@/lib/chartPlugins'
+import { useChartColors, axisTicks } from '@/lib/chartTheme'
 import ScrubChart from '@/components/ui/ScrubChart'
 ChartJS.register(LineElement, PointElement, LinearScale, CategoryScale, Filler)
 
@@ -12,10 +13,11 @@ interface MortPaydownChartProps {
 }
 
 export default function MortPaydownChart({ labels, mortData, endDate }: MortPaydownChartProps) {
+  const c = useChartColors()
   const end = new Date(endDate)
   const now = new Date()
   const yrs = Math.max(0, (end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24 * 365.25))
-  const datasets = [{ label: 'Home loan left', data: mortData, borderColor: '#9B2525', backgroundColor: 'rgba(155,37,37,0.07)', fill: true, tension: 0.4, borderWidth: 2, pointRadius: 0, pointHoverRadius: 4 }]
+  const datasets = [{ label: 'Home loan left', data: mortData, borderColor: c.red, backgroundColor: c.a(c.red, 0.07), fill: true, tension: 0.4, borderWidth: 2, pointRadius: 0, pointHoverRadius: 4 }]
 
   return (
     <>
@@ -23,8 +25,8 @@ export default function MortPaydownChart({ labels, mortData, endDate }: MortPayd
         <Line data={{ labels, datasets }} plugins={[crosshair]} options={{
           ...SCRUB_BASE,
           scales: {
-            x: { ticks: AXIS_TICKS, grid: { display: false } },
-            y: { min: 0, ticks: { ...AXIS_TICKS, callback: kTicks }, grid: { color: 'rgba(0,0,0,0.05)' } },
+            x: { ticks: axisTicks(c), grid: { display: false } },
+            y: { min: 0, ticks: { ...axisTicks(c), callback: kTicks }, grid: { color: c.grid } },
           },
         }} />
       </ScrubChart>

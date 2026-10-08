@@ -254,6 +254,7 @@ model User {
   lockedUntil      DateTime?
   totpSecret       String?
   totpRecoveryCodes String?
+  themePreference  String             @default("system") // system | light | dark (lib/theme.ts)
   createdAt        DateTime           @default(now())
   updatedAt        DateTime           @updatedAt
   sessions         Session[]

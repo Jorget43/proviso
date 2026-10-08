@@ -4,6 +4,7 @@ import { Doughnut } from 'react-chartjs-2'
 import { CATS, CAT_COLORS } from '@proviso/core/constants'
 import { fmt } from '@proviso/core/formatting'
 import Panel from '@/components/ui/Panel'
+import { useChartColors } from '@/lib/chartTheme'
 
 // Draw the percentage on each slice that's big enough to read, plus a centred
 // total — so the donut is labelled by default without needing a hover/tap.
@@ -32,16 +33,17 @@ const arcLabels: Plugin<'doughnut'> = {
       ctx.restore()
     })
 
-    // Centre total
+    // Centre total, in the theme's text colours (read when drawn, so a theme switch applies).
+    const css = getComputedStyle(chart.canvas)
     const cx = meta.data[0] ? (meta.data[0].getProps(['x'], true) as { x: number }).x : chart.width / 2
     const cy = meta.data[0] ? (meta.data[0].getProps(['y'], true) as { y: number }).y : chart.height / 2
     ctx.save()
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
-    ctx.fillStyle = '#6B6256'
+    ctx.fillStyle = css.getPropertyValue('--t2').trim()
     ctx.font = '500 9px system-ui, sans-serif'
     ctx.fillText('per month', cx, cy + 9)
-    ctx.fillStyle = '#2A2520'
+    ctx.fillStyle = css.getPropertyValue('--t1').trim()
     ctx.font = '600 14px system-ui, sans-serif'
     ctx.fillText(fmt(total), cx, cy - 4)
     ctx.restore()
@@ -55,6 +57,7 @@ interface SpendDonutProps {
 }
 
 export default function SpendDonut({ catMonthly }: SpendDonutProps) {
+  const c = useChartColors()
   const labels = CATS.filter(c => (catMonthly[c] ?? 0) > 0)
   const data   = labels.map(c => catMonthly[c] ?? 0)
   const colors = labels.map(c => CAT_COLORS[CATS.indexOf(c)])
@@ -64,7 +67,7 @@ export default function SpendDonut({ catMonthly }: SpendDonutProps) {
     datasets: [{
       data,
       backgroundColor: colors,
-      borderColor: '#FFFFFF',
+      borderColor: c.surface,
       borderWidth: 2,
       hoverOffset: 6,
     }],

@@ -23,7 +23,7 @@ export const crosshair: any = {
     ctx.moveTo(x, top)
     ctx.lineTo(x, bottom)
     ctx.lineWidth = 1
-    ctx.strokeStyle = 'rgba(0,0,0,0.18)'
+    ctx.strokeStyle = getComputedStyle(chart.ctx.canvas).getPropertyValue('--t3').trim() || 'rgba(0,0,0,0.18)'
     ctx.setLineDash([4, 4])
     ctx.stroke()
     ctx.restore()
@@ -42,7 +42,6 @@ export const SCRUB_BASE = {
   },
 } as const
 
-export const AXIS_TICKS = { font: { size: 10 }, color: '#A09484' } as const
 export const kTicks = (v: number | string) => {
   const n = Number(v)
   const sign = n < 0 ? '-$' : '$'
