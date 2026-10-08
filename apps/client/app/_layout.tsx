@@ -34,7 +34,7 @@ export default function RootLayout() {
           {/* Full pages with a back button */}
           {['settings', 'recovery', 'restore'].map(name => <Stack.Screen key={name} name={name} options={page} />)}
           {/* Forms over a tab */}
-          {['expense', 'income', 'item', 'loan', 'super', 'assumptions', 'oneoff', 'people', 'rent', 'childcare'].map(name => <Stack.Screen key={name} name={name} options={sheet} />)}
+          {['expense', 'income', 'item', 'loan', 'super', 'assumptions', 'whatif', 'oneoff', 'people', 'rent', 'childcare'].map(name => <Stack.Screen key={name} name={name} options={sheet} />)}
         </Stack>
       </DataProvider>
     </SafeAreaProvider>

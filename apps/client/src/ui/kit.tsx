@@ -179,6 +179,42 @@ export function TextField({ value, onChange, label, placeholder }: { value: stri
   return <Input value={value} onChangeText={onChange} placeholder={placeholder} accessibilityLabel={label} />
 }
 
+/**
+ * A number nudged down and up in fixed steps: a slider's job, but exact and
+ * easy to hit. Screen readers adjust it with the usual swipe up / down.
+ */
+export function Stepper({ label, value, onChange, min, max, step, format = String }: {
+  label: string
+  value: number
+  onChange: (v: number) => void
+  min: number
+  max: number
+  step: number
+  format?: (v: number) => string
+}) {
+  const p = usePalette()
+  const set = (v: number) => onChange(Math.min(max, Math.max(min, Number((Math.round(v / step) * step).toFixed(4)))))
+  const shown = format(value)
+  const button = (sign: '−' | '+', next: number, disabled: boolean) => (
+    <Pressable accessible={false} disabled={disabled} onPress={() => set(next)} hitSlop={space.xs}
+      style={({ pressed }) => ({ width: touch, height: touch, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center',
+        borderWidth: 1, borderColor: p.borderMd, backgroundColor: p.surface, opacity: disabled ? 0.35 : pressed ? 0.6 : 1 })}>
+      <Text style={{ fontSize: font.title, color: p.t1 }}>{sign}</Text>
+    </Pressable>
+  )
+  return (
+    <View accessible accessibilityRole="adjustable" accessibilityLabel={label} accessibilityValue={{ text: shown }}
+      accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
+      onAccessibilityAction={e => set(value + (e.nativeEvent.actionName === 'increment' ? step : -step))}
+      style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
+      <T style={{ flex: 1 }}>{label}</T>
+      {button('−', value - step, value <= min)}
+      <T weight="600" style={{ minWidth: 76, textAlign: 'center' }}>{shown}</T>
+      {button('+', value + step, value >= max)}
+    </View>
+  )
+}
+
 /** Reads a typed amount ("$1,200") as a number; NaN when it isn't one. */
 export const parseAmount = (s: string) => (s.trim() === '' ? NaN : Number(s.replace(/[$,\s]/g, '')))
 

@@ -17,6 +17,7 @@ import { saveCost, removeCost, kindOf, type CostDraft } from '@/data/costs'
 import { startHousehold, savePay } from '@/data/setup'
 import { saveAsset, removeAsset, saveDebt, saveLoan, saveSuper } from '@/data/wealth'
 import { saveAssumptions, saveOneOff, removeOneOff } from '@/data/future'
+import { startWhatIf, applyWhatIf, hasChanges, addWorkChange, keepWhatIf } from '@/data/whatif'
 import { estimateLivingCosts, buildStarterHousehold, type StarterAnswers } from '@proviso/core/starter'
 
 // The app's data layer against a real SQLite (node:sqlite), migrated with the
@@ -381,6 +382,75 @@ describe('future', () => {
     const v = futureView(h, NOW)
     expect(v.years).toBe(30)
     expect(v.retirement.goalMonthly).toBe(7_500)
+  })
+})
+
+describe('what if', () => {
+  const renters: StarterAnswers = {
+    state: 'nsw', regional: false,
+    you: { name: 'Alex', age: 32, salary: 110_000, days: 5, hasHelp: false, helpBalance: 0, superBalance: 60_000 },
+    partner: { name: 'Sam', age: 31, salary: 90_000, days: 5, hasHelp: false, helpBalance: 0, superBalance: 50_000 },
+    children: [], schoolType: null,
+    home: { kind: 'rent', weeklyRent: 650, mortgageBalance: 0, mortgageRate: 0, mortgageYears: 0, homeValue: 0 },
+    cars: 1, cash: 90_000, investments: 30_000,
+  }
+  async function setUp() {
+    const { db } = await migratedTestDb()
+    await startHousehold(db, buildStarterHousehold(renters, estimateLivingCosts(renters), NOW))
+    return db
+  }
+
+  it('previews without writing, and an untouched draft has no changes', async () => {
+    const db = await setUp()
+    const h = await loadHousehold(db)
+    const w = startWhatIf(h)
+    expect(hasChanges(h, w)).toBe(false)
+    expect(futureView(applyWhatIf(h, w), NOW).endNetWorth).toBe(futureView(h, NOW).endNetWorth)
+    w.projection = { ...w.projection, savingsRate: 90 }
+    expect(hasChanges(h, w)).toBe(true)
+    expect(futureView(applyWhatIf(h, w), NOW).endNetWorth).not.toBe(futureView(h, NOW).endNetWorth)
+    expect((await loadHousehold(db)).projection.savingsRate).toBe(h.projection.savingsRate)
+  })
+
+  it('a buying plan shows the purchase as a milestone once kept', async () => {
+    const db = await setUp()
+    const h = await loadHousehold(db)
+    const w = startWhatIf(h)
+    w.rent = { ...w.rent, purchasePlanEnabled: true, targetPurchaseYear: 2030, targetPropertyValue: 900_000, depositPct: 10, depositFromCash: 90_000 }
+    expect(futureView(applyWhatIf(h, w), NOW).milestones.map(m => m.text)).toContain('You buy your home')
+    await keepWhatIf(db, h, w)
+    const after = await loadHousehold(db)
+    expect(after.rent).toMatchObject({ enabled: true, purchasePlanEnabled: true, targetPurchaseYear: 2030, targetPropertyValue: 900_000 })
+    expect(futureView(after, NOW).milestones.find(m => m.text === 'You buy your home')?.year).toBe(2030)
+  })
+
+  it('work changes: fewer days lower the result; keeping adds, changes and removes rows', async () => {
+    const db = await setUp()
+    const h = await loadHousehold(db)
+    // The starter records each person's days for this year.
+    expect(h.workPhases.filter(p => p.person === 'p2')).toHaveLength(1)
+    let w = addWorkChange(startWhatIf(h), 'p2', 2026)
+    const added = w.workPhases.find(p => p.person === 'p2' && p.year === 2027)!
+    expect(added.days).toBe(5)
+    w = { ...w, workPhases: w.workPhases.map(p => (p.id === added.id ? { ...p, days: 3 } : p)) }
+    expect(futureView(applyWhatIf(h, w), NOW).endNetWorth).toBeLessThan(futureView(h, NOW).endNetWorth)
+
+    await keepWhatIf(db, h, w)
+    let now = await loadHousehold(db)
+    expect(now.workPhases.filter(p => p.person === 'p2').map(p => [p.year, p.days]).sort()).toEqual([[2026, 5], [2027, 3]])
+
+    // Remove it again: the row is soft-deleted, the household is back to the start.
+    const back = startWhatIf(now)
+    back.workPhases = back.workPhases.filter(p => p.id !== added.id)
+    await keepWhatIf(db, now, back)
+    now = await loadHousehold(db)
+    expect(now.workPhases.filter(p => p.person === 'p2').map(p => [p.year, p.days])).toEqual([[2026, 5]])
+    expect(futureView(now, NOW).endNetWorth).toBe(futureView(h, NOW).endNetWorth)
+  })
+
+  it('with no work phases, a change starts from full-time now', () => {
+    const w = addWorkChange({ projection: {} as never, rent: {} as never, workPhases: [] }, 'p1', 2026)
+    expect(w.workPhases.map(p => [p.person, p.year, p.days])).toEqual([['p1', 2026, 5], ['p1', 2027, 5]])
   })
 })
 

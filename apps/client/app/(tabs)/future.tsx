@@ -9,6 +9,7 @@ import { fmt, fmtK } from '@proviso/core/formatting'
 import { useHousehold } from '@/data/DataProvider'
 import { futureView } from '@/data/views'
 import { Button, Card, H2, Screen, T } from '@/ui/kit'
+import { NetWorthBars } from '@/ui/NetWorthBars'
 import { usePalette, space, radius, touch } from '@/ui/theme'
 
 export default function Future() {
@@ -26,6 +27,10 @@ export default function Future() {
           In today’s money ({fmtK(v.endNetWorth)} in {v.labels[v.labels.length - 1]} dollars). You’re at {fmtK(v.netWorthToday)} now.
         </T>
         <NetWorthBars labels={v.labels} values={v.netWorth} />
+        <T size="small" tone="t2" style={{ marginTop: space.sm }}>Try a pay rise, fewer days at work or buying a home, and see what changes.</T>
+        <View style={{ alignItems: 'flex-start' }}>
+          <Button title="What if?" onPress={() => router.push('/whatif')} />
+        </View>
       </Card>
 
       {v.shortYears.length > 0 && (
@@ -114,27 +119,5 @@ export default function Future() {
         </Card>
       </View>
     </Screen>
-  )
-}
-
-/** Net worth each year as bars, labelled at the start, middle and end. Negative years go red. */
-function NetWorthBars({ labels, values }: { labels: string[]; values: number[] }) {
-  const p = usePalette()
-  const max = Math.max(1, ...values.map(Math.abs))
-  const H = 96
-  return (
-    <View accessible accessibilityLabel={`Net worth from ${fmtK(values[0] ?? 0)} in ${labels[0]} to ${fmtK(values[values.length - 1] ?? 0)} in ${labels[labels.length - 1]}`}
-      style={{ marginTop: space.md, gap: space.xs }}>
-      <View style={{ height: H, flexDirection: 'row', alignItems: 'flex-end', gap: 2 }}>
-        {values.map((v, i) => (
-          <View key={labels[i]} style={{ flex: 1, height: Math.max(2, Math.abs(v) / max * H), borderRadius: 2, backgroundColor: v >= 0 ? p.green : p.red, opacity: 0.85 }} />
-        ))}
-      </View>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-        {[...new Set([labels[0], labels[Math.floor((labels.length - 1) / 2)], labels[labels.length - 1]])].map(l => (
-          <T key={l} size="caption" tone="t3">{l}</T>
-        ))}
-      </View>
-    </View>
   )
 }
