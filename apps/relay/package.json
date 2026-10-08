@@ -1,0 +1,19 @@
+{
+  "name": "@proviso/relay",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Proviso's sync relay: stores households' encrypted change messages and hands them to their other devices. Never sees the data.",
+  "type": "module",
+  "scripts": {
+    "dev": "node scripts/build.mjs && node dist/relay.mjs",
+    "build": "node scripts/build.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@proviso/sync": "*"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2"
+  }
+}

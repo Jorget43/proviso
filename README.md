@@ -91,6 +91,17 @@ This builds the standalone image locally and starts the `proviso` container on p
 
 Behind HTTPS (e.g. Tailscale Serve) set `COOKIE_SECURE=true` so session cookies carry the `Secure` flag and browsers get an HSTS header (remember HTTPS for this host for a year). Over a plain-http tailnet address leave it unset.
 
+### Sync relay for the app
+
+The Proviso phone app keeps the household on each phone and shares changes between a household's devices through a small sync relay. The relay only ever stores encrypted changes: it can't read the household's data, and it holds no names or email addresses.
+
+```bash
+docker compose --profile sync up -d            # starts proviso-relay on port 8787
+tailscale serve --bg --https=8443 http://localhost:8787
+```
+
+Phones refuse plain http, so the relay needs HTTPS; Tailscale Serve gives it a certificate for the machine's tailnet name. In the app, open Settings → Sync and enter `https://<machine>.<tailnet>.ts.net:8443`, then on the other phone choose "Join a household" and scan the code the first phone shows. Its data lives in the `proviso-relay` volume; `./update.sh` updates it alongside the main container once it's running.
+
 ### Protecting the data on disk
 
 Everything Proviso knows lives in one SQLite file, `/data/proviso.db`, in the `proviso-db` volume, alongside the three automatic `.bak` copies the container makes before each upgrade. Passwords and sign-in tokens in it are hashed, so the file can't be used to log in, but the household figures (budget, balances, transactions) are stored as plain data.

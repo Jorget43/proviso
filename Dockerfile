@@ -8,6 +8,8 @@ COPY apps/web/package.json        apps/web/
 COPY apps/client/package.json     apps/client/
 COPY packages/core/package.json   packages/core/
 COPY packages/tokens/package.json packages/tokens/
+COPY packages/sync/package.json   packages/sync/
+COPY apps/relay/package.json      apps/relay/
 RUN npm ci
 
 # ── Stage 2: build ─────────────────────────────────────────────────────────
@@ -35,13 +37,14 @@ RUN npm run build
 # install would not contain it. npm leaves dot-directories alone, so .prisma
 # and .bin survive the prune.
 FROM builder AS pruner
-# This image serves the web app only. Dropping the phone app's workspaces
-# (apps/client, packages/tokens) first makes Expo / React Native extraneous,
+# This image serves the web app only. Dropping the phone app's and the
+# relay's workspaces (apps/client, packages/tokens, packages/sync, apps/relay;
+# the relay has its own image, apps/relay/Dockerfile) first makes Expo / React Native extraneous,
 # so the prune removes them too — about 550 MB the server never uses. The
 # first prune keeps packages the app's tree had marked "dev or optional"
 # (e.g. micromatch); the second, reading the lockfile the first rewrote,
 # removes them. CI's audit step prunes the same way.
-RUN rm -rf apps/client packages/tokens \
+RUN rm -rf apps/client packages/tokens packages/sync apps/relay \
  && npm pkg set --json workspaces='["apps/web","packages/core"]' \
  && npm prune --omit=dev \
  && npm prune --omit=dev

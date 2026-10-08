@@ -22,4 +22,11 @@ cd "$(dirname "$0")"
 echo "[$(date -Is)] Checking for a new proviso image..."
 docker compose pull proviso
 docker compose up -d proviso
+
+# The sync relay, if it's been started (docker compose --profile sync up -d).
+if [ -n "$(docker compose --profile sync ps -q proviso-relay 2>/dev/null)" ]; then
+  echo "[$(date -Is)] Checking for a new proviso-relay image..."
+  docker compose --profile sync pull proviso-relay
+  docker compose --profile sync up -d proviso-relay
+fi
 echo "[$(date -Is)] Done."

@@ -1,20 +1,22 @@
 // Setting up a new household from the questionnaire (app/setup.tsx): the
 // answers become rows via @proviso/core/starter, written here in one go.
 //
-// Like an import, this is local set-up before sync exists: it replaces
-// whatever this device had (a household started but never set up). Rows are
-// written through mutate.ts, so the same path carries them into sync later.
+// Like an import, this is local set-up: it replaces whatever this device had
+// (a household started but never set up), so it's refused while sync is on —
+// the replaced rows would vanish here but not on the other devices.
 
 import { sql } from 'drizzle-orm'
 import { HOUSEHOLD_TABLES } from '@proviso/core/schema'
 import type { StarterHousehold } from '@proviso/core/starter'
 import type { Db } from './db'
 import { insertRow, updateRow, saveSettings } from './mutate'
+import { syncState } from './sync'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const anyDb = (db: Db) => db as any
 
 export async function startHousehold(db: Db, h: StarterHousehold): Promise<void> {
+  if (await syncState(db)) throw new Error('This household syncs with other devices. Turn sync off on this device first (Settings → Sync).')
   await db.run(sql`BEGIN`)
   try {
     for (const t of Object.values(HOUSEHOLD_TABLES)) await anyDb(db).delete(t)

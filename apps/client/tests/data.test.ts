@@ -1,7 +1,4 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { DatabaseSync } from 'node:sqlite'
-import { drizzle } from 'drizzle-orm/sqlite-proxy'
-import { applyMigrations } from '@proviso/core/migrate'
 import { emptyHouseholdTables, EXPORT_FORMAT, EXPORT_VERSION, type HouseholdExport } from '@proviso/core/householdExport'
 import { SCHEMA_VERSION, SETTINGS_ID } from '@proviso/core/schema'
 import { contentId } from '@proviso/core/ids'
@@ -20,33 +17,8 @@ import { saveAssumptions, saveOneOff, removeOneOff } from '@/data/future'
 import { startWhatIf, applyWhatIf, hasChanges, addWorkChange, keepWhatIf } from '@/data/whatif'
 import { estimateLivingCosts, buildStarterHousehold, type StarterAnswers } from '@proviso/core/starter'
 
-// The app's data layer against a real SQLite (node:sqlite), migrated with the
-// same bundled migrations the phone runs.
-// failOn: queries matching it throw (a simulated storage failure); set or clear it any time.
-function testDb(): { db: Db; raw: DatabaseSync; failOn: { re: RegExp | null } } {
-  const failOn: { re: RegExp | null } = { re: null }
-  const raw = new DatabaseSync(':memory:')
-  const db = drizzle(async (query, params, method) => {
-    if (failOn.re?.test(query)) throw new Error('disk full (simulated)')
-    const stmt = raw.prepare(query)
-    const args = params as (string | number | null)[]
-    if (method === 'run') { stmt.run(...args); return { rows: [] } }
-    stmt.setReturnArrays(true)
-    if (method === 'get') return { rows: (stmt.get(...args) ?? undefined) as unknown as unknown[] }
-    return { rows: stmt.all(...args) as unknown as unknown[] }
-  })
-  return { db: db as unknown as Db, raw, failOn }
-}
-
-// Migrated with the same migrator and bundle the phone uses.
-async function migratedTestDb() {
-  const t = testDb()
-  await applyMigrations({
-    exec: async sql => { t.raw.exec(sql) },
-    all:  async sql => t.raw.prepare(sql).all() as Record<string, unknown>[],
-  })
-  return t
-}
+import type { DatabaseSync } from 'node:sqlite'
+import { migratedTestDb } from './testDb'
 
 const ID = (n: number) => contentId('test', n)
 const NOW = new Date('2026-10-15T00:00:00Z')

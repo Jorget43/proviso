@@ -26,6 +26,14 @@ export default function Welcome() {
       </Card>
 
       <Card>
+        <T weight="600">Your household already uses Proviso?</T>
+        <T tone="t2">Join it from a partner’s phone or your other device: it shows a code to scan (Settings → Sync → Add a device).</T>
+        <View style={{ alignItems: 'flex-start', marginTop: space.sm }}>
+          <Button kind="quiet" title="Join a household" onPress={() => router.push('/join')} />
+        </View>
+      </Card>
+
+      <Card>
         <T weight="600">Bringing your data across?</T>
         <T tone="t2">Choose a Proviso backup (you’ll need your recovery phrase), or a file from Proviso on a home server (Settings → Download all your data).</T>
         <View style={{ alignItems: 'flex-start', marginTop: space.sm }}>

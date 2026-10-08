@@ -30,10 +30,32 @@ services:
       # - RESEND_API_KEY=re_...
       # - RESEND_FROM_EMAIL=onboarding@resend.dev
 
+  # Sync relay for the Proviso phone app (optional): start it with
+  #   docker compose --profile sync up -d
+  # It stores only encrypted changes and knows nothing about the household.
+  # Phones need https: put it behind Tailscale Serve, e.g.
+  #   tailscale serve --bg --https=8443 http://localhost:8787
+  # and enter https://<this-machine>.<your-tailnet>.ts.net:8443 in the app
+  # (Settings → Sync). See README.md "Sync relay for the app".
+  proviso-relay:
+    profiles: ["sync"]
+    image: ghcr.io/jorget43/proviso-relay:${PROVISO_VERSION:-latest}
+    build:
+      context: .
+      dockerfile: apps/relay/Dockerfile
+    container_name: proviso-relay
+    restart: unless-stopped
+    ports:
+      - "${PROVISO_RELAY_PORT:-8787}:8787"
+    volumes:
+      - proviso-relay:/data
+
 # Auto-updates: run ./update.sh on a schedule (cron / systemd timer / Unraid
 # User Scripts) rather than a Watchtower sidecar — see README.md "Updates"
 # for why, and docker-compose.watchtower.yml for the optional alternative.
 
 volumes:
   proviso-db:
+    driver: local
+  proviso-relay:
     driver: local

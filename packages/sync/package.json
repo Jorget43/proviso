@@ -1,0 +1,18 @@
+{
+  "name": "@proviso/sync",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Proviso's sync protocol: hybrid logical clocks, per-field change messages, end-to-end encryption, merge, and the relay client. Pure TypeScript.",
+  "exports": {
+    "./*": "./src/*.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@noble/ciphers": "^2.4.0",
+    "@noble/hashes": "^2.4.0",
+    "@proviso/core": "*"
+  }
+}

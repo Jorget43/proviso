@@ -1,0 +1,15 @@
+{
+  // The relay runs on Node only, so Node types are in.
+  "compilerOptions": {
+    "target": "ES2023",
+    "lib": ["ES2023"],
+    "types": ["node"],
+    "strict": true,
+    "noEmit": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "isolatedModules": true,
+    "skipLibCheck": true
+  },
+  "include": ["src/**/*.ts", "tests/**/*.ts"]
+}

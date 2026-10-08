@@ -18,7 +18,7 @@ The agreed target is `docs/architecture.md` (read it if you haven't this session
 | `apps/relay` | Sync relay (hosted and self-hosted are the same code); static host for the web build | Anything that reads household data — it only ever sees ciphertext |
 | `apps/web` | **Legacy** Next.js app, kept until the Expo web build reaches parity | New features that aren't also planned for `apps/client` |
 
-Today (Phase 30) the repo has `apps/web`, `apps/client`, `packages/core` and `packages/tokens`; `packages/sync` and `apps/relay` are created when their phase starts. A new pure calculation goes in `packages/core`, never in `apps/web/lib` or a screen.
+Since Phase 34 the repo has all six: `apps/web`, `apps/client`, `apps/relay`, `packages/core`, `packages/sync` and `packages/tokens`. The relay imports only the protocol from `packages/sync` (`relay.ts`, types from `messages.ts`) and is bundled to one file with no dependencies (`apps/relay/scripts/build.mjs`); it never imports the crypto. In `apps/client`, sync's logic is `src/data/sync.ts` (tested in Node); `syncRunner.ts` and `syncScheduler.ts` are the device glue. A new pure calculation goes in `packages/core`, never in `apps/web/lib` or a screen.
 
 In `apps/client`: screens (`app/`) read through `src/data/views.ts` and change data through `src/data/mutate.ts` (or a helper built on it: `costs.ts`, `wealth.ts`, `future.ts`, `settings.ts`, `setup.ts`). Everything in `src/data` is plain TypeScript tested in Node except the device glue: `open.ts`, `DataProvider.tsx`, `identity.ts` (secure storage), `useIdentity.ts` and `files.ts` (picker, share sheet). Keep new logic out of those. Always `await` database calls: the driver is async on every platform.
 

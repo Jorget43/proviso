@@ -17,7 +17,7 @@ import { usePalette, space, radius, touch } from '@/ui/theme'
 const APP_VERSION = Constants.expoConfig?.version ?? '0'
 
 export default function Settings() {
-  const { household: h, read, erase } = useHousehold()
+  const { household: h, read, erase, sync } = useHousehold()
   const identity = useIdentity()
   const p = usePalette()
   const [busy, setBusy] = useState<string | null>(null)
@@ -71,9 +71,20 @@ export default function Settings() {
       </View>
 
       <View style={{ gap: space.sm }}>
+        <H2>Sync</H2>
+        <Card style={{ gap: 0, paddingVertical: space.xs }}>
+          <Row label="Other devices" value={sync.state ? (sync.error ? 'Can’t sync right now' : 'Syncing') : 'This device only'} onPress={() => router.push('/sync')} first />
+        </Card>
+      </View>
+
+      <View style={{ gap: space.sm }}>
         <H2>Your data</H2>
         <Card>
-          <T tone="t2">Everything stays on this phone. Save a backup now and then, somewhere other than this phone: Files, Google Drive, Dropbox or email.</T>
+          <T tone="t2">
+            {sync.state
+              ? 'Your household is on your devices, and encrypted on your sync server. A backup now and then is still worth keeping somewhere else: Files, Google Drive, Dropbox or email.'
+              : 'Everything stays on this phone. Save a backup now and then, somewhere other than this phone: Files, Google Drive, Dropbox or email.'}
+          </T>
           <View style={{ gap: space.sm, marginTop: space.sm }}>
             <Button title={busy === 'backup' ? 'Preparing…' : 'Save a backup'} onPress={() => save('backup')} disabled={!identity || busy !== null}
               accessibilityHint="Encrypted. Opens with your recovery phrase." />

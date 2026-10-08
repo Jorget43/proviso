@@ -12,6 +12,7 @@ import { drizzle } from 'drizzle-orm/sqlite-proxy'
 import { getRandomValues } from 'expo-crypto'
 import { applyMigrations } from '@proviso/core/migrate'
 import type { Db } from './db'
+import { ensureSyncTables } from './sync'
 
 // Record ids need a secure random source (@proviso/core/ids). Browsers and
 // Node have crypto.getRandomValues; React Native's Hermes doesn't, so give it
@@ -44,5 +45,6 @@ export async function openHouseholdDb(): Promise<Db> {
       await stmt.finalizeAsync()
     }
   })
+  await ensureSyncTables(db as unknown as Db)
   return db as unknown as Db
 }

@@ -24,7 +24,15 @@
       "expo-status-bar",
       "expo-secure-store",
       "expo-sharing",
-      "expo-dev-client"
+      "expo-dev-client",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Proviso uses the camera only to scan the code that adds this device to your household.",
+          "microphonePermission": false,
+          "recordAudioAndroid": false
+        }
+      ]
     ]
   }
 }

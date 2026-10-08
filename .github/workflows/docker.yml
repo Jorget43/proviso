@@ -84,7 +84,7 @@ jobs:
       # high/critical advisory in what remains: what the image ships.
       - name: Prune as the image does, and audit what it ships
         run: |
-          rm -rf apps/client packages/tokens
+          rm -rf apps/client packages/tokens packages/sync apps/relay
           npm pkg set --json workspaces='["apps/web","packages/core"]'
           npm prune --omit=dev
           npm prune --omit=dev
@@ -130,6 +130,30 @@ jobs:
           docker logs smoke | grep -q "Database exists" || { echo "Restart path not taken"; docker logs smoke; exit 1; }
           if docker logs smoke 2>&1 | grep -q "migrate deploy FAILED"; then docker logs smoke; exit 1; fi
           echo "Smoke test passed"
+
+      # The sync relay's own image (apps/relay/Dockerfile): it starts, answers
+      # its health check, accepts a push and survives a restart with its data.
+      - name: Build relay image (not pushed)
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: apps/relay/Dockerfile
+          load: true
+          tags: proviso-relay:smoke
+          cache-from: type=gha,scope=relay
+          cache-to: type=gha,scope=relay,mode=max
+
+      - name: Relay starts, stores, restarts
+        run: |
+          docker run -d --name relay -p 8787:8787 -v relay-data:/data proviso-relay:smoke
+          for i in $(seq 1 30); do curl -fsS http://localhost:8787/v1/health && break; sleep 1; done
+          H=0192a3b4-c5d6-7e8f-9a0b-1c2d3e4f5a6b
+          K=$(printf 'a%.0s' $(seq 1 64))
+          curl -fsS -X POST -H "authorization: Bearer $K" -H 'content-type: application/json'             -d '{"envelopes":[{"v":1,"schema":1,"table":"expense","nonce":"AAAAAAAAAAAAAAAA","data":"AAAA"}]}'             http://localhost:8787/v1/households/$H/envelopes | grep -q '"last":1'
+          docker restart relay
+          for i in $(seq 1 30); do curl -fsS http://localhost:8787/v1/health && break; sleep 1; done
+          curl -fsS -H "authorization: Bearer $K" "http://localhost:8787/v1/households/$H/envelopes?since=0" | grep -q '"seq":1'
+          echo "Relay smoke test passed"
 
   build-and-push:
     needs: [privacy, test, smoke]
@@ -184,3 +208,16 @@ jobs:
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.tag }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+
+      - name: Build and push the sync relay
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: apps/relay/Dockerfile
+          push: true
+          cache-from: type=gha,scope=relay
+          build-args: |
+            PROVISO_VERSION=${{ steps.meta.outputs.version }}
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-relay:${{ steps.meta.outputs.tag }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-relay:latest
