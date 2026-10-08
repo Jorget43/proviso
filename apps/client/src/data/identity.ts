@@ -18,7 +18,7 @@ export interface Identity {
   phraseSaved: boolean
 }
 
-const K = { id: 'proviso.householdId', key: 'proviso.householdKey', saved: 'proviso.phraseSaved' }
+const K = { id: 'proviso.householdId', key: 'proviso.householdKey', saved: 'proviso.phraseSaved', inStore: 'proviso.keyInStore' }
 
 const web = Platform.OS === 'web'
 async function get(name: string): Promise<string | null> {
@@ -47,6 +47,7 @@ export async function saveIdentity(i: Identity): Promise<Identity> {
   await set(K.id, i.householdId)
   await set(K.key, keyToHex(i.key))
   await set(K.saved, i.phraseSaved ? 'yes' : null)
+  await set(K.inStore, null)   // a different household's key isn't in the password manager yet
   return i
 }
 
@@ -64,5 +65,14 @@ export async function markPhraseSaved(): Promise<void> {
 }
 
 export async function forgetIdentity(): Promise<void> {
-  await Promise.all([set(K.id, null), set(K.key, null), set(K.saved, null)])
+  await Promise.all([set(K.id, null), set(K.key, null), set(K.saved, null), set(K.inStore, null)])
+}
+
+/** Whether this household's key has been saved to the platform's password manager (src/data/keyBackup.ts). */
+export async function keyInStore(): Promise<boolean> {
+  return (await get(K.inStore)) === 'yes'
+}
+
+export async function markKeyInStore(): Promise<void> {
+  await set(K.inStore, 'yes')
 }

@@ -1,5 +1,6 @@
 // The code a device shows (as a QR code) so another device can join the
-// household: the relay's address, the household id and the household key.
+// household: the relay's address, the household id (for the new device's
+// identity; the relay's own id comes from the key) and the household key.
 // Holding it is holding the household, so it's only ever shown on screen,
 // on request, and never stored or sent anywhere (docs/architecture.md, D4/D6).
 

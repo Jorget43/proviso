@@ -1,6 +1,7 @@
 // The relay protocol (docs/architecture.md, D5) and the client devices use.
 //
-// A relay keeps, per household, an append-only list of envelopes, each
+// A relay keeps, per household (named by an id derived from the household
+// key, SyncKeys.relayId), an append-only list of envelopes, each
 // given a sequence number as it arrives. Devices push what they changed and
 // pull everything after the last sequence number they've seen. The relay
 // never decrypts anything: it knows a random household id, the hash of an
@@ -55,10 +56,10 @@ export interface RelayClient {
   remove(): Promise<void>
 }
 
-export function relayClient(baseUrl: string, householdId: string, accessKey: string, fetchFn: FetchLike): RelayClient {
-  if (!isHouseholdId(householdId)) throw new RelayError('Not a household id.')
+export function relayClient(baseUrl: string, relayId: string, accessKey: string, fetchFn: FetchLike): RelayClient {
+  if (!isHouseholdId(relayId)) throw new RelayError('Not a household id.')
   const base = `${baseUrl}/${RELAY_API}`
-  const home = `${base}/households/${householdId}`
+  const home = `${base}/households/${relayId}`
   const auth = { authorization: `Bearer ${accessKey}` }
 
   async function call(url: string, init: Parameters<FetchLike>[1] = {}): Promise<unknown> {

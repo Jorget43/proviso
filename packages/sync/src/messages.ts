@@ -50,6 +50,20 @@ export interface SyncKeys {
   enc:  Uint8Array
   /** Proves to the relay that a device belongs to the household (hex). The relay stores only its hash. */
   auth: string
+  /**
+   * The household's name on the relay, a UUID derived from the key: the
+   * recovery phrase (or a saved key) plus the relay's address is enough to
+   * find the household again, and the relay never learns the household id.
+   */
+  relayId: string
+}
+
+function uuidFrom(b: Uint8Array): string {
+  const x = Uint8Array.from(b.slice(0, 16))
+  x[6] = (x[6] & 0x0f) | 0x80   // version 8: custom
+  x[8] = (x[8] & 0x3f) | 0x80   // RFC 9562 variant
+  const h = bytesToHex(x)
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`
 }
 
 export function syncKeys(householdKey: Uint8Array): SyncKeys {
@@ -57,6 +71,7 @@ export function syncKeys(householdKey: Uint8Array): SyncKeys {
   return {
     enc:  hkdf(sha256, householdKey, undefined, utf8ToBytes('proviso sync v1'), 32),
     auth: bytesToHex(hkdf(sha256, householdKey, undefined, utf8ToBytes('proviso relay auth v1'), 32)),
+    relayId: uuidFrom(hkdf(sha256, householdKey, undefined, utf8ToBytes('proviso relay id v1'), 16)),
   }
 }
 

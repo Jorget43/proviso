@@ -8,6 +8,7 @@ import { router, Stack } from 'expo-router'
 import { isBackupFile } from '@proviso/core/backup'
 import { useHousehold } from '@/data/DataProvider'
 import { pickJsonFile } from '@/data/files'
+import { keyStoreName, keysFromStore } from '@/data/keyBackup'
 import { Button, Card, Field, Input, Screen, T } from '@/ui/kit'
 import { space } from '@/ui/theme'
 
@@ -47,6 +48,23 @@ export default function Restore() {
     }
   }
 
+  // The key saved in iCloud Keychain / Google Password Manager instead of the phrase: try each one found.
+  async function unlockWithSavedKey() {
+    setError(null); setBusy(true)
+    try {
+      const keys = await keysFromStore()
+      if (!keys.length) { setError(`No Proviso key was found in ${keyStoreName}. Use your recovery phrase instead.`); return }
+      for (const k of keys) {
+        try { await restoreBackup(file, k.key); router.replace('/'); return } catch { /* not this household's key */ }
+      }
+      setError(`The key in ${keyStoreName} doesn’t open this backup. It may be from a different household: use your recovery phrase.`)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'That didn’t work.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   return (
     <Screen>
       <Stack.Screen options={{ title: 'Restore', headerShown: true }} />
@@ -72,6 +90,7 @@ export default function Restore() {
           {household.exists && <T size="small" tone="amber">This replaces the household that’s on this phone now.</T>}
           {error && <T tone="red" accessibilityRole="alert">{error}</T>}
           <Button title={busy ? 'Opening…' : 'Restore'} onPress={unlock} disabled={busy || phrase.trim() === ''} />
+          {keyStoreName && <Button kind="quiet" title={`Use the key saved in ${keyStoreName}`} onPress={unlockWithSavedKey} disabled={busy} />}
           <Button kind="quiet" title="Choose a different file" onPress={() => { setFile(null); setPhrase(''); setError(null) }} />
         </>
       ) : (

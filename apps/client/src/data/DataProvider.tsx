@@ -14,7 +14,7 @@ import { importHousehold, restoreHousehold, eraseHousehold, type ImportResult } 
 import { decryptBackup, keyFromPhrase } from '@proviso/core/backup'
 import { freshIdentity, saveIdentity, forgetIdentity } from './identity'
 import { syncState, stopSync, type SyncState } from './sync'
-import { turnOnSync, joinHousehold, currentJoinCode, deleteFromRelay } from './syncRunner'
+import { turnOnSync, joinHousehold, recoverFromRelay, currentJoinCode, deleteFromRelay } from './syncRunner'
 import { SyncScheduler, type SyncStatus } from './syncScheduler'
 
 export interface SyncControls {
@@ -26,6 +26,8 @@ export interface SyncControls {
   now:    () => Promise<void>
   turnOn: (address: string) => Promise<void>
   join:   (code: string) => Promise<void>
+  /** Gets a synced household back from its sync server with the recovery phrase (or the key from a password manager). */
+  recover: (address: string, phrase: string | Uint8Array) => Promise<void>
   stop:   () => Promise<void>
   /** Removes the household from the sync server; every device stops syncing. */
   deleteFromServer: () => Promise<void>
@@ -40,8 +42,8 @@ interface DataContext {
   read:      <T>(fn: (db: Db) => Promise<T>) => Promise<T>
   /** Brings in an export file (e.g. from the NAS). It becomes a new household on this device, with its own key. */
   importFile: (json: unknown) => Promise<ImportResult>
-  /** Restores an encrypted backup with its recovery phrase. Throws a readable error if either is wrong. */
-  restoreBackup: (file: unknown, phrase: string) => Promise<ImportResult>
+  /** Restores an encrypted backup with its recovery phrase (or the key itself, from a password manager). Throws a readable error if either is wrong. */
+  restoreBackup: (file: unknown, phrase: string | Uint8Array) => Promise<ImportResult>
   /** Removes the household and its key from this device. */
   erase: () => Promise<void>
   sync:  SyncControls
@@ -104,7 +106,7 @@ export function DataProvider({ children, loading, failed }: {
       return r
     },
     restoreBackup: async (file, phrase) => {
-      const key = keyFromPhrase(phrase)            // checks the words first
+      const key = typeof phrase === 'string' ? keyFromPhrase(phrase) : phrase   // checks the words first
       const doc = decryptBackup(file, key)         // then that they open this backup
       await notWhileSyncing(db)
       const r = await restoreHousehold(db, doc)
@@ -125,6 +127,10 @@ export function DataProvider({ children, loading, failed }: {
       turnOn: async address => { await turnOnSync(db, address); await scheduler.refresh() },
       join: async code => {
         try { await joinHousehold(db, code) } finally { await reload(db); await scheduler.refresh() }
+      },
+      recover: async (address, phrase) => {
+        const key = typeof phrase === 'string' ? keyFromPhrase(phrase) : phrase
+        try { await recoverFromRelay(db, address, key) } finally { await reload(db); await scheduler.refresh() }
       },
       stop: async () => { await stopSync(db); await scheduler.refresh() },
       deleteFromServer: async () => { await deleteFromRelay(db); await scheduler.refresh() },

@@ -78,6 +78,13 @@ describe('messages', () => {
     expect(() => open({ ...env, v: FORMAT_VERSION + 1 }, k.enc)).toThrow(/newer/)
   })
 
+  it('the relay id comes from the key: the same everywhere, a valid UUID, different per household', () => {
+    const a = syncKeys(KEY).relayId
+    expect(a).toBe(syncKeys(Uint8Array.from(KEY)).relayId)
+    expect(a).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-8[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/)
+    expect(syncKeys(new Uint8Array(32)).relayId).not.toBe(a)
+  })
+
   it('sync, relay access and backups use different keys', () => {
     const k = syncKeys(KEY)
     expect(k.auth).toMatch(/^[0-9a-f]{64}$/)

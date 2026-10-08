@@ -1,9 +1,9 @@
 // Settings: who's in the household, rent and childcare, and the data itself:
 // the recovery phrase, backups, restoring, and starting again.
 
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import { Alert, Platform, Pressable, View } from 'react-native'
-import { router, Stack } from 'expo-router'
+import { router, Stack, useFocusEffect } from 'expo-router'
 import Constants from 'expo-constants'
 import { encryptBackup } from '@proviso/core/backup'
 import { fmt } from '@proviso/core/formatting'
@@ -11,6 +11,8 @@ import { useHousehold } from '@/data/DataProvider'
 import { useIdentity } from '@/data/useIdentity'
 import { exportHousehold } from '@/data/importExport'
 import { shareJson, datedName } from '@/data/files'
+import { keyStoreName, saveKeyToStore } from '@/data/keyBackup'
+import { keyInStore } from '@/data/identity'
 import { Button, Card, H2, Screen, T } from '@/ui/kit'
 import { usePalette, space, radius, touch } from '@/ui/theme'
 
@@ -22,6 +24,23 @@ export default function Settings() {
   const p = usePalette()
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [inStore, setInStore] = useState<boolean | null>(null)
+  const [storeMsg, setStoreMsg] = useState<string | null>(null)
+  useFocusEffect(useCallback(() => { void keyInStore().then(setInStore) }, []))
+
+  async function saveToStore() {
+    if (!identity) return
+    setStoreMsg(null); setBusy('store')
+    try {
+      const saved = await saveKeyToStore(identity)
+      setInStore(await keyInStore())
+      setStoreMsg(saved ? null : 'Not saved. You can try again any time.')
+    } catch (e) {
+      setStoreMsg(e instanceof Error ? e.message : 'That didn’t work. Try again.')
+    } finally {
+      setBusy(null)
+    }
+  }
 
   async function save(kind: 'backup' | 'copy') {
     if (!identity) return
@@ -108,6 +127,21 @@ export default function Settings() {
           <View style={{ alignItems: 'flex-start', marginTop: space.sm }}>
             <Button kind="quiet" title={identity?.phraseSaved ? 'Show my recovery phrase' : 'Set up my recovery phrase'} onPress={() => router.push('/recovery')} />
           </View>
+          {keyStoreName && (
+            <View style={{ gap: space.sm, marginTop: space.sm, paddingTop: space.md, borderTopWidth: 1, borderTopColor: p.border }}>
+              <T tone="t2">
+                {inStore
+                  ? `Your household key is also saved in ${keyStoreName}. A new phone signed in to the same account can open your backups without the words.`
+                  : `You can also save your household key in ${keyStoreName}. Then a new phone signed in to the same account can open your backups without the words. Keep the words as well.`}
+              </T>
+              {!inStore && (
+                <View style={{ alignItems: 'flex-start' }}>
+                  <Button kind="quiet" title={busy === 'store' ? 'Saving…' : `Save to ${keyStoreName}`} onPress={saveToStore} disabled={!identity || busy !== null} />
+                </View>
+              )}
+              {storeMsg && <T tone="amber">{storeMsg}</T>}
+            </View>
+          )}
         </Card>
       </View>
 

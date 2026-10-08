@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   newHouseholdKey, recoveryPhrase, keyFromPhrase, normalisePhrase, encryptBackup, decryptBackup, isBackupFile,
   keyToHex, keyFromHex, toB64, fromB64, RecoveryPhraseError, BackupError,
+  keyBackupAccount, keyBackupSecret, parseKeyBackupSecret,
 } from '../src/backup'
 import { emptyHouseholdTables, EXPORT_FORMAT, EXPORT_VERSION, type HouseholdExport } from '../src/householdExport'
 import { SCHEMA_VERSION, SETTINGS_ID } from '../src/schema'
@@ -84,5 +85,22 @@ describe('encodings', () => {
   it('hex round-trips the key', () => {
     const k = newHouseholdKey()
     expect(keyFromHex(keyToHex(k))).toEqual(k)
+  })
+})
+
+describe('key saved in a password manager', () => {
+  it('round-trips the household id and key, and names no person', () => {
+    const key = newHouseholdKey()
+    const id = '0192a3b4-c5d6-7e8f-9a0b-1c2d3e4f5a6b'
+    const secret = keyBackupSecret(id, key)
+    expect(secret).toMatch(/^proviso-key-1:/)
+    expect(parseKeyBackupSecret(` ${secret} `)).toEqual({ householdId: id, key })
+    expect(keyBackupAccount(id)).toBe('Proviso household 0192a3b4')
+  })
+
+  it('ignores anything else a password manager might hand back', () => {
+    expect(parseKeyBackupSecret('hunter2')).toBeNull()
+    expect(parseKeyBackupSecret('proviso-key-1:not-an-id:00')).toBeNull()
+    expect(parseKeyBackupSecret('proviso-key-2:0192a3b4-c5d6-7e8f-9a0b-1c2d3e4f5a6b:' + '0'.repeat(64))).toBeNull()
   })
 })

@@ -121,3 +121,23 @@ export function decryptBackup(file: unknown, key: Uint8Array): HouseholdExport {
 
 export const keyToHex = (k: Uint8Array) => bytesToHex(k)
 export const keyFromHex = (h: string) => hexToBytes(h)
+
+// ── The key in a password manager (D4's second recovery route) ───────────────
+// Saved as a "password" in iCloud Keychain or Google Password Manager: the
+// household id and key, versioned so the format can change. The "account"
+// shown in the password manager names no person.
+
+const SECRET_PREFIX = 'proviso-key-1'
+
+export const keyBackupAccount = (householdId: string) => `Proviso household ${householdId.slice(0, 8)}`
+
+export function keyBackupSecret(householdId: string, key: Uint8Array): string {
+  if (key.length !== KEY_BYTES) throw new RecoveryPhraseError('A household key is 32 bytes.')
+  return `${SECRET_PREFIX}:${householdId}:${bytesToHex(key)}`
+}
+
+/** Reads a saved secret back. Null when it isn't one of ours (or is damaged). */
+export function parseKeyBackupSecret(secret: string): { householdId: string; key: Uint8Array } | null {
+  const m = /^proviso-key-1:([0-9a-f-]{36}):([0-9a-f]{64})$/.exec(secret.trim())
+  return m ? { householdId: m[1], key: hexToBytes(m[2]) } : null
+}

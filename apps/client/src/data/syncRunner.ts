@@ -15,7 +15,7 @@ async function connection(relay: string) {
   const id = await loadIdentity()
   if (!id) throw new RelayError('This device has no household key yet.')
   const keys = syncKeys(id.key)
-  return { id, keys, client: relayClient(relay, id.householdId, keys.auth, fetchFn) }
+  return { id, keys, client: relayClient(relay, keys.relayId, keys.auth, fetchFn) }
 }
 
 /** Syncs now if sync is on. Null when it's off. */
@@ -40,12 +40,31 @@ export async function turnOnSync(db: Db, address: string): Promise<SyncResult> {
 export async function joinHousehold(db: Db, code: string): Promise<SyncResult> {
   const j = parseJoinCode(code)
   if (!j) throw new RelayError('That isn’t a Proviso join code. On the other device, open Settings → Sync → Add a device.')
-  const keys = syncKeys(j.key)
-  const client = relayClient(j.relay, j.household, keys.auth, fetchFn)
+  return join(db, j.relay, j.household, j.key)
+}
+
+/**
+ * Gets a synced household back with no other device to scan from: the sync
+ * server's address plus the household key (from the recovery phrase, or the
+ * password manager). The relay finds the household by an id derived from the key.
+ */
+export async function recoverFromRelay(db: Db, address: string, key: Uint8Array): Promise<SyncResult> {
+  const relay = normaliseRelayUrl(address)
+  if (!relay) throw new RelayError('Enter the sync server’s address, starting with https://.')
+  const keys = syncKeys(key)
+  const probe = await relayClient(relay, keys.relayId, keys.auth, fetchFn).pull(0)
+  if (probe.last === 0) throw new RelayError('That sync server has nothing for this household. Check the address, and that the words (or saved key) are this household’s.')
+  // The original household id isn't recoverable from the key; the relay id stands in for it.
+  return join(db, relay, keys.relayId, key)
+}
+
+async function join(db: Db, relay: string, householdId: string, key: Uint8Array): Promise<SyncResult> {
+  const keys = syncKeys(key)
+  const client = relayClient(relay, keys.relayId, keys.auth, fetchFn)
   await client.health()
-  await prepareJoin(db, j.relay)
-  // The other device already has the recovery phrase saved; it's the same household.
-  await saveIdentity({ householdId: j.household, key: j.key, phraseSaved: true })
+  await prepareJoin(db, relay)
+  // The household's recovery phrase was saved when it was set up; it's the same household.
+  await saveIdentity({ householdId, key, phraseSaved: true })
   return syncNow(db, client, keys)
 }
 
