@@ -1,5 +1,6 @@
 // Who's in the household: names, and whether there's a partner.
 
+import { possessive } from '@proviso/core/formatting'
 import { useState } from 'react'
 import { View } from 'react-native'
 import { router, Stack } from 'expo-router'
@@ -42,7 +43,7 @@ export default function People() {
       )}
       {partner && !h.settings.partnerEnabled && <T size="small" tone="t2">Next, you’ll add their pay.</T>}
       {!partner && h.settings.partnerEnabled && (
-        <T size="small" tone="amber">{h.settings.person2Name}’s pay and super will stop counting. Their details are kept if you switch this back on.</T>
+        <T size="small" tone="amber">{possessive(h.settings.person2Name)} pay and super will stop counting. Their details are kept if you switch this back on.</T>
       )}
       {error && <T tone="red" accessibilityRole="alert">{error}</T>}
       <View style={{ gap: space.sm }}>

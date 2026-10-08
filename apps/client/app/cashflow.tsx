@@ -4,7 +4,7 @@
 
 import { View } from 'react-native'
 import { Stack } from 'expo-router'
-import { fmt, fmtK, fmtS } from '@proviso/core/formatting'
+import { fmt, fmtK, fmtS, possessive } from '@proviso/core/formatting'
 import { useHousehold } from '@/data/DataProvider'
 import { cashflowView } from '@/data/views'
 import { Card, H2, Screen, T } from '@/ui/kit'
@@ -50,12 +50,12 @@ export default function CashflowScreen() {
           <H2>If {v.person2Name} takes parental leave</H2>
           <Card>
             <Row label="While Parental Leave Pay lasts (6 months)" value={`${fmtS(v.leave.onPplSurplus)} a month`} good={v.leave.onPplSurplus >= 0} />
-            <Row label={`After that, on ${v.person1Name}’s pay only`} value={`${fmtS(v.leave.afterPplSurplus)} a month`} good={v.leave.afterPplSurplus >= 0} />
+            <Row label={`After that, on ${possessive(v.person1Name)} pay only`} value={`${fmtS(v.leave.afterPplSurplus)} a month`} good={v.leave.afterPplSurplus >= 0} />
             <T tone={v.leave.runsOut ? 'red' : 't2'}>
               {v.leave.runsOut
                 ? `Cash would run out in ${v.leave.runsOut.label}.`
                 : v.leave.runwayMonths === Infinity
-                  ? `${v.person1Name}’s pay covers regular spending on its own.`
+                  ? `${possessive(v.person1Name)} pay covers regular spending on its own.`
                   : `On one income, today’s cash would last about ${Math.floor(v.leave.runwayMonths)} months.`}
             </T>
             <NetWorthBars labels={v.months.map(m => m.label)} values={v.months.map(m => m.leaveBalance ?? 0)} height={64} what="Cash with parental leave" />

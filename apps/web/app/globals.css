@@ -372,11 +372,11 @@ body {
 }
 
 /* ── Expense table ── */
-.expense-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
+.expense-table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
 .expense-table th {
-  padding: 4px 7px;
+  padding: 8px 8px;
   text-align: left;
-  font-size: 0.63rem;
+  font-size: 0.72rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--t3);
@@ -386,54 +386,64 @@ body {
   white-space: nowrap;
 }
 .expense-table th.r { text-align: right; }
-.expense-table td { padding: 3px 6px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+.expense-table td { padding: 6px 8px; border-bottom: 1px solid var(--border); vertical-align: middle; }
 .expense-table tr:last-child td { border-bottom: none; }
 .expense-table tr.cat-row td {
   background: var(--surface2);
-  font-size: 0.65rem;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--t2);
-  padding: 5px 8px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--t1);
+  padding: 10px 8px 8px;
 }
-.expense-table tr.cat-row td span { font-weight: 400; color: var(--t3); text-transform: none; letter-spacing: 0; }
+.cat-row-inner { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.cat-row-total { font-weight: 400; color: var(--t3); margin-left: 6px; font-size: 0.85rem; }
+.annual-row td { background: var(--surface2); }
+.annual-tag { font-size: 0.82rem; color: var(--teal); font-weight: 500; }
+.computed.muted { color: var(--t3); }
+.row-open { background: none; border: none; padding: 5px 7px; font: inherit; color: var(--t1); cursor: pointer; text-align: left; border-radius: 4px; }
+.row-open:hover:not(:disabled) { color: var(--blue); background: var(--blue-lt); }
+.row-open:disabled { cursor: default; }
+.exp-add-bar { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 0.9rem 1.2rem; border-top: 1px solid var(--border); background: var(--surface2); }
+.exp-add-bar span { font-size: 0.85rem; color: var(--t2); flex: 1; min-width: 240px; line-height: 1.45; }
 .expense-table tr:not(.cat-row):hover td { background: var(--surface2); }
 td.r { text-align: right; }
 td.computed { font-weight: 500; text-align: right; white-space: nowrap; }
 .item-input {
   border: none;
   background: transparent;
-  font-size: 0.78rem;
+  font-size: 0.92rem;
   font-family: inherit;
   color: var(--t1);
   width: 100%;
   outline: none;
-  padding: 2px 3px;
-  border-radius: 3px;
+  padding: 5px 6px;
+  border-radius: 4px;
+  border: 1px solid transparent;
 }
+.item-input:hover, .amt-input:hover { border-color: var(--border-md); }
 .item-input:focus { background: var(--blue-lt); color: var(--blue); }
 .amt-input {
   border: none;
   background: transparent;
-  font-size: 0.78rem;
+  font-size: 0.92rem;
   font-family: inherit;
   color: var(--t1);
   text-align: right;
-  width: 85px;
+  width: 100px;
   outline: none;
-  padding: 2px 3px;
-  border-radius: 3px;
+  padding: 5px 6px;
+  border-radius: 4px;
+  border: 1px solid transparent;
 }
 .amt-input:focus { background: var(--blue-lt); color: var(--blue); }
 .freq-select {
   border: 1px solid var(--border);
   background: var(--bg);
-  font-size: 0.7rem;
+  font-size: 0.85rem;
   font-family: inherit;
   color: var(--t2);
-  border-radius: 4px;
-  padding: 2px 4px;
+  border-radius: 6px;
+  padding: 5px 6px;
   cursor: pointer;
   outline: none;
 }
@@ -452,11 +462,11 @@ td.computed { font-weight: 500; text-align: right; white-space: nowrap; }
 .add-btn {
   background: none;
   border: 1px dashed var(--border-md);
-  color: var(--t3);
-  font-size: 0.7rem;
+  color: var(--t2);
+  font-size: 0.82rem;
   font-family: inherit;
   cursor: pointer;
-  padding: 4px 11px;
+  padding: 6px 12px;
   border-radius: 5px;
   transition: all .15s;
 }
@@ -553,6 +563,19 @@ input[type=range] { width: 100%; accent-color: var(--t3); }
 .pink-t  { accent-color: var(--pink)  !important; }
 
 /* ── Person2 timeline table ── */
+/* Work pattern cards (WorkPhaseTimeline) */
+.wp { display: flex; flex-direction: column; gap: 0.75rem; }
+.wp-intro { font-size: 0.85rem; color: var(--t2); line-height: 1.45; }
+.wp-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 0.6rem; }
+.wp-card { border: 1px solid var(--border-md); border-radius: var(--r); padding: 0.75rem; display: flex; flex-direction: column; gap: 0.55rem; background: var(--surface); }
+.wp-card.now { border-color: var(--green); background: var(--green-lt); }
+.wp-card.leave { border-color: var(--pink); background: var(--pink-lt); }
+.wp-card-head { display: flex; justify-content: space-between; align-items: center; font-size: 0.95rem; }
+.wp-remove { background: none; border: none; color: var(--t3); font: inherit; font-size: 0.82rem; cursor: pointer; min-height: 36px; padding: 0 6px; border-radius: 6px; }
+.wp-remove:hover { color: var(--red); background: var(--red-lt); }
+.wp-field { display: flex; flex-direction: column; gap: 4px; font-size: 0.8rem; color: var(--t2); }
+.wp-field input, .wp-field select { font: inherit; font-size: 1rem; min-height: 42px; padding: 0 10px; border: 1px solid var(--border-md); border-radius: 8px; background: var(--surface); color: var(--t1); }
+.wp-pay { font-size: 0.82rem; color: var(--t2); }
 .tl-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
 .tl-table th { font-size: 0.64rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--t3); padding: 4px 7px; border-bottom: 1px solid var(--border); text-align: left; background: var(--surface2); }
 .tl-table td { padding: 4px 7px; border-bottom: 1px solid var(--border); vertical-align: middle; }
@@ -1104,6 +1127,7 @@ input[type=range] { width: 100%; accent-color: var(--t3); }
 .proj-headline { margin: 0.2rem 0 1.2rem; }
 .proj-lede { font-family: var(--font-dm-serif, serif); font-size: 1.6rem; line-height: 1.25; }
 .proj-lede strong { color: var(--green); font-weight: 400; }
+.proj-lede strong.neg { color: var(--red); }
 .proj-lede-sub { font-size: 0.95rem; color: var(--t2); margin-top: 6px; line-height: 1.45; }
 .explorer { scroll-margin-top: 64px; }
 .explorer-tabs {

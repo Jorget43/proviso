@@ -8,7 +8,7 @@ import { workDaysForYear, runProjections } from '@proviso/core/projections'
 import { projectionBaseline, buildProjectionInputs, feeScheduleFor, superInputsFor } from '@proviso/core/future'
 import { runHouseholdProjection } from '@proviso/core/super'
 import { situationFrom, situationLabels } from '@proviso/core/situation'
-import { toMonthly } from '@proviso/core/formatting'
+import { toMonthly, possessive } from '@proviso/core/formatting'
 import { netPositionOf, computeCashOnHand, isHomeEquity } from '@proviso/core/netWorth'
 import { findHelpDebt } from '@proviso/core/members'
 import { calcHELPRepayment } from '@proviso/core/tax'
@@ -252,8 +252,8 @@ export function futureView(h: HouseholdData, now: Date): FutureView {
   const cleared = run.mortArr.findIndex(v => v <= 0)
   if (baseline.mortBalance > 0 && !h.rent.enabled && cleared >= 0) milestones.push({ year: Number(out.labels[cleared]), text: 'Home loan paid off', tone: 'good' })
   if (run.purchaseYr) milestones.push({ year: run.purchaseYr, text: 'You buy your home', tone: 'neutral' })
-  if (run.person1HelpClearedYr) milestones.push({ year: run.person1HelpClearedYr, text: `${h.settings.person1Name}’s HELP debt cleared`, tone: 'good' })
-  if (run.person2HelpClearedYr) milestones.push({ year: run.person2HelpClearedYr, text: `${h.settings.person2Name}’s HELP debt cleared`, tone: 'good' })
+  if (run.person1HelpClearedYr) milestones.push({ year: run.person1HelpClearedYr, text: `${possessive(h.settings.person1Name)} HELP debt cleared`, tone: 'good' })
+  if (run.person2HelpClearedYr) milestones.push({ year: run.person2HelpClearedYr, text: `${possessive(h.settings.person2Name)} HELP debt cleared`, tone: 'good' })
   if (s.schoolFeesOn) {
     const feeYears = out.labels.filter((_, i) => run.sfTotalArr[i] > 0)
     if (feeYears.length) milestones.push({ year: Number(feeYears[feeYears.length - 1]), text: 'Last year of school fees', tone: 'good' })

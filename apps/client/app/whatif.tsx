@@ -5,7 +5,7 @@
 import { useMemo, useState } from 'react'
 import { View } from 'react-native'
 import { router, Stack } from 'expo-router'
-import { fmt, fmtK } from '@proviso/core/formatting'
+import { fmt, fmtK, possessive } from '@proviso/core/formatting'
 import { useHousehold } from '@/data/DataProvider'
 import { futureView } from '@/data/views'
 import { addWorkChange, applyWhatIf, hasChanges, keepWhatIf, startWhatIf, type WhatIf } from '@/data/whatif'
@@ -88,9 +88,9 @@ export default function WhatIfSheet() {
         {group === 'basics' && (
           <Card>
             <Stepper label="Years to look ahead" min={5} max={40} step={1} value={s.projYears} onChange={v => setProj({ projYears: v })} format={v => `${v} yrs`} />
-            <Stepper label={`${h.settings.person1Name}’s pay rise each year`} min={0} max={15} step={0.5} value={s.person1Growth} onChange={v => setProj({ person1Growth: v })} format={pct} />
+            <Stepper label={`${possessive(h.settings.person1Name)} pay rise each year`} min={0} max={15} step={0.5} value={s.person1Growth} onChange={v => setProj({ person1Growth: v })} format={pct} />
             {h.settings.partnerEnabled && (
-              <Stepper label={`${h.settings.person2Name}’s pay rise each year`} min={0} max={15} step={0.5} value={s.person2Growth} onChange={v => setProj({ person2Growth: v })} format={pct} />
+              <Stepper label={`${possessive(h.settings.person2Name)} pay rise each year`} min={0} max={15} step={0.5} value={s.person2Growth} onChange={v => setProj({ person2Growth: v })} format={pct} />
             )}
             <Stepper label="Share of what’s left over that’s invested" min={0} max={100} step={5} value={s.savingsRate} onChange={v => setProj({ savingsRate: v })} format={pct} />
             <Stepper label="Investment growth each year" min={0} max={15} step={0.5} value={s.investReturn} onChange={v => setProj({ investReturn: v })} format={pct} />

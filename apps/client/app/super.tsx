@@ -1,5 +1,6 @@
 // Super balances and retirement ages, per person.
 
+import { possessive } from '@proviso/core/formatting'
 import { useState } from 'react'
 import { View } from 'react-native'
 import { router, Stack } from 'expo-router'
@@ -26,7 +27,7 @@ export default function Super() {
       const bal = form[x.n].balance.trim() === '' ? 0 : parseAmount(form[x.n].balance)
       const age = parseAmount(form[x.n].age)
       if (!Number.isFinite(bal) || bal < 0 || !Number.isInteger(age) || age < 50 || age > 80) {
-        setError(`Check ${x.name}’s figures: a balance, and a retirement age between 50 and 80.`); return
+        setError(`Check ${possessive(x.name)} figures: a balance, and a retirement age between 50 and 80.`); return
       }
       patch[`person${x.n}Balance`] = bal
       patch[`person${x.n}RetirementAge`] = age

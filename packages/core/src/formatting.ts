@@ -23,3 +23,8 @@ export function fmtK(n: number): string {
   if (a >= 1000) return (n < 0 ? '-' : '') + '$' + Math.round(a / 1000) + 'k';
   return fmtS(n);
 }
+
+/** "Alex’s", or "Your" for the default name "You" (so labels never read "You’s"). */
+export function possessive(name: string): string {
+  return name.trim().toLowerCase() === 'you' ? 'Your' : `${name}’s`
+}

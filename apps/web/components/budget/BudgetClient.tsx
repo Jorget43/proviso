@@ -74,17 +74,6 @@ export default function BudgetClient({
   }), [expenses, annualExpenses, income, childcare, rentSettings, person1Days, person2Days, partnerEnabled])
 
   // ── Regular expense CRUD ────────────────────────────────────────────────────
-  const addExpense = useCallback(async (cat: string = 'Fun') => {
-    const res = await fetch('/api/expenses', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ cat, name: 'New item', freq: 'monthly', amt: 0 }),
-    })
-    if (!res.ok) return  // failure is reported by SaveErrorToast
-    const created: Expense = await res.json()
-    setExpenses(prev => [...prev, created])
-  }, [])
-
   const updateExpense = useCallback(async (id: number, field: string, value: string | number) => {
     const parsed = field === 'amt' ? (parseFloat(String(value)) || 0) : value
     setExpenses(prev => prev.map(e => e.id === id ? { ...e, [field]: parsed } : e))
@@ -101,28 +90,6 @@ export default function BudgetClient({
   }, [])
 
   // ── Annual expense CRUD ─────────────────────────────────────────────────────
-  const createAnnualExpense = useCallback(async (data: { name: string; cat: string; amt: number; month: number }) => {
-    const res = await fetch('/api/annual-expenses', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    })
-    if (!res.ok) throw new Error((await res.json()).error ?? 'Failed to save')
-    const created: AnnualExpense = await res.json()
-    setAnnualExpenses(prev => [...prev, created].sort((a, b) => a.month - b.month))
-  }, [])
-
-  const updateAnnualExpense = useCallback(async (id: number, data: { name: string; cat: string; amt: number; month: number }) => {
-    const res = await fetch(`/api/annual-expenses/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    })
-    if (!res.ok) throw new Error((await res.json()).error ?? 'Failed to save')
-    const updated: AnnualExpense = await res.json()
-    setAnnualExpenses(prev => prev.map(i => i.id === id ? updated : i))
-  }, [])
-
   const deleteAnnualExpense = useCallback(async (id: number) => {
     const res = await fetch(`/api/annual-expenses/${id}`, { method: 'DELETE' })
     if (!res.ok) throw new Error('Failed to delete')
@@ -309,14 +276,12 @@ export default function BudgetClient({
         <ReadOnlyFence canEdit={canEdit}>
           <ExpenseTable
             expenses={shownExpenses}
-            onAdd={addExpense}
             onUpdate={updateExpense}
             onDelete={deleteExpense}
             annualExpenses={annualExpenses}
             canEdit={canEdit}
-            onAnnualAdd={createAnnualExpense}
-            onAnnualUpdate={updateAnnualExpense}
             onAnnualDelete={deleteAnnualExpense}
+            onOpen={setSheet}
             rentMonthly={rentMonthly}
             onRentUpdate={updateRentMonthly}
           />

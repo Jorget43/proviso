@@ -2,6 +2,11 @@
 import { PARTNER_FTE } from '@proviso/core/constants'
 import { fmt } from '@proviso/core/formatting'
 
+// Someone's work pattern over time, one card per change: from which year,
+// how many days a week, and roughly what that pays. Cards (not a table) so
+// each field is a proper, labelled, tappable control on a phone, and wide
+// screens simply fit two or three side by side.
+
 export interface WorkPhaseRow {
   id:   number
   year: number
@@ -19,73 +24,55 @@ interface WorkPhaseTimelineProps {
 }
 
 function phaseLabel(days: number, showLeave: boolean): string {
-  if (days === 0) return showLeave ? 'Parental leave' : 'Leave'
-  if (days === 5) return 'Full time'
-  return `${days} days/wk`
+  if (days === 0) return showLeave ? 'Parental leave' : 'Not working'
+  if (days === 5) return 'Full-time'
+  return `${days} days a week`
 }
 
 function phaseIncome(days: number, fte: number, showLeave: boolean): string {
-  if (days === 0) return showLeave ? 'PPL (first year)' : 'Unpaid leave'
-  return fmt(fte * (days / 5)) + '/yr'
+  if (days === 0) return showLeave ? 'Parental Leave Pay in the first year' : 'No pay'
+  return `About ${fmt(fte * (days / 5))} a year before tax`
 }
 
 export default function WorkPhaseTimeline({
   phases, currentYear, fte = PARTNER_FTE, showLeave = true, onUpdate, onDelete, onAdd,
 }: WorkPhaseTimelineProps) {
   const sorted = [...phases].sort((a, b) => a.year - b.year)
-  const kStr   = Math.round(fte / 1000)
+  const dayChoices = showLeave ? [0, 1, 2, 3, 4, 5] : [1, 2, 3, 4, 5]
 
   return (
-    <>
-      <div style={{ fontSize: '0.78rem', color: 'var(--t2)', marginBottom: '0.65rem', lineHeight: 1.5 }}>
-        Full-time salary <strong style={{ color: 'var(--t1)' }}>${fte.toLocaleString()}/yr</strong>.
-        {' '}3 days a week ≈ ${Math.round(fte * 0.6 / 1000)}k, 4 days ≈ ${Math.round(fte * 0.8 / 1000)}k, 5 days = ${kStr}k.
+    <div className="wp">
+      <p className="wp-intro">Full-time pay is {fmt(fte)} a year. Add a change for each year the days you work go up or down.</p>
+      <div className="wp-cards">
+        {sorted.map((p, i) => {
+          const isCur = p.year <= currentYear && (i === sorted.length - 1 || sorted[i + 1].year > currentYear)
+          const tone = p.days === 0 ? 'leave' : isCur ? 'now' : ''
+          return (
+            <div key={p.id} className={`wp-card ${tone}`}>
+              <div className="wp-card-head">
+                <strong>{isCur ? 'Now' : `From ${p.year}`}</strong>
+                {sorted.length > 1 && (
+                  <button type="button" className="wp-remove" onClick={() => onDelete(p.id)} aria-label={`Remove the change from ${p.year}`}>Remove</button>
+                )}
+              </div>
+              <label className="wp-field">
+                <span>From the year</span>
+                <input type="number" inputMode="numeric" min={currentYear - 50} max={currentYear + 60}
+                  key={`y-${p.id}-${p.year}`} defaultValue={p.year}
+                  onBlur={e => { const v = parseInt(e.target.value); if (v && v !== p.year) onUpdate(p.id, 'year', v) }} />
+              </label>
+              <label className="wp-field">
+                <span>Days a week</span>
+                <select value={p.days} onChange={e => onUpdate(p.id, 'days', parseInt(e.target.value))}>
+                  {dayChoices.map(d => <option key={d} value={d}>{phaseLabel(d, showLeave)}</option>)}
+                </select>
+              </label>
+              <p className="wp-pay">{phaseIncome(p.days, fte, showLeave)}</p>
+            </div>
+          )
+        })}
       </div>
-      <div style={{ overflowX: 'auto' }}>
-        <table className="tl-table">
-          <thead>
-            <tr><th>From</th><th style={{ textAlign: 'center' }}>Days</th><th>Income</th><th>Phase</th><th /></tr>
-          </thead>
-          <tbody>
-            {sorted.map((p, i) => {
-              const isLeave = p.days === 0
-              const isCur   = p.year <= currentYear && (i === sorted.length - 1 || sorted[i + 1].year > currentYear)
-              return (
-                <tr key={p.id} className={isLeave ? 'leave-row' : isCur ? 'current-row' : ''}>
-                  <td>
-                    <input
-                      type="number"
-                      defaultValue={p.year}
-                      style={{ width: 60, border: 'none', background: 'transparent', fontSize: '0.78rem' }}
-                      onBlur={e => onUpdate(p.id, 'year', parseInt(e.target.value) || p.year)}
-                    />
-                  </td>
-                  <td style={{ textAlign: 'center' }}>
-                    <select
-                      defaultValue={p.days}
-                      onChange={e => onUpdate(p.id, 'days', parseInt(e.target.value))}
-                      style={{ fontSize: '0.76rem', border: 'none', background: 'transparent', cursor: 'pointer' }}
-                    >
-                      {(showLeave ? [0, 1, 2, 3, 4, 5] : [1, 2, 3, 4, 5]).map(d =>
-                        <option key={d} value={d}>{d === 0 ? 'Leave' : d + 'd'}</option>
-                      )}
-                    </select>
-                  </td>
-                  <td style={{ color: isLeave ? 'var(--pink)' : 'var(--t2)', fontSize: '0.74rem' }}>{phaseIncome(p.days, fte, showLeave)}</td>
-                  <td style={{ color: 'var(--t2)', fontSize: '0.74rem' }}>{phaseLabel(p.days, showLeave)}{isCur ? ' ←' : ''}</td>
-                  <td>
-                    <button
-                      onClick={() => onDelete(p.id)}
-                      style={{ background: 'none', border: 'none', color: 'var(--t3)', cursor: 'pointer', fontSize: '0.8rem', padding: '0 4px' }}
-                    >×</button>
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      </div>
-      <button className="add-btn mt1" onClick={onAdd}>+ Add phase</button>
-    </>
+      <button type="button" className="add-btn" onClick={onAdd}>+ Add a change (for example, going part-time)</button>
+    </div>
   )
 }

@@ -2,6 +2,7 @@
 // goal. The NAS shows more dials (near-term inflation, childcare inflation);
 // here one inflation figure sets both.
 
+import { possessive } from '@proviso/core/formatting'
 import { useState } from 'react'
 import { View } from 'react-native'
 import { router, Stack } from 'expo-router'
@@ -54,12 +55,12 @@ export default function AssumptionsSheet() {
   return (
     <Sheet>
       <Stack.Screen options={{ title: 'Assumptions' }} />
-      <Field label={`${h.settings.person1Name}’s pay rises`}>
-        <NumberField unit="%" label={`${h.settings.person1Name}’s pay rises, percent a year`} value={f.p1} onChange={set('p1')} />
+      <Field label={`${possessive(h.settings.person1Name)} pay rises`}>
+        <NumberField unit="%" label={`${possessive(h.settings.person1Name)} pay rises, percent a year`} value={f.p1} onChange={set('p1')} />
       </Field>
       {h.settings.partnerEnabled && (
-        <Field label={`${h.settings.person2Name}’s pay rises`}>
-          <NumberField unit="%" label={`${h.settings.person2Name}’s pay rises, percent a year`} value={f.p2} onChange={set('p2')} />
+        <Field label={`${possessive(h.settings.person2Name)} pay rises`}>
+          <NumberField unit="%" label={`${possessive(h.settings.person2Name)} pay rises, percent a year`} value={f.p2} onChange={set('p2')} />
         </Field>
       )}
       <Field label="Prices rise" hint="Inflation: how fast your costs grow each year.">

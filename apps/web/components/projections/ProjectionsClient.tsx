@@ -1,6 +1,6 @@
 'use client'
 import { useState, useMemo, useCallback } from 'react'
-import { fmtK } from '@proviso/core/formatting'
+import { fmtK, possessive } from '@proviso/core/formatting'
 import { runProjections } from '@proviso/core/projections'
 import { buildProjectionInputs, type ProjectionBaseline } from '@proviso/core/future'
 import { type FeeSchedule } from '@proviso/core/schoolFees'
@@ -400,7 +400,7 @@ export default function ProjectionsClient({
     <div className={`page proj${whatIfOpen ? ' whatif-open' : ''}`}>
       <section className="proj-headline">
         <p className="proj-lede">
-          In {lastLabel}, you&rsquo;re on track to be worth <strong>{fmtK(finalNW)}</strong>.
+          In {lastLabel}, you&rsquo;re on track to be worth <strong className={finalNW < 0 ? 'neg' : undefined}>{fmtK(finalNW)}</strong>.
         </p>
         <p className="proj-lede-sub">
           {hasLoan && (clearedIdx >= 0 ? `Home loan paid off in ${mortCleared}. ` : 'Home loan still being paid off. ')}
@@ -481,8 +481,8 @@ export default function ProjectionsClient({
                 ...(hasLoan ? [{ label: `Home loan left in ${lastLabel}`, val: fmtK(main.mortArr[main.mortArr.length - 1]), color: 'var(--red)' }] : []),
                 { label: 'Spending today', val: '$' + Math.round(baseline.budgetMonthlyExpenses).toLocaleString('en-AU') + '/mo', color: '' },
                 ...(main.leaveYrs.length ? [{ label: 'Parental leave', val: main.leaveYrs.join(', '), color: 'var(--pink)' }] : []),
-                ...(person1HELPBalance > 0 ? [{ label: `${person1Name}'s HELP debt cleared`, val: main.person1HelpClearedYr ? String(main.person1HelpClearedYr) : `After ${lastLabel}`, color: main.person1HelpClearedYr ? 'var(--teal)' : '' }] : []),
-                ...(person2HELPBalance > 0 ? [{ label: `${person2Name}'s HELP debt cleared`, val: main.person2HelpClearedYr ? String(main.person2HelpClearedYr) : `After ${lastLabel}`, color: main.person2HelpClearedYr ? 'var(--teal)' : '' }] : []),
+                ...(person1HELPBalance > 0 ? [{ label: `${possessive(person1Name)} HELP debt cleared`, val: main.person1HelpClearedYr ? String(main.person1HelpClearedYr) : `After ${lastLabel}`, color: main.person1HelpClearedYr ? 'var(--teal)' : '' }] : []),
+                ...(person2HELPBalance > 0 ? [{ label: `${possessive(person2Name)} HELP debt cleared`, val: main.person2HelpClearedYr ? String(main.person2HelpClearedYr) : `After ${lastLabel}`, color: main.person2HelpClearedYr ? 'var(--teal)' : '' }] : []),
               ].map(({ label, val, color }) => (
                 <div key={label} className="proj-summary-row">
                   <span>{label}</span>
@@ -520,9 +520,9 @@ export default function ProjectionsClient({
           <div className="wi-group" data-group="basics">
             <Panel title="The basics" dotColor="var(--amber)">
               <Slider label="Years to look ahead" min={5} max={40} step={1} value={settings.projYears} cls="amber-t" fmt={v => v + ' yrs'} onChange={v => patchSettings({ projYears: v })} />
-              <Slider label={`${person1Name}'s pay rise each year`} min={0} max={15} step={0.5} value={settings.person1Growth} cls="blue-t" onChange={v => patchSettings({ person1Growth: v })} />
+              <Slider label={`${possessive(person1Name)} pay rise each year`} min={0} max={15} step={0.5} value={settings.person1Growth} cls="blue-t" onChange={v => patchSettings({ person1Growth: v })} />
               {income.person2FTE > 0 && (
-                <Slider label={`${person2Name}'s pay rise each year`} min={0} max={15} step={0.5} value={settings.person2Growth} cls="green-t" onChange={v => patchSettings({ person2Growth: v })} />
+                <Slider label={`${possessive(person2Name)} pay rise each year`} min={0} max={15} step={0.5} value={settings.person2Growth} cls="green-t" onChange={v => patchSettings({ person2Growth: v })} />
               )}
               <Slider label="Leftover money you invest" hint="The rest stays as cash." min={0} max={100} step={5} value={settings.savingsRate} cls="purple-t" onChange={v => patchSettings({ savingsRate: v })} />
               <Slider label="Investment growth each year" min={0} max={15} step={0.5} value={settings.investReturn} cls="purple-t" onChange={v => patchSettings({ investReturn: v })} />
@@ -537,7 +537,7 @@ export default function ProjectionsClient({
           </div>
 
           <div className="wi-group" data-group="work">
-            <Panel title={`${person1Name}'s work`} dotColor="var(--blue)">
+            <Panel title={`${possessive(person1Name)} work`} dotColor="var(--blue)">
               <WorkPhaseTimeline
                 phases={person1Phases} currentYear={currentYear}
                 fte={income.person1FTE} showLeave={false}
@@ -545,7 +545,7 @@ export default function ProjectionsClient({
               />
             </Panel>
             <Panel
-              title={`${person2Name}'s work`}
+              title={`${possessive(person2Name)} work`}
               dotColor="var(--pink)"
               right={
                 <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.8rem', color: 'var(--t2)', cursor: 'pointer' }}>
