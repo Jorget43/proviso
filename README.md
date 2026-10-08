@@ -2,9 +2,18 @@
 
 > Most apps tell you what you spent yesterday. Proviso models what you will be worth tomorrow.
 
-A self-hosted personal finance dashboard for Australian households — budget, cashflow, debts & assets, long-term projections, superannuation, EOFY tax planning, and CGT-aware investments. Built for the household CFO: wealth building, tax efficiency, and retirement planning, not day-to-day expense tracking.
+Personal finance for Australian households. It covers budget and cashflow, debts and assets, super and retirement, long-term projections, EOFY tax planning and CGT-aware investments. Proviso is for wealth building, tax efficiency and retirement planning, not day-to-day expense tracking.
 
-Your data never leaves your own hardware. Proviso runs on your box (e.g. Unraid) and is reachable privately over Tailscale.
+**Where it's going: app first, local-first.** The plan is in [`docs/architecture.md`](docs/architecture.md):
+- one app for iOS, Android and the web
+- your data kept on your own devices
+- sync between devices that's end-to-end encrypted, through a relay that only ever sees ciphertext; you can host the relay yourself
+
+**What runs today:**
+- **The self-hosted NAS web app** (Docker; e.g. Unraid, reached privately over Tailscale). It's the full product.
+- **The app** (`apps/client`). It's catching up feature by feature.
+
+Both use the same calculation engine (`packages/core`), so they give the same numbers.
 
 ## Stack
 
@@ -30,7 +39,13 @@ npm run web -w @proviso/client   # http://localhost:8080
 
 ### The app (`apps/client`)
 
-The new Expo app for iOS, Android and the web, local-first (data on the device), being built towards the plan in [`docs/architecture.md`](docs/architecture.md). Today it's single-device: a setup questionnaire that fills in typical costs, Home, Spending, Wealth, Future, and Settings with a 24-word recovery phrase and encrypted backups. Sync between devices comes next.
+The Expo app for iOS, Android and the web. It's local-first (data on the device) and is being built towards the plan in [`docs/architecture.md`](docs/architecture.md). It has:
+- a setup questionnaire that fills in typical costs
+- Home, Spending, Wealth and Future, with What if? and the life-course projection to age 95
+- Settings, with a 24-word recovery phrase and encrypted backups
+- sync between devices through the relay (below)
+
+Android development builds come from EAS (Expo's build service); iOS waits on an Apple Developer account.
 
 To try it on a phone, install **Expo Go**, run `npm run start -w @proviso/client` and scan the QR code (same Wi-Fi; add `-- --tunnel` if the phone can't connect). If Expo Go is signed in to an Expo account, sign the CLI in to the same one first (`npx expo login`; on Windows with a Google sign-in use `$env:BROWSER="none"; npx expo login --browser`). To bring your NAS data across, use Settings → Download all your data on the NAS, then *Choose the file* on the app's welcome screen.
 
@@ -120,8 +135,13 @@ Built for phones first (Add to Home Screen opens it like an app), with the same 
 - **Home** — what's left over each month, things worth a look, where you stand, bills coming up
 - **Spending** — Budget · Actual spending (bank/card statement import)
 - **Wealth** — Own & owe · Super · Investments
-- **Future** — Long term (projections with "What if?") · Next 2 years (cashflow)
+- **Future** — Long term (net worth, money in and out, home, school fees and retirement, projected until you're 95, with "What if?") · Next 2 years (cashflow)
 
-The NAS web app is the full product today; the app (above) has Home, Spending, Wealth and Future so far.
+The projection follows a life course:
+- pay stops when each person retires
+- super grows inside the projection and is paid out by the drawdown strategy you choose (spend what you need, the 4% rule, a set percentage, or the legal minimum)
+- it warns if savings run out before super can be reached at 60
+
+The NAS web app is the full product today. `CLAUDE.md` (Backlog → "Where each feature lives") tracks which features the app has so far.
 
 Plus a seasonal EOFY view (May/June) and Settings, where "Your situation" switches on renting, childcare, school fees and parental leave. See `CLAUDE.md` for architecture and engine details.

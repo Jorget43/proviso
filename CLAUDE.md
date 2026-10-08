@@ -105,7 +105,10 @@ Mobile-first since Phase 22: four destinations ("hubs", `apps/web/lib/navigation
 | (⚙)      | Settings           | `/settings`     |
 | (seasonal) | EOFY             | `/eofy`         |
 
-**The app (`apps/client`, Phases 27–30)** has the same four destinations as tabs, with Settings behind a gear: a setup questionnaire with typical costs, Home, Spending, Wealth, Future and Settings (recovery phrase, encrypted backups). Single device, no sync yet. Run it on a phone with Expo Go (`npm run start:go -w @proviso/client`, scan the QR code), or in the development build once one is installed (`npm run start -w @proviso/client`) or in a browser (`npm run web -w @proviso/client`). The NAS web app below is still the full product; "The app — next steps" in the Backlog lists what the app lacks.
+**The app (`apps/client`, Phases 27–40)** has the same four destinations as tabs, with Settings behind a gear:
+- a setup questionnaire with typical costs
+- Home, Spending, Wealth and Future, with What if? and the life-course projection
+- Settings: recovery phrase, encrypted backups, sync (Phase 34), key backup (Phase 35) Run it on a phone with Expo Go (`npm run start:go -w @proviso/client`, scan the QR code), or in the development build once one is installed (`npm run start -w @proviso/client`) or in a browser (`npm run web -w @proviso/client`). The NAS web app below is still the full product; "The app — next steps" in the Backlog lists what the app lacks.
 
 **EAS (Expo's build service, Phase 32):** `apps/client/eas.json` has `development` (dev client, internal distribution), `preview` and `production` profiles. App id `app.proviso.dev` on both platforms — a development id; choose the final one before TestFlight or a store. **The Expo account name and project id are never committed** (public repo): `app.config.js` adds the project id from `EAS_PROJECT_ID`, which lives in the gitignored `apps/client/.env.local` locally and in the project's EAS environment variables for the build servers; `owner` is left out so EAS uses the signed-in account. EAS doesn't read `.env.local`, so run it through `npm run eas -w @proviso/client -- <args>` (e.g. `-- build --profile development --platform android`). Don't run `eas init` again — it writes the account name into `app.json`. `react-native-reanimated`/`react-native-worklets` are pinned to the SDK's versions in the root `overrides` (expo-router pulled newer ones, and a native build can hold only one copy); `npx expo-doctor` should pass 21/21 before a build.
 
@@ -420,7 +423,7 @@ Tracked in [`docs/security-privacy-legal.md`](docs/security-privacy-legal.md) §
 - ~~Small-text desktop layouts on phones~~ — done (v1.12.0), checked at 390px: Own & owe rows restacked, Investments labels/dropdowns fixed, work-pattern wording plain; EOFY, Super and the school-fee controls were already fine. Investment parcel cards rebuilt in Phase 24.
 - ~~Native app: token auth alongside the cookie session~~ — done (Phase 24), see [`docs/app-api.md`](docs/app-api.md). Still open for the app: passkey sign-in (WebAuthn from a native app needs the platform APIs and an associated domain), and CORS if the app is ever a web view on another origin.
 
-### The app — next steps (as of 2026-10-08)
+### The app — next steps (as of 2026-10-09)
 In [`docs/architecture.md`](docs/architecture.md) order. Phase 3 there (the single-device app) is built except for a store build; Phase 4 (sync) is built (Phases 34–35) and needs its first real run on the NAS. Settings passed the owner's phone check on 2026-10-07. The owner is enrolling in the Apple Developer Program.
 
 **Start here next session**, in this order:
@@ -428,7 +431,7 @@ In [`docs/architecture.md`](docs/architecture.md) order. Phase 3 there (the sing
 2. **Run the relay on the NAS** with the owner: `docker compose --profile sync up -d` (image `ghcr.io/jorget43/proviso-relay`, published by CI from master since 2026-10-08), then `tailscale serve --bg --https=8443 http://localhost:8787` (README "Sync relay for the app"). Turn sync on in the app with the `https://<machine>.<tailnet>.ts.net:8443` address, then join from a second phone. Phones need Tailscale running to reach it.
 3. **Owner decisions pending**: the home-purchase deposit gap (below). (The NAS "Next 2 years" change in Phase 36 — rent and after-subsidy childcare now counted — was pushed with the owner's go-ahead on 2026-10-08.)
 4. **Step B of [`docs/plan-modelling-and-ux.md`](docs/plan-modelling-and-ux.md)**:
-   - The life-course engine is Phase 40, on branch `phase-40-life-course`. It changes NAS numbers, so the owner must OK it before merge.
+   - The life-course engine shipped as Phase 40 (merged to master 2026-10-09 with the owner's OK).
    - Next is Phase 41: birth years (so ages don't go stale each year) and a `child` table.
    - Step A (dark mode, editing, chart trim) shipped as Phases 37–39.
    - Also open: the relay enforcing roles, and the iOS build once the Apple account is ready.
@@ -438,10 +441,37 @@ The full list:
 - **Home purchase deposit**: the projection takes the deposit only from the amounts entered as coming from savings and investments; any rest appears from nowhere (NAS and app alike). The app's What if? warns about the gap; the engine should probably take the rest from cash, then investments (a behaviour change for the NAS too: decide with the owner, re-pin the tests). Stamp duty isn't modelled either.
 - **Key backup** (Phase 35): built, not yet compiled — check it in the next Android development build (Settings → Recovery phrase → Save to Google Password Manager; then on a fresh install, Restore or Join → "Use the key saved in …"), and on iOS once the Apple account is ready.
 - **Sync, what's left after Phase 34**: run the relay on the NAS (`docker compose --profile sync up -d` + Tailscale Serve, README) and try it with two phones; the relay enforcing roles (D6: a Partner's devices may not write some tables); pocket-money spaces for children; the relay serving the web build; turning an existing NAS household into the synced one (today: import the NAS export on one phone, turn sync on there, others join).
-- **NAS features the app doesn't have yet**: Actual spending (statement import and review; needs its own phone design), Investments (parcels and CGT), EOFY, life phases, the HELP indexation alert, super carry-forward and extra contributions, the net-worth history line, the parental-leave switch (the app reads it; only the NAS changes it), passkey sign-in. Done in the app: work changes and rent-then-buy (What if?, Phase 33), Next 2 years (Phase 36).
+- **Where each feature lives (NAS ↔ app)**: see the table below. Keep it current whenever a phase ships. The rule (plan decision 1): engine changes show on the NAS charts first; new screens are built in the app first. All maths stays in `packages/core`, so both give the same numbers.
 - **Web build (architecture Phase 5)**: an instant reload can fail with "Access Handles cannot be created" (the previous page still holds the database file), and the household key falls back to `localStorage` there (`src/data/identity.ts`). Both need solving before the web client ships.
 - **Dependency advisories**: GitHub lists some on master, believed to be all in Expo's build and dev-server tools (`braces`, `node-forge`, `uuid` via `xcode`, `decode-uri-component`), several with no fixed version yet. They don't reach the NAS image (CI audits exactly what it ships). Dependabot was preparing a security update for them on 2026-10-06: review it carefully, because Expo pins some of them, and React / React Native / `expo*` move only with the Expo SDK (`proviso-release` skill).
 - **Starter estimates** (`packages/core/src/starter.ts`): re-check the figures yearly with the July recalibration; electricity still uses the AER's 2020 usage benchmarks (no longer updated).
+
+### Where each feature lives (NAS ↔ app), as of Phase 40
+
+| Feature | NAS web app | The app | Notes |
+|---|---|---|---|
+| Setup | Onboarding wizard | Questionnaire with typical costs | Different flows, same data |
+| Home overview | ✓ | ✓ | |
+| Budget | ✓ | ✓ | |
+| Actual spending (statement import) | ✓ | — | Needs its own phone design |
+| Own & owe, net worth | ✓ | ✓ | One definition (`core/netWorth.ts`) |
+| Net-worth history line | ✓ | — | |
+| Super: balances, retirement ages | ✓ | ✓ | |
+| Super: extra contributions, carry-forward | ✓ | — | Extra contributions feed the projection as salary sacrifice since Phase 40 |
+| Investments (parcels, CGT) | ✓ | — | |
+| Future: net worth, money in & out | ✓ charts | Net worth bars, short years, milestones | Same engine; app charts wait on plan item 2 |
+| Future: Retirement (chart, drawdown strategy) | ✓ | Summary text only | App needs the chart component (plan item 2) and the strategy choice |
+| Future: look-ahead age, work changes, rent-then-buy | ✓ | ✓ (What if?) | |
+| Future: school fees | ✓ chart | Total only | |
+| Life phases (calendar rows) | ✓ edit | Read only | Step C turns these into age-based modifiers |
+| Next 2 years | ✓ | ✓ | `core/cashflow.ts` |
+| Parental-leave switch | ✓ | Read only | |
+| EOFY | ✓ | — | |
+| HELP indexation alert | ✓ | — | |
+| Dark mode | Per account | Per device | |
+| Sign-in | Password, TOTP, passkeys | Recovery phrase (no accounts) | |
+| Backup / move data | Download all your data | Encrypted backup, import NAS export | |
+| Sync between devices | — | ✓ (relay) | The relay isn't running on the NAS yet |
 
 ### Deferred (revisit only if needed)
 - `Transaction` `@@index([ym])` — premature at household scale (see Phase 15).
