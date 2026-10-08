@@ -20,10 +20,11 @@ import {
 
 function expectShape(r: ProjectionResult, years: number) {
   expect(Object.keys(r).sort()).toEqual([
-    'cashArr', 'cashRunningArr', 'deficitArr', 'expArr', 'incArr',
+    'bridgeShortYr', 'cashArr', 'cashRunningArr', 'deficitArr', 'expArr', 'incArr',
     'investArr', 'leaveYrs', 'mortArr', 'mortStressArr', 'nwArr', 'owedArr', 'person1Arr',
-    'person1HelpClearedYr', 'person2Arr', 'person2HelpClearedYr', 'phaseArr', 'purchaseYr', 'rentArr', 'sfC1Arr', 'sfC2Arr',
-    'sfSibArr', 'sfTotalArr',
+    'person1HelpClearedYr', 'person1RetireYr', 'person2Arr', 'person2HelpClearedYr', 'person2RetireYr',
+    'phaseArr', 'purchaseYr', 'rentArr', 'retiredArr', 'sfC1Arr', 'sfC2Arr',
+    'sfSibArr', 'sfTotalArr', 'shortfallYr', 'super1Arr', 'super2Arr', 'superArr', 'superDrawArr',
   ])
   for (const k of ['nwArr', 'incArr', 'expArr', 'mortArr', 'cashArr', 'investArr'] as const) {
     expect(r[k]).toHaveLength(years)

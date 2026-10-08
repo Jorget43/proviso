@@ -130,6 +130,45 @@ export interface HouseholdSuperResult {
   monthlyIncomeGoal:         number
 }
 
+export interface AccumulationYear {
+  balance:         number
+  earnings:        number
+  earningsTax:     number
+  contribution:    number
+  contributionTax: number
+  fees:            number
+  capHit:          boolean
+  div293:          boolean
+}
+
+/**
+ * One year of a fund in accumulation phase: earnings taxed at 15%,
+ * concessional contributions (capped) taxed at 15% (30% under Division 293),
+ * fees on the opening balance. Shared by the Super page's engine and the
+ * life-course projection so both step a balance the same way.
+ */
+export function superAccumulationYear(
+  balance: number,
+  y: { investmentReturn: number; fundFeePercent: number; grossContribution: number; cap: number; salary: number },
+): AccumulationYear {
+  const earnings        = balance * y.investmentReturn
+  const earningsTax     = earnings * 0.15
+  const contribution    = Math.min(y.grossContribution, y.cap)
+  const capHit          = y.grossContribution > y.cap
+  const div293          = y.salary > DIV293_THRESHOLD
+  const contributionTax = contribution * (div293 ? 0.30 : 0.15)
+  const fees            = balance * y.fundFeePercent
+  return {
+    balance: balance + earnings - earningsTax + contribution - contributionTax - fees,
+    earnings, earningsTax, contribution, contributionTax, fees, capHit, div293,
+  }
+}
+
+/** One year of a fund in pension phase, before withdrawals: earnings untaxed, fees on the opening balance. */
+export function superPensionGrowth(balance: number, investmentReturn: number, fundFeePercent: number): number {
+  return balance + balance * investmentReturn - balance * fundFeePercent
+}
+
 export function runSuperProjection(inputs: SuperInputs): SuperResult {
   const {
     currentBalance, currentAge, retirementAge,
@@ -153,21 +192,16 @@ export function runSuperProjection(inputs: SuperInputs): SuperResult {
     const year     = startYear + yearsFromNow
     const fyEnding = startFyEnding + yearsFromNow
 
-    const earnings    = balance * investmentReturn
-    const earningsTax = earnings * 0.15
-
-    const gross        = salary * sgRate + additionalContribs
     // Carry-forward headroom (unused cap from the last 5 FYs) applies only
     // in the run's first year — see computeCarryForward in lib/superHistory.ts.
-    const cap          = legislativeCap(fyEnding) + (yearsFromNow === 0 ? firstYearCapBonus : 0)
-    const contribution = Math.min(gross, cap)
-    const capHit       = gross > cap
-
-    const div293          = salary > DIV293_THRESHOLD
-    const contributionTax = contribution * (div293 ? 0.30 : 0.15)
-
-    const fees    = balance * fundFeePercent
-    balance       = balance + earnings - earningsTax + contribution - contributionTax - fees
+    const step = superAccumulationYear(balance, {
+      investmentReturn, fundFeePercent,
+      grossContribution: salary * sgRate + additionalContribs,
+      cap:               legislativeCap(fyEnding) + (yearsFromNow === 0 ? firstYearCapBonus : 0),
+      salary,
+    })
+    const { earnings, earningsTax, contribution, contributionTax, fees, capHit, div293 } = step
+    balance       = step.balance
     const presentValue = balance / Math.pow(1 + inflationRate, yearsFromNow + 1)
 
     rows.push({

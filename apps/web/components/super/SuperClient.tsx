@@ -365,6 +365,7 @@ export default function SuperClient({ canEdit, initial, context, mortgage, budge
           <p style={{ fontSize: '0.8rem', color: 'var(--t2)', marginBottom: '0.75rem', lineHeight: 1.45 }}>
             Super grows until retirement (marked ↓ on the timeline), then gets drawn down.
             &ldquo;Today&rsquo;s $&rdquo; shows what that money is worth after inflation.
+            This is super on its own; for how long your money lasts, counting your savings outside super and your spending, see <a href="/projections">Future &rarr; Retirement</a>.
           </p>
           <SuperBalanceChart
             combined={result.combined}

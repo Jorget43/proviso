@@ -37,7 +37,7 @@ function sampleExport(): HouseholdExport {
   // A NAS household always has this row (seeded); parental leave is off here.
   h.projectionSettings.push({ id: SETTINGS_ID.projections, deletedAt: null, person1Growth: 3.5, person2Growth: 3, expInflNear: 4, expInfl: 2.5,
     childcareInfl: 6, propGrowth: 3.5, savingsRate: 10, investReturn: 3.5, projYears: 20, schoolFeesOn: false, sfC1Start: 2032, sfC1ExitIdx: 13,
-    sfC2Start: 2035, sfC2ExitIdx: 13, sfInfl: 5, sfPresetKey: null, parentalLeaveEnabled: false })
+    sfC2Start: 2035, sfC2ExitIdx: 13, sfInfl: 5, sfPresetKey: null, parentalLeaveEnabled: false, horizonAge: 95 })
   h.rentSettings.push({ id: SETTINGS_ID.rent, deletedAt: null, enabled: true, monthlyRent: 2400, annualIncreaseRate: 5, purchasePlanEnabled: false,
     targetPurchaseYear: 2031, targetPropertyValue: 800000, depositPct: 20, depositFromCash: 0, depositFromInvestments: 0, newMortgageRate: 6, newMortgageTermYrs: 30 })
   return {
@@ -313,8 +313,9 @@ describe('future', () => {
   it('projects net worth, milestones and retirement from the household', async () => {
     const db = await setUp()
     const v = futureView(await loadHousehold(db), NOW)
-    expect(v.years).toBe(20)
-    expect(v.netWorth).toHaveLength(20)
+    // Until the younger adult (Sam, 36) turns 95: 95 − 36 = 59 years.
+    expect(v.years).toBe(59)
+    expect(v.netWorth).toHaveLength(v.years)
     expect(v.netWorthToday).toBe(40_000 + 20_000 + 500_000 - 12_000)
     expect(v.schoolFees.on).toBe(true)
     expect(v.schoolFees.total).toBeGreaterThan(0)
@@ -330,7 +331,7 @@ describe('future', () => {
     // Turning the model off keeps the budget lines, flat (inflated) for all 20 years.
     const h = await loadHousehold(db)
     await saveAssumptions(db, { person1Growth: h.projection.person1Growth, person2Growth: h.projection.person2Growth, expInfl: h.projection.expInfl,
-      investReturn: h.projection.investReturn, savingsRate: h.projection.savingsRate, propGrowth: h.projection.propGrowth, projYears: 20, schoolFeesOn: false }, 0)
+      investReturn: h.projection.investReturn, savingsRate: h.projection.savingsRate, propGrowth: h.projection.propGrowth, horizonAge: 95, schoolFeesOn: false }, 0)
     const off = futureView(await loadHousehold(db), NOW)
     expect(off.schoolFees.on).toBe(false)
     expect(on.endNetWorth).not.toBe(off.endNetWorth)
@@ -359,12 +360,12 @@ describe('future', () => {
 
   it('saves the assumptions and the retirement goal', async () => {
     const db = await setUp()
-    await saveAssumptions(db, { person1Growth: 2, person2Growth: 2, expInfl: 3, investReturn: 6, savingsRate: 80, propGrowth: 4, projYears: 30, schoolFeesOn: true }, 90_000)
+    await saveAssumptions(db, { person1Growth: 2, person2Growth: 2, expInfl: 3, investReturn: 6, savingsRate: 80, propGrowth: 4, horizonAge: 90, schoolFeesOn: true }, 90_000)
     const h = await loadHousehold(db)
-    expect(h.projection).toMatchObject({ expInfl: 3, expInflNear: 3, projYears: 30, savingsRate: 80 })
+    expect(h.projection).toMatchObject({ expInfl: 3, expInflNear: 3, horizonAge: 90, savingsRate: 80 })
     expect(h.superSettings.desiredRetirementIncome).toBe(90_000)
     const v = futureView(h, NOW)
-    expect(v.years).toBe(30)
+    expect(v.years).toBe(90 - 36)
     expect(v.retirement.goalMonthly).toBe(7_500)
   })
 })

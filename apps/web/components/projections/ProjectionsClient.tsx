@@ -2,8 +2,8 @@
 import { useState, useMemo, useCallback } from 'react'
 import { fmtK, possessive } from '@proviso/core/formatting'
 import { runProjections } from '@proviso/core/projections'
-import { buildProjectionInputs, superInputsFor, type ProjectionBaseline, type SuperSettingsLike } from '@proviso/core/future'
-import { runHouseholdProjection } from '@proviso/core/super'
+import { buildProjectionInputs, type ProjectionBaseline, type SuperSettingsLike } from '@proviso/core/future'
+import { asDrawdownStrategy, PRESERVATION_AGE, DEFAULT_HORIZON_AGE, type DrawdownStrategy } from '@proviso/core/retirement'
 import { type FeeSchedule } from '@proviso/core/schoolFees'
 import { LOCATION_OPTIONS, presetScheduleFor, presetTotalFor } from '@proviso/core/educationCosts'
 
@@ -13,7 +13,7 @@ import ReadOnlyFence from '@/components/ui/ReadOnlyFence'
 import NetWorthChart      from './NetWorthChart'
 import MoneyInOutChart    from './MoneyInOutChart'
 import HomeChart          from './HomeChart'
-import SuperBalanceChart  from '@/components/super/SuperBalanceChart'
+import RetirementChart    from './RetirementChart'
 import SchoolFeeChart     from './SchoolFeeChart'
 import WorkPhaseTimeline, { type WorkPhaseRow } from './WorkPhaseTimeline'
 import OneOffPanel,       { type OneOffRow }      from './OneOffPanel'
@@ -32,6 +32,7 @@ interface ProjSettings {
   savingsRate:   number
   investReturn:  number
   projYears:     number
+  horizonAge:    number
   parentalLeaveEnabled: boolean
   schoolFeesOn:  boolean
   sfC1Start:     number
@@ -100,6 +101,13 @@ const GROUPS: { key: Group; label: string }[] = [
   { key: 'plans',  label: 'Plans' },
 ]
 
+const DRAWDOWN_CHOICES: { key: DrawdownStrategy; label: string; hint: string }[] = [
+  { key: 'need',             label: 'Spend what you need', hint: 'Cash and savings outside super pay first, then super. Super always pays at least the legal minimum.' },
+  { key: 'fourPercent',      label: '4% rule',             hint: 'Super pays 4% of its balance in your first year of retirement, then the same amount plus price rises.' },
+  { key: 'percentOfBalance', label: 'A set % each year',   hint: 'Super pays a fixed share of whatever is there. The amount changes, but it never runs out.' },
+  { key: 'minimum',          label: 'Legal minimum',       hint: 'Super pays only the minimum the law requires: 4% a year under 65, rising with age.' },
+]
+
 const DEFAULT_RENT: RentSettingsType = {
   id: 1, enabled: false, monthlyRent: 0, annualIncreaseRate: 5.0,
   purchasePlanEnabled: false, targetPurchaseYear: new Date().getFullYear() + 5,
@@ -153,6 +161,7 @@ export default function ProjectionsClient({
   const [snapshots,   setSnapshots]   = useState<NetWorthSnapshotRow[]>(initialSnapshots)
   const [view,        setView]        = useState<View>('networth')
   const [includeSuper, setIncludeSuper] = useState(false)
+  const [sup,         setSup]         = useState<SuperSettingsLike>(superSettings)
   const [group,       setGroup]       = useState<Group>('basics')
   const [whatIfOpen,  setWhatIfOpen]  = useState(false)
 
@@ -176,7 +185,8 @@ export default function ProjectionsClient({
   const inputs = useMemo(() => buildProjectionInputs(baseline, {
     income, settings, person1Phases, person2Phases, oneoffs, lifePhases, sfSchedule,
     rent: rentSt, mortgage: { rate: mortRate, payment: mortPayment }, currentYear,
-  }), [baseline, income, settings, person1Phases, person2Phases, oneoffs, lifePhases, sfSchedule, rentSt, mortRate, mortPayment, currentYear])
+    life: { partnerEnabled, person1Age: income.person1Age, person2Age: income.person2Age, super: sup },
+  }), [baseline, income, settings, person1Phases, person2Phases, oneoffs, lifePhases, sfSchedule, rentSt, mortRate, mortPayment, currentYear, partnerEnabled, sup])
   const { person1HELPBalance, person2HELPBalance, netWorthToday } = baseline
 
   const output = useMemo(() => runProjections(inputs), [inputs])
@@ -210,6 +220,15 @@ export default function ProjectionsClient({
   const patchSettings = useCallback(async (patch: Partial<ProjSettings>) => {
     setSettings(prev => ({ ...prev, ...patch }))
     await fetch('/api/projection-settings', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    })
+  }, [])
+
+  const patchSuper = useCallback(async (patch: Partial<SuperSettingsLike>) => {
+    setSup(prev => ({ ...prev, ...patch }))
+    await fetch('/api/super-settings', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(patch),
@@ -342,26 +361,38 @@ export default function ProjectionsClient({
   const growth      = finalNW - initNW
   const hasLoan     = main.mortArr.some(v => v > 0)
   const hasHousing  = main.mortStressArr.some(v => v > 0)
-  const deficitIdx  = main.deficitArr.flatMap((v, i) => (v < 0 ? [i] : []))
+  // Tight years are counted while someone still works: once everyone has
+  // retired, living off super and savings is the plan, not a shortfall.
+  const retiredIdx  = main.retiredArr.indexOf(true)
+  const workingEnd  = retiredIdx >= 0 ? retiredIdx : main.deficitArr.length
+  const deficitIdx  = main.deficitArr.slice(0, workingEnd).flatMap((v, i) => (v < 0 ? [i] : []))
   const stressIdx   = main.mortStressArr.flatMap((v, i) => (v > 30 ? [i] : []))
   const peakStress  = Math.max(0, ...main.mortStressArr)
   const hhIncome    = main.person1Arr.map((v, i) => v + (main.person2Arr[i] ?? 0))
   const plural      = (n: number, w: string) => `${n} ${w}${n === 1 ? '' : 's'}`
 
-  // Super, year by year: the same engine and inputs as the app's Future screen
-  // (@proviso/core/future), following the pay-rise sliders here.
-  const superResult = useMemo(() => {
-    const sup = superInputsFor(superSettings, partnerEnabled, baseline.retirementMonthly,
-      { person1Age: income.person1Age, person2Age: income.person2Age, person1FTE: income.person1FTE, person2FTE: income.person2FTE },
-      { person1Growth: settings.person1Growth, person2Growth: settings.person2Growth })
-    return runHouseholdProjection(sup.inputs, { ...sup.ctx, startYear: currentYear })
-  }, [superSettings, partnerEnabled, baseline.retirementMonthly, income, settings.person1Growth, settings.person2Growth, currentYear])
-  const superByYear  = new Map(superResult.combined.map(r => [r.year, r.total]))
-  const superData    = output.labels.map(l => Math.round(superByYear.get(Number(l)) ?? 0))
+  // Super and retirement come from the same projection (the life course in
+  // @proviso/core/projections), so every Future chart tells one story.
+  const superData    = main.superArr
   const hasSuper     = superData.some(v => v > 0)
-  const p1RetireYear = currentYear + (superSettings.person1RetirementAge - income.person1Age)
-  const p2RetireYear = partnerEnabled ? currentYear + (superSettings.person2RetirementAge - income.person2Age) : null
   const superAtEnd   = superData[superData.length - 1] ?? 0
+  const ageIn        = (age: number, year: number) => age + (year - currentYear)
+  const p1RetireYear = main.person1RetireYr ?? currentYear
+  const p2RetireYear = main.person2RetireYr
+  const lastRetireYr = Math.max(p1RetireYear, p2RetireYear ?? 0)
+  const strategy     = asDrawdownStrategy(sup.drawdownStrategy)
+  const retirementTakeaway = (() => {
+    const lasts = main.shortfallYr
+      ? `Money runs short from ${main.shortfallYr}, when ${partnerEnabled ? `${person1Name} is` : 'you are'} ${ageIn(income.person1Age, main.shortfallYr)}.`
+      : `Your money lasts to ${lastLabel}${partnerEnabled ? '' : `, when you're ${ageIn(income.person1Age, Number(lastLabel))}`}.`
+    const bridge = main.bridgeShortYr
+      ? ` Before super can be reached at ${PRESERVATION_AGE}, savings outside super run out in ${main.bridgeShortYr}.`
+      : ''
+    const when = lastRetireYr > currentYear
+      ? ` Retiring in ${p1RetireYear}${p2RetireYear ? ` and ${p2RetireYear}` : ''}.`
+      : ''
+    return `${lasts}${bridge}${when} Doesn't count the Age Pension.`
+  })()
 
   const views: { key: View; label: string; takeaway: string }[] = [
     {
@@ -373,18 +404,22 @@ export default function ProjectionsClient({
     {
       key: 'inout', label: 'Money in & out',
       takeaway: (() => {
-        const worst = Math.min(...main.deficitArr)
-        const wi = main.deficitArr.indexOf(worst)
-        const range = `Take-home pay goes from ${fmtK(hhIncome[0] ?? 0)} to ${fmtK(hhIncome[hhIncome.length - 1] ?? 0)} a year.`
+        const working = main.deficitArr.slice(0, workingEnd)
+        const worst = Math.min(...working)
+        const wi = working.indexOf(worst)
+        const lastPaid = Math.max(0, workingEnd - 1)
+        const range = `Take-home pay goes from ${fmtK(hhIncome[0] ?? 0)} to ${fmtK(hhIncome[lastPaid] ?? 0)} a year${retiredIdx >= 0 ? ` by ${output.labels[lastPaid]}` : ''}.`
         const leave = main.leaveYrs.length ? ` ${person2Name} is on parental leave in ${main.leaveYrs.join(', ')}.` : ''
-        return deficitIdx.length === 0
-          ? `${range} Your income covers your spending in every year shown; the leanest is ${output.labels[wi]}, with ${fmtK(worst)} to spare.${leave}`
-          : `${range} You'd spend more than you earn in ${plural(deficitIdx.length, 'year')}, starting ${output.labels[deficitIdx[0]]}; the tightest is ${output.labels[wi]}, ${fmtK(-worst)} short.${leave}`
+        const retired = retiredIdx > 0 ? ` From ${output.labels[retiredIdx]} you live on super and savings.` : ''
+        if (working.length === 0) return `You live on super and savings in every year shown.${leave}`
+        return (deficitIdx.length === 0
+          ? `${range} Your income covers your spending in every working year; the leanest is ${output.labels[wi]}, with ${fmtK(worst)} to spare.`
+          : `${range} You'd spend more than you earn in ${plural(deficitIdx.length, 'working year')}, starting ${output.labels[deficitIdx[0]]}; the tightest is ${output.labels[wi]}, ${fmtK(-worst)} short.`) + retired + leave
       })(),
     },
     ...(hasLoan || hasHousing ? [{
       key: 'home' as const, label: 'Home',
-      takeaway: (clearedIdx >= 0 ? `Your home loan is paid off in ${mortCleared}.` : `Your home loan isn't paid off within the ${settings.projYears} years shown.`)
+      takeaway: (clearedIdx >= 0 ? `Your home loan is paid off in ${mortCleared}.` : `Your home loan isn't paid off by ${lastLabel}.`)
         + (stressIdx.length === 0
           ? ' Repayments stay under 30% of your income, a comfortable level.'
           : ` Repayments take more than 30% of your income in ${plural(stressIdx.length, 'year')}, peaking at ${peakStress.toFixed(0)}% in ${output.labels[main.mortStressArr.indexOf(peakStress)]}.`),
@@ -398,10 +433,7 @@ export default function ProjectionsClient({
     }] : []),
     ...(hasSuper ? [{
       key: 'retirement' as const, label: 'Retirement',
-      takeaway: (superResult.combinedDepletionAge === null
-        ? `Super should pay ${fmtK(superResult.monthlyIncomeGoal)} a month (in today's money) past age 100.`
-        : `Super would pay ${fmtK(superResult.monthlyIncomeGoal)} a month (in today's money) until age ${superResult.combinedDepletionAge}.`)
-        + ` Retirement from ${p1RetireYear}${p2RetireYear ? ` and ${p2RetireYear}` : ''}. Doesn't count the Age Pension or savings outside super.`,
+      takeaway: retirementTakeaway,
     }] : []),
   ]
   const current = views.find(v => v.key === view) ?? views[0]
@@ -420,7 +452,8 @@ export default function ProjectionsClient({
         <p className="proj-lede-sub">
           {hasLoan && (clearedIdx >= 0 ? `Home loan paid off in ${mortCleared}. ` : 'Home loan still being paid off. ')}
           {rentSt.enabled && `${fmtK(totalRentPaid)} paid in rent along the way. `}
-          {deficitIdx.length > 0 ? `${plural(deficitIdx.length, 'tight year')} where spending beats income.` : 'No years where spending beats income.'}
+          {deficitIdx.length > 0 ? `${plural(deficitIdx.length, 'tight year')} where spending beats income while you work.` : 'No working years where spending beats income.'}
+          {main.shortfallYr ? ` Money runs short in retirement from ${main.shortfallYr}.` : ''}
         </p>
       </section>
 
@@ -460,22 +493,42 @@ export default function ProjectionsClient({
                   labels={output.labels} person1Data={main.person1Arr} person2Data={main.person2Arr}
                   person1Name={person1Name} person2Name={person2Name} showPerson2={partnerEnabled}
                   leaveYrs={main.leaveYrs} spendData={main.expArr} sfTotalData={sfOn ? main.sfTotalArr : main.sfTotalArr.map(() => 0)}
-                  phaseData={main.phaseArr} cashData={main.cashRunningArr}
+                  phaseData={main.phaseArr} cashData={main.cashRunningArr} superData={main.superDrawArr}
                 />
               )}
               {current.key === 'home' && (
                 <HomeChart labels={output.labels} mortData={main.mortArr} stressData={main.mortStressArr} rentData={main.rentArr} endDate={mortEndDate} />
               )}
               {current.key === 'retirement' && (
-                <SuperBalanceChart
-                  combined={superResult.combined}
-                  person1Rows={superResult.person1.rows}
-                  person2Rows={superResult.person2?.rows ?? null}
-                  person1RetirementYear={p1RetireYear}
-                  person2RetirementYear={p2RetireYear}
-                  person1Name={person1Name}
-                  person2Name={person2Name}
-                />
+                <>
+                  <RetirementChart
+                    labels={output.labels}
+                    super1={main.super1Arr} super2={partnerEnabled ? main.super2Arr : null}
+                    outside={main.investArr.map((v, i) => v + main.cashArr[i])}
+                    drawn={main.superDrawArr}
+                    person1Name={person1Name} person2Name={person2Name}
+                    marks={[p1RetireYear, ...(p2RetireYear ? [p2RetireYear] : [])]}
+                  />
+                  <ReadOnlyFence canEdit={canEdit}>
+                    <fieldset className="drawdown-choice">
+                      <legend>How you&rsquo;d pay for retirement</legend>
+                      <div className="drawdown-options">
+                        {DRAWDOWN_CHOICES.map(o => (
+                          <button key={o.key} type="button" aria-pressed={strategy === o.key}
+                            className={`drawdown-option${strategy === o.key ? ' active' : ''}`}
+                            onClick={() => patchSuper({ drawdownStrategy: o.key })}>
+                            {o.label}
+                          </button>
+                        ))}
+                      </div>
+                      <p className="proj-note">{DRAWDOWN_CHOICES.find(o => o.key === strategy)!.hint}</p>
+                      {strategy === 'percentOfBalance' && (
+                        <Slider label="Share of super taken each year" min={2} max={10} step={0.5} value={sup.drawdownPct ?? 5} cls="teal-t" onChange={v => patchSuper({ drawdownPct: v })} />
+                      )}
+                    </fieldset>
+                  </ReadOnlyFence>
+                  <p className="proj-note mt1">Estimates, not advice. Super earns {(sup.investmentReturn * 100).toFixed(1)}% a year, less fees of {(sup.fundFeePercent * 100).toFixed(1)}% (set on Wealth &rarr; Super). Its earnings aren&rsquo;t taxed once you&rsquo;ve retired and turned {PRESERVATION_AGE}.</p>
+                </>
               )}
               {current.key === 'fees' && (
                 <SchoolFeeChart
@@ -540,7 +593,8 @@ export default function ProjectionsClient({
           <ReadOnlyFence canEdit={canEdit}>
           <div className="wi-group" data-group="basics">
             <Panel title="The basics" dotColor="var(--amber)">
-              <Slider label="Years to look ahead" min={5} max={40} step={1} value={settings.projYears} cls="amber-t" fmt={v => v + ' yrs'} onChange={v => patchSettings({ projYears: v })} />
+              <Slider label={partnerEnabled ? 'Look ahead until the younger of you is' : 'Look ahead until you are'} min={70} max={105} step={1}
+                value={settings.horizonAge ?? DEFAULT_HORIZON_AGE} cls="amber-t" fmt={v => String(v)} onChange={v => patchSettings({ horizonAge: v })} />
               <Slider label={`${possessive(person1Name)} pay rise each year`} min={0} max={15} step={0.5} value={settings.person1Growth} cls="blue-t" onChange={v => patchSettings({ person1Growth: v })} />
               {income.person2FTE > 0 && (
                 <Slider label={`${possessive(person2Name)} pay rise each year`} min={0} max={15} step={0.5} value={settings.person2Growth} cls="green-t" onChange={v => patchSettings({ person2Growth: v })} />
@@ -559,6 +613,8 @@ export default function ProjectionsClient({
 
           <div className="wi-group" data-group="work">
             <Panel title={`${possessive(person1Name)} work`} dotColor="var(--blue)">
+              <Slider label="Stops work at age" hint={`${income.person1Age} now; pay stops in ${p1RetireYear}.`} min={Math.max(40, income.person1Age)} max={80} step={1}
+                value={sup.person1RetirementAge} cls="blue-t" fmt={v => String(v)} onChange={v => patchSuper({ person1RetirementAge: v })} />
               <WorkPhaseTimeline
                 phases={person1Phases} currentYear={currentYear}
                 fte={income.person1FTE} showLeave={false}
@@ -579,6 +635,10 @@ export default function ProjectionsClient({
                 </label>
               }
             >
+              {partnerEnabled && (
+                <Slider label="Stops work at age" hint={`${income.person2Age} now; pay stops in ${p2RetireYear}.`} min={Math.max(40, income.person2Age)} max={80} step={1}
+                  value={sup.person2RetirementAge} cls="green-t" fmt={v => String(v)} onChange={v => patchSuper({ person2RetirementAge: v })} />
+              )}
               <WorkPhaseTimeline
                 phases={person2Phases} currentYear={currentYear}
                 fte={income.person2FTE}

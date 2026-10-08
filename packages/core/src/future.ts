@@ -23,6 +23,7 @@ import { presetScheduleFor } from './educationCosts'
 import { SF_BASE, type FeeSchedule } from './schoolFees'
 import type { LifePhaseOverlay } from './lifephases'
 import type { HouseholdSuperInputs, ProjectionContext } from './super'
+import { asDrawdownStrategy, yearsToAge, DEFAULT_HORIZON_AGE } from './retirement'
 
 /** The budget's home-loan repayment line(s). */
 export const isMortgageLine = (e: { cat: string; name: string }) => e.cat === 'Home' && /mortgage/i.test(e.name)
@@ -107,6 +108,8 @@ export interface ProjectionSettingsLike {
   sfC1Start: number; sfC1ExitIdx: number; sfC2Start: number; sfC2ExitIdx: number; sfInfl: number
   sfPresetKey: string | null
   parentalLeaveEnabled: boolean
+  /** With a life course, the projection runs until the younger adult reaches this age (projYears is ignored). */
+  horizonAge?: number
 }
 
 export interface RentSettingsLike {
@@ -135,6 +138,15 @@ export interface ProjectionLive {
   rent:           RentSettingsLike
   mortgage:       { rate: number; payment: number }
   currentYear:    number
+  /** People, retirement and super. Without it the projection runs as before Phase 40 (pay never stops). */
+  life?:          LifeLive
+}
+
+export interface LifeLive {
+  partnerEnabled: boolean
+  person1Age:     number
+  person2Age:     number
+  super:          SuperSettingsLike
 }
 
 export function buildProjectionInputs(b: ProjectionBaseline, l: ProjectionLive): ProjectionInputs {
@@ -147,6 +159,8 @@ export function buildProjectionInputs(b: ProjectionBaseline, l: ProjectionLive):
   const base = b.baseMonthlyExpenses
     - (modelsMortgage ? b.budgetMortgageMonthly : 0)
     - (s.schoolFeesOn ? b.modelledSchoolMonthly : 0)
+  const life = l.life
+  const sup  = life?.super
   return {
     person1FTE: l.income.person1FTE, person2FTE: l.income.person2FTE, taxMode: l.income.taxMode,
     // HELP is modelled whenever a balance is recorded: repayments are compulsory.
@@ -156,7 +170,9 @@ export function buildProjectionInputs(b: ProjectionBaseline, l: ProjectionLive):
     person1GrowthRate: s.person1Growth, person2GrowthRate: s.person2Growth,
     expInflNear: s.expInflNear, expInfl: s.expInfl, childcareInfl: s.childcareInfl,
     propGrowth: s.propGrowth, savingsRate: s.savingsRate, investReturn: s.investReturn,
-    projYears: s.projYears,
+    projYears: life
+      ? yearsToAge(s.horizonAge ?? DEFAULT_HORIZON_AGE, life.person1Age, life.partnerEnabled ? life.person2Age : null)
+      : s.projYears,
     mortBalance: b.mortBalance, mortRate: l.mortgage.rate, mortPayment: payment,
     cashOnHand: b.cashOnHand, propValue: b.propValue, cryptoValue: b.cryptoValue,
     investmentsValue: b.investmentsValue, otherDebts: b.otherDebts,
@@ -174,6 +190,18 @@ export function buildProjectionInputs(b: ProjectionBaseline, l: ProjectionLive):
     targetPropertyValue: l.rent.targetPropertyValue, depositPct: l.rent.depositPct,
     depositFromCash: l.rent.depositFromCash, depositFromInvestments: l.rent.depositFromInvestments,
     newMortgageRate: l.rent.newMortgageRate, newMortgageTermYrs: l.rent.newMortgageTermYrs,
+    lifeCourse: life && sup ? {
+      partnerEnabled: life.partnerEnabled,
+      person1Age: life.person1Age, person2Age: life.person2Age,
+      person1RetirementAge: sup.person1RetirementAge, person2RetirementAge: sup.person2RetirementAge,
+      person1Super: sup.person1Balance, person2Super: sup.person2Balance,
+      person1ExtraSuper: sup.person1AdditionalContribs, person2ExtraSuper: sup.person2AdditionalContribs,
+      sgRate: sup.sgRate, superReturn: sup.investmentReturn, superFeePct: sup.fundFeePercent,
+      // The goal counts all spending; the engine models rent itself (it stops at a purchase).
+      retirementSpending: Math.max(0, retirementIncomeGoal(sup.desiredRetirementIncome, b.retirementMonthly)
+        - (l.rent.enabled ? l.rent.monthlyRent * 12 : 0)),
+      drawdown: asDrawdownStrategy(sup.drawdownStrategy), drawdownPct: sup.drawdownPct ?? 5,
+    } : undefined,
   }
 }
 
@@ -208,6 +236,7 @@ export interface SuperSettingsLike {
   desiredRetirementIncome: number
   person1Balance: number; person1RetirementAge: number; person1AdditionalContribs: number
   person2Balance: number; person2RetirementAge: number; person2AdditionalContribs: number
+  drawdownStrategy?: string | null; drawdownPct?: number
 }
 
 export function superInputsFor(

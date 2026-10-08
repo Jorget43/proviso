@@ -10,6 +10,9 @@ import { schoolFeesForYear, type FeeSchedule } from './schoolFees';
 import { lifePhaseCostForYear } from './lifephases';
 import type { LifePhaseOverlay } from './lifephases';
 import { PPL_TOTAL, NEAR_TERM_INFLATION_HORIZON } from './constants';
+import { superAccumulationYear, superPensionGrowth } from './super';
+import { legislativeCap } from './superHistory';
+import { PRESERVATION_AGE, minimumDrawdownRate, superAccessible, type DrawdownStrategy } from './retirement';
 
 export interface WorkPhase {
   year: number;
@@ -21,6 +24,37 @@ export interface OneOff {
   amt:  number;
   year: number;
 }
+
+/**
+ * The life course: ages, retirement, super and how retirement is paid for.
+ * Super-fund rates are DECIMALS (0.12), as in super.ts; everything else on
+ * ProjectionInputs is a percentage.
+ */
+export interface LifeCourse {
+  partnerEnabled:       boolean;
+  person1Age:           number;   // age in currentYear
+  person2Age:           number;
+  person1RetirementAge: number;   // pay stops in the year they reach it
+  person2RetirementAge: number;
+  person1Super:         number;   // balance today
+  person2Super:         number;
+  person1ExtraSuper:    number;   // salary sacrifice a year, while working
+  person2ExtraSuper:    number;
+  sgRate:               number;   // decimal
+  superReturn:          number;   // decimal
+  superFeePct:          number;   // decimal
+  /** Yearly spending once everyone has retired, in today's dollars, excluding rent, the home loan and school fees (the engine models those). */
+  retirementSpending:   number;
+  drawdown:             DrawdownStrategy;
+  drawdownPct:          number;   // percent, for 'percentOfBalance'
+}
+
+/**
+ * In net-pay mode there's no tax calculation, so salary sacrifice reduces
+ * take-home pay by the contribution less the 28% the mode already assumes
+ * (gross = net / 0.72, see p1GrossBase).
+ */
+const NET_MODE_KEEP = 0.72;
 
 export interface ProjectionInputs {
   // Income
@@ -102,6 +136,10 @@ export interface ProjectionInputs {
   depositFromInvestments: number; // triggers CGT — approx 12% haircut applied
   newMortgageRate:       number;  // as percent (e.g. 6.0)
   newMortgageTermYrs:    number;
+
+  // Without a life course, the engine runs as before: pay never stops and
+  // super isn't modelled.
+  lifeCourse?:           LifeCourse;
 }
 
 export interface ProjectionResult {
@@ -128,6 +166,22 @@ export interface ProjectionResult {
   person2HelpClearedYr: number | null;
   rentArr:        number[];   // annual rent paid each year (0 for homeowners / post-purchase)
   purchaseYr:     number | null; // year of rent→own transition (null if no purchase plan)
+
+  // ── Life course (zeros / nulls without one) ──
+  /** Super balances at the end of each year. Not in nwArr: super is shown separately. */
+  super1Arr:      number[];
+  super2Arr:      number[];
+  superArr:       number[];
+  /** Taken out of super each year: to live on (included in incArr) and to clear money owed (not). */
+  superDrawArr:   number[];
+  /** True in the years everyone has stopped work. */
+  retiredArr:     boolean[];
+  person1RetireYr: number | null;
+  person2RetireYr: number | null;
+  /** First year, once everyone has retired, that money runs short (money owed grows). */
+  shortfallYr:    number | null;
+  /** First year money runs short while someone has retired but can't yet reach their super (the "bridge" years). */
+  bridgeShortYr:  number | null;
 }
 
 export interface ProjectionOutput {
@@ -224,6 +278,14 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
     // expense inflation stands in for that from the current rate onward.
     let pplIndex       = 1;
 
+    // Life course state
+    const lc       = inputs.lifeCourse;
+    let s1         = lc ? Math.max(0, lc.person1Super) : 0;
+    let s2         = lc && lc.partnerEnabled ? Math.max(0, lc.person2Super) : 0;
+    let retSpend   = lc ? Math.max(0, lc.retirementSpending) : 0;
+    // The 4% rule's yearly amount per person: set in their first pension year, then grown with inflation.
+    const fourPct: [number | null, number | null] = [null, null];
+
     const nwArr:          number[] = [];
     const incArr:         number[] = [];
     const expArr:         number[] = [];
@@ -243,17 +305,33 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
     const sfTotalArr:     number[] = [];
     const leaveYrs:       number[] = [];
     const rentArr:        number[] = [];
+    const super1Arr:      number[] = [];
+    const super2Arr:      number[] = [];
+    const superArr:       number[] = [];
+    const superDrawArr:   number[] = [];
+    const retiredArr:     boolean[] = [];
     let   person1HelpClearedYr: number | null = null;
     let   person2HelpClearedYr: number | null = null;
+    let   shortfallYr:    number | null = null;
+    let   bridgeShortYr:  number | null = null;
     const purchaseYr:     number | null = (rentMode && purchasePlanEnabled) ? targetPurchaseYear : null;
 
     for (let i = 0; i < projYears; i++) {
       const yr          = cy + i + 1;
       const yearInflRate = inflRateForYear(yr);
       expBase  *= (1 + yearInflRate);
+      retSpend *= (1 + yearInflRate);
       if (i > 0) pplIndex *= (1 + yearInflRate);
       const pplGross = (parentalLeaveEnabled ? PPL_TOTAL : 0) * pplIndex;
       if (!isRenting) pVal *= (1 + pG);  // only grow property value when owned
+
+      // ── Who's working ── (ages as reached during this year)
+      const age1       = lc ? lc.person1Age + i + 1 : 0;
+      const age2       = lc ? lc.person2Age + i + 1 : 0;
+      const p1Retired  = !!lc && age1 >= lc.person1RetirementAge;
+      // No partner: person 2 counts as retired (no pay, no super).
+      const p2Retired  = !!lc && (!lc.partnerEnabled || age2 >= lc.person2RetirementAge);
+      const allRetired = p1Retired && p2Retired;
 
       // ── Rent → own transition ──────────────────────────────────────────────
       if (isRenting && purchasePlanEnabled && yr === targetPurchaseYear) {
@@ -276,45 +354,51 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
       // ── Income ──
       const phase        = getPhaseForYear(yr, sorted);
       const p1Phase      = getPhaseForYear(yr, sortedPerson1);
-      const isLeave      = phase.days === 0;
+      const isLeave      = !p2Retired && phase.days === 0;
       const isFirstLeave = isLeave && leaveSt.has(yr);
 
       // HELP balances are indexed on 1 June; expense inflation stands in for CPI.
       p1HELP *= (1 + yearInflRate);
       p2HELP *= (1 + yearInflRate);
 
+      // Salary sacrifice comes out of pre-tax pay. HELP repayment income
+      // still counts it (reportable super contributions), so HELP uses gross.
+      const p1Days      = p1Retired ? 0 : p1Phase.days;
       const p1GrossYr   = p1GrossBase * Math.pow(1 + jG, i + 1);
-      const p1DaysGross = p1GrossYr * (p1Phase.days / 5);
+      const p1DaysGross = p1GrossYr * (p1Days / 5);
+      const p1Sacrifice = lc && p1Days > 0 ? Math.min(Math.max(0, lc.person1ExtraSuper), p1DaysGross) : 0;
       // Compulsory repayment, capped at what's still owed, so the clearing year
       // only deducts the residual.
       const p1Repay     = p1HELP > 0 ? Math.min(p1HELP, calcHELPRepayment(p1DaysGross)) : 0;
       let p1Annual: number;
       if (taxMode) {
-        p1Annual = calcAfterTax(p1DaysGross) - p1Repay;
+        p1Annual = calcAfterTax(p1DaysGross - p1Sacrifice) - p1Repay;
       } else {
         // Simple mode: the entered net pay is taken as already net of HELP.
-        p1Annual = person1MonthlyNet * 12 * Math.pow(1 + jG, i + 1) * (p1Phase.days / 5);
+        p1Annual = person1MonthlyNet * 12 * Math.pow(1 + jG, i + 1) * (p1Days / 5) - p1Sacrifice * NET_MODE_KEEP;
       }
       if (p1Repay > 0) {
         p1HELP = Math.max(0, p1HELP - p1Repay);
         if (p1HELP < 1 && person1HelpClearedYr === null) { p1HELP = 0; person1HelpClearedYr = yr; }
       }
 
+      const p2DaysGross = p2Retired || isLeave ? 0 : p2GrossBase * Math.pow(1 + gG, i + 1) * (phase.days / 5);
+      const p2Sacrifice = lc && p2DaysGross > 0 ? Math.min(Math.max(0, lc.person2ExtraSuper), p2DaysGross) : 0;
       let p2Annual: number;
-      if (isLeave) {
+      if (p2Retired) {
+        p2Annual = 0;
+      } else if (isLeave) {
         // PPL is paid once per birth (the first leave year) and is taxable.
         p2Annual = isFirstLeave ? calcAfterTax(pplGross) : 0;
         leaveYrs.push(yr);
       } else {
-        const p2GrossFTE  = p2GrossBase * Math.pow(1 + gG, i + 1);
-        const p2DaysGross = p2GrossFTE * (phase.days / 5);
         const p2Repay     = p2HELP > 0 ? Math.min(p2HELP, calcHELPRepayment(p2DaysGross)) : 0;
 
         if (taxMode) {
-          p2Annual = calcAfterTax(p2DaysGross) - p2Repay;
+          p2Annual = calcAfterTax(p2DaysGross - p2Sacrifice) - p2Repay;
         } else {
           // Simple mode mirrors Person 1: entered net pay, own growth rate.
-          p2Annual = person2MonthlyNet * 12 * Math.pow(1 + gG, i + 1) * (phase.days / 5);
+          p2Annual = person2MonthlyNet * 12 * Math.pow(1 + gG, i + 1) * (phase.days / 5) - p2Sacrifice * NET_MODE_KEEP;
         }
 
         if (p2Repay > 0) {
@@ -324,6 +408,41 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
       }
       person1Arr.push(Math.round(p1Annual));
       person2Arr.push(Math.round(p2Annual));
+
+      // ── Super ──
+      // Accumulation while working (or retired before preservation age);
+      // pension phase once retired and 60+, when earnings are untaxed and
+      // at least the legal minimum must be paid out.
+      let superDraw = 0;
+      if (lc) {
+        const cap = legislativeCap(yr + 1);   // the financial year starting this July
+        const step = (k: 0 | 1, bal: number, age: number, retired: boolean, sgPay: number, sacrifice: number): number => {
+          if (!(retired && age >= PRESERVATION_AGE)) {
+            return superAccumulationYear(bal, {
+              investmentReturn: lc.superReturn, fundFeePercent: lc.superFeePct,
+              grossContribution: sgPay * lc.sgRate + sacrifice, cap, salary: sgPay,
+            }).balance;
+          }
+          const grown   = superPensionGrowth(bal, lc.superReturn, lc.superFeePct);
+          const minimum = minimumDrawdownRate(age) * bal;
+          let set = minimum;
+          if (lc.drawdown === 'fourPercent') {
+            fourPct[k] = fourPct[k] === null ? 0.04 * bal : fourPct[k]! * (1 + yearInflRate);
+            set = Math.max(minimum, fourPct[k]!);
+          } else if (lc.drawdown === 'percentOfBalance') {
+            set = Math.max(minimum, lc.drawdownPct / 100 * bal);
+          }
+          const paid = Math.min(set, grown);
+          superDraw += paid;
+          return grown - paid;
+        };
+        // Super is paid on Paid Parental Leave from 1 July 2025, at the SG
+        // rate (Paid Parental Leave Amendment (Adding Superannuation for a
+        // More Secure Retirement) Act 2024).
+        const p2SgPay = isLeave ? (isFirstLeave ? pplGross : 0) : p2DaysGross;
+        s1 = step(0, s1, age1, p1Retired, p1DaysGross, p1Sacrifice);
+        if (lc.partnerEnabled) s2 = step(1, s2, age2, p2Retired, p2SgPay, p2Sacrifice);
+      }
 
       // ── School fees ──
       const sf = includeSchoolFees
@@ -343,10 +462,11 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
       // repayments are NOT in here: simulateMortgageYear pays them out of cash
       // at the actual (un-inflated) amount and stops once the loan is cleared,
       // for the current loan and for one started by a purchase plan alike.
-      const nonMortExp  = expBase + sf.total + phaseOverlay + rentAnnual;
+      // Once everyone has retired, everyday spending becomes the retirement goal.
+      const nonMortExp  = (allRetired ? retSpend : expBase) + sf.total + phaseOverlay + rentAnnual;
       const oneoffTotal = oneoffs.filter(o => o.year === yr).reduce((s, o) => s + o.amt, 0);
 
-      const monthlyNetFlow = (annualInc - nonMortExp) / 12;
+      const monthlyNetFlow = (annualInc + superDraw - nonMortExp) / 12;
       const mortResult = simulateMortgageYear(mb, cash, lMortRate, lMortPayment, monthlyNetFlow);
       mb   = mortResult.endBalance;
       cash = mortResult.endCash;
@@ -359,20 +479,46 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
 
       // ── Shortfalls ──
       // Months cash couldn't cover, and one-offs beyond the cash left, come
-      // out of investments first; anything more is carried as money owed.
+      // out of investments first, then (spending what you need) from super
+      // that can be reached; anything more is carried as money owed.
       // (Flooring cash at 0 alone would make a shortfall simply vanish.)
       const fromCash = Math.min(cash, oneoffTotal);
       cash -= fromCash;
       const gap        = mortResult.unfunded + (oneoffTotal - fromCash);
       const fromInvest = Math.min(invest, gap);
       invest -= fromInvest;
-      owed   += gap - fromInvest;
+      let short = gap - fromInvest;
+      // Spending what you need also clears money owed (e.g. from the years
+      // before super could be reached) once super can be reached.
+      let superRepay = 0;
+      if (lc && lc.drawdown === 'need' && short + owed > 0.5) {
+        const r1 = superAccessible(age1, p1Retired) ? s1 : 0;
+        const r2 = lc.partnerEnabled && superAccessible(age2, p2Retired) ? s2 : 0;
+        const take = Math.min(short + owed, r1 + r2);
+        if (take > 0) {
+          s1 -= take * r1 / (r1 + r2);
+          s2 -= take * r2 / (r1 + r2);
+          const toShort = Math.min(short, take);
+          short     -= toShort;
+          superDraw += toShort;
+          superRepay = take - toShort;
+          owed      -= superRepay;
+        }
+      }
+      owed += short;
+      if (short > 0.5 && lc) {
+        const locked = (p1Retired && !superAccessible(age1, true))
+          || (lc.partnerEnabled && p2Retired && !superAccessible(age2, true));
+        if (locked) bridgeShortYr ??= yr;
+        else if (allRetired) shortfallYr ??= yr;
+      }
 
       // ── Invest surplus ── (after repaying anything owed)
       const repaid          = Math.min(owed, cash);
       owed -= repaid;
       cash -= repaid;
-      const surplusThisYear = annualInc - annualExp - oneoffTotal;
+      const moneyIn         = annualInc + superDraw;
+      const surplusThisYear = moneyIn - annualExp - oneoffTotal;
       const invested        = Math.max(0, surplusThisYear - repaid) * sR;
       cash    = Math.max(0, cash - invested);
       invest  = invest * (1 + iR) + invested;
@@ -381,28 +527,28 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
       const nw     = equity + cash + invest + crypto - p1HELP - p2HELP - otherDebts - owed;
 
       phaseArr.push(Math.round(phaseOverlay));
-      deficitArr.push(Math.round(annualInc - annualExp));
+      deficitArr.push(Math.round(moneyIn - annualExp));
       cashRunningArr.push(Math.round(cash));
       owedArr.push(Math.round(owed));
 
       // Mortgage stress: annual repayments / gross household income (standard AU definition)
-      const p1GrossForStress = p1GrossBase * Math.pow(1 + jG, i + 1) * (p1Phase.days / 5);
-      const p2GrossForStress = (() => {
-        if (isLeave) return isFirstLeave ? pplGross : 0;
-        const fte = p2GrossBase * Math.pow(1 + gG, i + 1);
-        return fte * (phase.days / 5);
-      })();
-      const grossHousehold = p1GrossForStress + p2GrossForStress;
+      const p2GrossForStress = isLeave ? (isFirstLeave ? pplGross : 0) : p2DaysGross;
+      const grossHousehold = p1DaysGross + p2GrossForStress;
       // Repayments actually made: 0 while renting and once the loan is cleared.
       const stressPct = grossHousehold > 0 ? mortPaid / grossHousehold * 100 : 0;
       mortStressArr.push(parseFloat(stressPct.toFixed(1)));
 
       nwArr.push(Math.round(nw));
-      incArr.push(Math.round(annualInc));
+      incArr.push(Math.round(moneyIn));
       expArr.push(Math.round(annualExp));
       mortArr.push(Math.round(mb));
       cashArr.push(Math.round(cash));
       investArr.push(Math.round(invest));
+      super1Arr.push(Math.round(s1));
+      super2Arr.push(Math.round(s2));
+      superArr.push(Math.round(s1 + s2));
+      superDrawArr.push(Math.round(superDraw + superRepay));
+      retiredArr.push(allRetired);
     }
 
     return {
@@ -410,6 +556,10 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
       person1Arr, person2Arr, phaseArr, deficitArr, cashRunningArr, owedArr, mortStressArr,
       sfC1Arr, sfC2Arr, sfSibArr, sfTotalArr, leaveYrs, person1HelpClearedYr, person2HelpClearedYr,
       rentArr, purchaseYr,
+      super1Arr, super2Arr, superArr, superDrawArr, retiredArr,
+      person1RetireYr: lc ? cy + lc.person1RetirementAge - lc.person1Age : null,
+      person2RetireYr: lc && lc.partnerEnabled ? cy + lc.person2RetirementAge - lc.person2Age : null,
+      shortfallYr, bridgeShortYr,
     };
   }
 

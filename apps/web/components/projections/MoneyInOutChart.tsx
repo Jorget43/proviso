@@ -23,16 +23,19 @@ interface Props {
   sfTotalData:  number[]
   phaseData:    number[]
   cashData:     number[]
+  /** Taken out of super to live on, stacked on the pay bars (retirement). */
+  superData?:   number[]
 }
 
 const signed = (v: number) => (v > 0 ? '+' : '') + fmtK(v)
 
 export default function MoneyInOutChart({
-  labels, person1Data, person2Data, person1Name, person2Name, showPerson2, leaveYrs, spendData, sfTotalData, phaseData, cashData,
+  labels, person1Data, person2Data, person1Name, person2Name, showPerson2, leaveYrs, spendData, sfTotalData, phaseData, cashData, superData,
 }: Props) {
   const c = useChartColors()
   const leave = new Set(leaveYrs)
-  const income = person1Data.map((v, i) => v + (showPerson2 ? person2Data[i] ?? 0 : 0))
+  const fromSuper = superData?.some(v => v > 0) ? superData : null
+  const income = person1Data.map((v, i) => v + (showPerson2 ? person2Data[i] ?? 0 : 0) + (fromSuper?.[i] ?? 0))
   const gap = income.map((v, i) => v - (spendData[i] ?? 0))
   // Readout-only series: listed with the year's values, not drawn.
   // On their own hidden scale, so they don't stretch the chart.
@@ -44,6 +47,7 @@ export default function MoneyInOutChart({
     { type: 'bar' as const, label: person1Name, data: person1Data, backgroundColor: c.a(c.blue, 0.7), stack: 'in', borderRadius: 3, order: 2 },
     ...(showPerson2 ? [{ type: 'bar' as const, label: person2Name, data: person2Data, stack: 'in', borderRadius: 3, order: 2,
       backgroundColor: labels.map(y => (leave.has(Number(y)) ? c.a(c.pink, 0.7) : c.a(c.green, 0.7))) }] : []),
+    ...(fromSuper ? [{ type: 'bar' as const, label: 'From super', data: fromSuper, backgroundColor: c.a(c.teal, 0.7), stack: 'in', borderRadius: 3, order: 2 }] : []),
     { ...readOnly, label: 'Left over (or short)', data: gap, borderColor: c.t2, format: signed },
     { ...readOnly, label: 'Of the spending: school fees', data: sfTotalData, borderColor: c.amber },
     { ...readOnly, label: 'Of the spending: life stages', data: phaseData, borderColor: c.teal },
@@ -63,7 +67,7 @@ export default function MoneyInOutChart({
         }} />
       </ScrubChart>
       <p className="proj-note mt1">
-        Bars: take-home pay{showPerson2 && leaveYrs.length ? ' (pink: parental leave)' : ''}. Line: everything that goes out, home loan repayments included; red dots mark years you&rsquo;d be short.
+        Bars: take-home pay{fromSuper ? ', then money taken from super in retirement' : ''}{showPerson2 && leaveYrs.length ? ' (pink: parental leave)' : ''}. Line: everything that goes out, home loan repayments included; red dots mark years you&rsquo;d be short.
       </p>
     </>
   )

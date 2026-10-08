@@ -560,6 +560,7 @@ input[type=range] { width: 100%; accent-color: var(--t3); }
 .red-t   { accent-color: var(--red)   !important; }
 .amber-t { accent-color: var(--amber) !important; }
 .purple-t{ accent-color: var(--purple)!important; }
+.teal-t  { accent-color: var(--teal)  !important; }
 .pink-t  { accent-color: var(--pink)  !important; }
 
 /* ── Person2 timeline table ── */
@@ -1132,6 +1133,12 @@ input[type=range] { width: 100%; accent-color: var(--t3); }
 .super-toggle input { width: 18px; height: 18px; }
 .super-toggle-text { display: flex; flex-direction: column; line-height: 1.35; }
 .super-toggle-text small { color: var(--t3); font-size: 0.8rem; }
+/* Retirement view: how retirement is paid for */
+.drawdown-choice { border: 0; padding: 0; margin: 1rem 0 0; min-width: 0; }
+.drawdown-choice legend { font-weight: 600; font-size: 0.95rem; color: var(--t1); margin-bottom: 0.5rem; padding: 0; }
+.drawdown-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 6px; margin-bottom: 0.4rem; }
+.drawdown-option { min-height: 44px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface2); color: var(--t2); font-size: 0.9rem; cursor: pointer; }
+.drawdown-option.active { background: var(--blue); color: var(--on-accent); border-color: var(--blue); }
 .proj-lede-sub { font-size: 0.95rem; color: var(--t2); margin-top: 6px; line-height: 1.45; }
 .explorer { scroll-margin-top: 64px; }
 .explorer-tabs {

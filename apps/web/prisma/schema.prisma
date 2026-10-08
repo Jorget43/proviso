@@ -105,6 +105,7 @@ model ProjectionSettings {
   sfInfl               Float   @default(5.0)
   sfPresetKey          String? // e.g. "vic|independent"; null = custom schedule
   parentalLeaveEnabled Boolean @default(true)
+  horizonAge           Int     @default(95) // project until the younger adult reaches this age; projYears no longer read
 }
 
 model LifePhase {
@@ -214,6 +215,9 @@ model SuperSettings {
   currentAge                Int     @default(30)
   salaryExcSuper            Float   @default(0)
   salaryGrowthRate          Float   @default(0.04)
+  // How retirement is paid for (@proviso/core/retirement DrawdownStrategy)
+  drawdownStrategy          String  @default("need")
+  drawdownPct               Float   @default(5)
 }
 
 model SuperHistory {

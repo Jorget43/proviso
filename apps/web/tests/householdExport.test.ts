@@ -42,7 +42,8 @@ function legacy(): LegacyHousehold {
     ],
     superSettings: { id: 1, currentBalance: 90000, retirementAge: 67, additionalContribs: 0, sgRate: 0.12, investmentReturn: 0.06,
       fundFeePercent: 0.005, inflationRate: 0.04, desiredRetirementIncome: 60000, partnerEnabled: true, partnerBalance: 70000,
-      partnerRetirementAge: 65, partnerAdditionalContribs: 1000, currentAge: 30, salaryExcSuper: 0, salaryGrowthRate: 0.04 },
+      partnerRetirementAge: 65, partnerAdditionalContribs: 1000, currentAge: 30, salaryExcSuper: 0, salaryGrowthRate: 0.04,
+      drawdownStrategy: 'fourPercent', drawdownPct: 5 },
     superHistory: [
       { id: 1, member: 'sam', financialYearEnding: 2025, concessionalCap: 30000, concessionalUtilised: 12000, totalSuperBalance: 65000, createdAt: at, updatedAt: at },
       // An old name that no longer matches anyone, and collides with Alex's 2025 row once it falls back to p1.
@@ -131,7 +132,7 @@ describe('mapLegacyHousehold', () => {
 
   it('renames super fields and drops the unused ones', () => {
     const s = exportOf().household.superSettings[0]
-    expect(s).toMatchObject({ person1Balance: 90000, person2Balance: 70000, person2RetirementAge: 65, person2AdditionalContribs: 1000 })
+    expect(s).toMatchObject({ person1Balance: 90000, person2Balance: 70000, person2RetirementAge: 65, person2AdditionalContribs: 1000, drawdownStrategy: 'fourPercent', drawdownPct: 5 })
     expect(s).not.toHaveProperty('currentAge')
     expect(s).not.toHaveProperty('partnerEnabled')
   })

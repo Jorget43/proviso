@@ -72,6 +72,7 @@ export default async function ProjectionsPage() {
         desiredRetirementIncome: sup?.desiredRetirementIncome ?? 0,
         person1Balance: sup?.currentBalance ?? 0, person1RetirementAge: sup?.retirementAge ?? 67, person1AdditionalContribs: sup?.additionalContribs ?? 0,
         person2Balance: sup?.partnerBalance ?? 0, person2RetirementAge: sup?.partnerRetirementAge ?? 67, person2AdditionalContribs: sup?.partnerAdditionalContribs ?? 0,
+        drawdownStrategy: sup?.drawdownStrategy ?? 'need', drawdownPct: sup?.drawdownPct ?? 5,
       }}
     />
   )

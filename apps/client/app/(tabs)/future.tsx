@@ -99,10 +99,13 @@ export default function Future() {
           ))}
           <T tone={v.retirement.runsOutAt === null ? 'green' : 'amber'}>
             {v.retirement.runsOutAt === null
-              ? `Enough for ${fmt(v.retirement.goalMonthly)} a month in retirement, past age 100.`
-              : `${fmt(v.retirement.goalMonthly)} a month in retirement would run super out around age ${v.retirement.runsOutAt}.`}
+              ? `Enough for ${fmt(v.retirement.goalMonthly)} a month in retirement, to age ${v.retirement.lastAge}.`
+              : `${fmt(v.retirement.goalMonthly)} a month in retirement would run your money out around age ${v.retirement.runsOutAt}.`}
           </T>
-          <T size="small" tone="t2">In today’s money. Doesn’t count the Age Pension or savings outside super.</T>
+          {v.retirement.bridgeShortYear !== null && (
+            <T tone="amber">Savings outside super run out in {v.retirement.bridgeShortYear}, before super can be reached at 60.</T>
+          )}
+          <T size="small" tone="t2">In today’s money. Counts super and your savings outside it; doesn’t count the Age Pension.</T>
         </Card>
       </View>
 

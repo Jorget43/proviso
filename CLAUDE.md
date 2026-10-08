@@ -386,6 +386,7 @@ The assumptions watchdog (`/admin/watchdog` for the CFO when `WATCHDOG_ENABLED=t
 - **1 Jul 2027**: the 15% income tax rate becomes 14% (legislated) — `packages/core/src/tax.ts`.
 - **Medicare levy low-income thresholds for FY2026-27** weren't announced at the time of Phase 20; the FY2025-26 figures are in use. Update when legislated (often retrospectively).
 - Annual indexation: HELP thresholds (1 Jul) and HELP CPI (1 Jun — the most time-sensitive), CCS thresholds and caps (first Monday of July), PPL (minimum wage, 1 Jul), concessional cap (AWOTE steps).
+- Retirement rules (`packages/core/src/retirement.ts`): minimum pension drawdown rates, preservation age (60 for everyone born after 30 June 1964), and the 65 unrestricted-access age. These rarely change, but check them.
 
 ### Known model simplifications (by design, not bugs)
 - Projections apply today's tax rates and thresholds to every future year (no bracket indexation), so far-out years overstate tax slightly.
@@ -396,6 +397,15 @@ The assumptions watchdog (`/admin/watchdog` for the CFO when `WATCHDOG_ENABLED=t
 - The projection's school-fee model covers the two eldest children; a third child's school costs stay in the spending base as an ordinary, inflating line.
 - One-off costs aren't inflated: the amount is what's paid in that year.
 - `marginalRate()` ignores the LITO taper and the Medicare shade-in band (headline rate only — used for guidance figures).
+- Life course (Phase 40):
+  - No Age Pension yet.
+  - Investments outside super grow untaxed.
+  - Super withdrawals are tax-free (true at 60+).
+  - Ages are whole years from `incomeSettings` and go stale each year until Phase 41's birth years.
+  - The minimum drawdown uses the start-of-year balance.
+  - Spending switches to the retirement goal only once everyone has retired.
+  - Retirement before 60 leaves super in accumulation (taxed at 15%) until 60.
+  - Excess minimum drawdowns pile up in cash, like any surplus (step C's cash-buffer rule will fix that).
 
 ### Security hardening still open
 Tracked in [`docs/security-privacy-legal.md`](docs/security-privacy-legal.md) § Cybersecurity. Phase 21 closed headers/CSP, HSTS, the audit log, session lifetime and automated dependency updates. Left:
@@ -417,7 +427,11 @@ In [`docs/architecture.md`](docs/architecture.md) order. Phase 3 there (the sing
 1. **⏰ Remind the owner first — phone test still to do** (deferred 2026-10-08, "soon"). **The Android development build with Phases 34–35** (sync, camera, key backup): it built successfully on EAS on 2026-10-08 (so the key-backup Kotlin module and expo-camera compile); `npm run eas -w @proviso/client -- build:list --limit 1` shows the APK link. Install it and check on the phone: Settings → Recovery phrase → Save to Google Password Manager; Settings → Sync; Join a household (camera scan).
 2. **Run the relay on the NAS** with the owner: `docker compose --profile sync up -d` (image `ghcr.io/jorget43/proviso-relay`, published by CI from master since 2026-10-08), then `tailscale serve --bg --https=8443 http://localhost:8787` (README "Sync relay for the app"). Turn sync on in the app with the `https://<machine>.<tailnet>.ts.net:8443` address, then join from a second phone. Phones need Tailscale running to reach it.
 3. **Owner decisions pending**: the home-purchase deposit gap (below). (The NAS "Next 2 years" change in Phase 36 — rent and after-subsidy childcare now counted — was pushed with the owner's go-ahead on 2026-10-08.)
-4. **Then: step B of [`docs/plan-modelling-and-ux.md`](docs/plan-modelling-and-ux.md)** — people's ages and a `child` table, then the life-course engine (retirement stops pay, super inside the projection, drawdown strategies, horizon to age 95 adjustable). Step A (dark mode, editing, chart trim) shipped as Phases 37–39. Also open: the relay enforcing roles, the iOS build once the Apple account is ready.
+4. **Step B of [`docs/plan-modelling-and-ux.md`](docs/plan-modelling-and-ux.md)**:
+   - The life-course engine is Phase 40, on branch `phase-40-life-course`. It changes NAS numbers, so the owner must OK it before merge.
+   - Next is Phase 41: birth years (so ages don't go stale each year) and a `child` table.
+   - Step A (dark mode, editing, chart trim) shipped as Phases 37–39.
+   - Also open: the relay enforcing roles, and the iOS build once the Apple account is ready.
 
 The full list:
 - **First development build with EAS** (Expo's build service): configured (see "EAS" above); Android built 2026-10-08, not yet checked on the phone. iOS needs the Apple Developer account (A$149 a year).
@@ -501,6 +515,40 @@ The full list:
 - **School fees decided**: the questionnaire's school-cost lines stay in today's budget; the projection models the two eldest children's fees year by year (ending after Year 12) and leaves those lines out (`isModelledSchoolLine`), so nothing is counted twice. The questionnaire switches `schoolFeesOn` on when there are children.
 - Typed routes are off in `apps/client` (the generated file only existed where a dev server ran, never in CI, and misread the monorepo).
 - Verified: 356 tests; the app at 390px (a Melbourne family of four: $2.32M in today's money in 20 years, HELP cleared 2028, school fees end 2039, loan paid off 2042; a $45k car in 2029 gives $2.28M); the NAS Projections and Super pages rendered against a scratch household. The NAS Super "consider a lower target" hint was fixed on the way (it would have subtracted the mortgage twice and suggested $0).
+
+### Phase 40 — Plan step B, part 1: the life-course engine (2026-10-09)
+
+Owner's decisions (2026-10-09): spending switches to the retirement goal once everyone has retired; extra super contributions are salary sacrifice (out of pre-tax pay); "spend what you need" is the default drawdown; the engine comes before birth years and the `child` table (Phase 41).
+
+- **Engine** (`packages/core/src/projections.ts`): an optional `lifeCourse` input. Without it every pinned figure is unchanged.
+  - Pay stops in the year each person reaches their retirement age (`superSettings.person*RetirementAge`; ages from `incomeSettings`). A household without a partner ignores person 2's pay.
+  - Super is stepped inside the yearly loop with **`superAccumulationYear`**, shared with the Super page's engine (`super.ts`), so there's one formula. SG is paid on actual pay (part-time and leave included) and on Paid Parental Leave (from 1 July 2025). Salary sacrifice reduces taxable pay, but HELP still counts it. Pension phase begins once retired and 60+: earnings untaxed, at least the legal minimum paid out.
+  - **Drawdown** (`retirement.ts` `DrawdownStrategy`):
+    - `need`: cash → investments → reachable super → money owed. Once super can be reached, it also clears money owed from the bridge years.
+    - `fourPercent`, `percentOfBalance`, `minimum`: super pays only its set amount, and any gap becomes money owed.
+  - New outputs: `super1Arr`/`super2Arr`/`superArr`, `superDrawArr`, `retiredArr`, `person*RetireYr`, `shortfallYr` (money runs short once everyone has retired) and `bridgeShortYr` (runs short while someone's super is still locked). `nwArr` still leaves super out; `incArr` includes what's taken from super to live on.
+  - `retirement.ts`: preservation age 60, unrestricted at 65, ATO minimum drawdown rates, `yearsToAge`, `asDrawdownStrategy` (unknown values from newer devices fall back to `need`).
+- **Data**:
+  - Drizzle migration `0001_life_course` (`SCHEMA_VERSION` 2) and Prisma `0006_life_course` add `projectionSettings.horizonAge` (95), `superSettings.drawdownStrategy` ('need', plain text) and `superSettings.drawdownPct` (5).
+  - `projYears` is no longer read: `buildProjectionInputs` takes `life` (partner, ages, super settings) and runs until the younger adult reaches `horizonAge`.
+  - Retirement spending is the saved goal (`retirementIncomeGoal`) less today's rent; the engine models rent itself.
+  - Older export files still import, because missing columns take their defaults.
+- **NAS Future**:
+  - The Retirement view is `RetirementChart` (super by person, savings outside super, what super pays each year), drawn from the same projection, with the strategy chooser under it. `runHouseholdProjection` is no longer used on Future.
+  - What if? gains "Look ahead until … is" (an age, 70–105) and "Stops work at age" per person.
+  - Money in & out stacks "From super" bars. Tight years are counted only while someone still works ("From 2043 you live on super and savings").
+  - The Super page keeps its own super-only chart and links to Future → Retirement.
+- **App Future**: the same projection; retirement shows super at retirement from it, "runs your money out around age N" or "to age N", and the bridge warning. Assumptions and What if? swap "Years ahead" for "Look ahead until age".
+- **NAS numbers change (deliberate, owner to OK before merge)**:
+  - Charts run to 95.
+  - Pay stops at retirement age.
+  - Extra super contributions lower take-home pay.
+  - Super is paid on PPL.
+  - Spending follows the retirement goal once both have retired.
+  - A partner-less household no longer counts a stale person 2 salary.
+- **Verified:**
+  - 443 tests in total. Core gained 18 life-course tests with hand-worked figures: salary sacrifice, SG, SG on PPL, the spending switch, need drawdown to running out, the bridge years, the 4% rule, % of balance and minimum only.
+  - Headless Edge against a scratch NAS (port 3110), with a couple aged 45 and 43 retiring at 58 and 60: Retirement, Net worth and Money in & out at 1280px and 390px.
 
 ### Phases 37–39 — Plan step A: dark mode, clearer editing, fewer Future charts (2026-10-08)
 

@@ -22,7 +22,7 @@
 import { sqliteTable, text, integer, real } from 'drizzle-orm/sqlite-core'
 
 /** Bumped by every migration. Travels with each sync message and export. */
-export const SCHEMA_VERSION = 1
+export const SCHEMA_VERSION = 2
 
 export type PersonKey = 'p1' | 'p2'
 export const PERSON_KEYS: readonly PersonKey[] = ['p1', 'p2']
@@ -147,6 +147,9 @@ export const projectionSettings = sqliteTable('projectionSettings', {
   sfInfl:               real('sfInfl').notNull().default(5.0),
   sfPresetKey:          text('sfPresetKey'),  // e.g. "vic|independent"; null = custom schedule
   parentalLeaveEnabled: bool('parentalLeaveEnabled').notNull().default(true),
+  // v2: the projection runs until the younger adult reaches this age
+  // (retirement.ts yearsToAge). projYears is no longer read.
+  horizonAge:           integer('horizonAge').notNull().default(95),
 })
 
 export const lifePhase = sqliteTable('lifePhase', {
@@ -235,6 +238,10 @@ export const superSettings = sqliteTable('superSettings', {
   fundFeePercent:            real('fundFeePercent').notNull().default(0.005),
   inflationRate:             real('inflationRate').notNull().default(0.04),
   desiredRetirementIncome:   real('desiredRetirementIncome').notNull().default(60000),
+  // v2: how retirement is paid for (retirement.ts DrawdownStrategy). Plain
+  // text so a value from a newer device is kept; asDrawdownStrategy reads it.
+  drawdownStrategy:          text('drawdownStrategy').notNull().default('need'),
+  drawdownPct:               real('drawdownPct').notNull().default(5),   // percent, for 'percentOfBalance'
 })
 
 /** id = contentId('superHistory', person, financialYearEnding). */

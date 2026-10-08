@@ -31,7 +31,7 @@ export default function AssumptionsSheet() {
 
   const [f, setF] = useState({
     p1: String(s.person1Growth), p2: String(s.person2Growth), infl: String(s.expInfl), ret: String(s.investReturn),
-    save: String(s.savingsRate), prop: String(s.propGrowth), years: String(s.projYears), monthly: String(Math.round(goal / 12)),
+    save: String(s.savingsRate), prop: String(s.propGrowth), age: String(s.horizonAge), monthly: String(Math.round(goal / 12)),
     fees: s.schoolFeesOn,
   })
   const [error, setError] = useState<string | null>(null)
@@ -42,12 +42,12 @@ export default function AssumptionsSheet() {
     const n = (v: string) => parseAmount(v)
     const pct = [n(f.p1), n(f.p2), n(f.infl), n(f.ret), n(f.save), n(f.prop)]
     if (pct.some(x => !Number.isFinite(x) || x < -5 || x > 100)) { setError('Check the percentages.'); return }
-    const years = n(f.years)
-    if (!Number.isInteger(years) || years < 5 || years > 50) { setError('Years ahead: between 5 and 50.'); return }
+    const age = n(f.age)
+    if (!Number.isInteger(age) || age < 70 || age > 105) { setError('Look ahead to an age between 70 and 105.'); return }
     if (!(n(f.monthly) >= 0)) { setError('Check the retirement income.'); return }
     await change(db => saveAssumptions(db, {
       person1Growth: pct[0], person2Growth: pct[1], expInfl: pct[2], investReturn: pct[3], savingsRate: pct[4], propGrowth: pct[5],
-      projYears: years, schoolFeesOn: f.fees,
+      horizonAge: age, schoolFeesOn: f.fees,
     }, Math.round(n(f.monthly) * 12)))
     router.back()
   }
@@ -75,8 +75,8 @@ export default function AssumptionsSheet() {
       <Field label="Home values grow">
         <NumberField unit="%" label="Home values grow, percent a year" value={f.prop} onChange={set('prop')} />
       </Field>
-      <Field label="Years ahead">
-        <NumberField unit="years" label="Years ahead" value={f.years} onChange={set('years')} />
+      <Field label="Look ahead until age" hint={h.settings.partnerEnabled ? 'The age the younger of you reaches by the last year shown.' : 'Your age in the last year shown.'}>
+        <NumberField label="Look ahead until age" value={f.age} onChange={set('age')} />
       </Field>
       <Field label="Income you’d like in retirement" hint="A month, in today’s money, for the household. It starts as what you spend now, less the home loan and the children’s costs.">
         <NumberField label="Retirement income a month" value={f.monthly} onChange={set('monthly')} />

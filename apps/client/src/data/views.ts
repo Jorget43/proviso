@@ -5,8 +5,7 @@
 import { computeHomeOverview, type HomeOverview } from '@proviso/core/overview'
 import { computeBudgetSummary, isManagedChildcare } from '@proviso/core/budgetSummary'
 import { workDaysForYear, runProjections } from '@proviso/core/projections'
-import { projectionBaseline, buildProjectionInputs, feeScheduleFor, superInputsFor } from '@proviso/core/future'
-import { runHouseholdProjection } from '@proviso/core/super'
+import { projectionBaseline, buildProjectionInputs, feeScheduleFor, retirementIncomeGoal } from '@proviso/core/future'
 import { situationFrom, situationLabels } from '@proviso/core/situation'
 import { toMonthly, possessive } from '@proviso/core/formatting'
 import { netPositionOf, computeCashOnHand, isHomeEquity } from '@proviso/core/netWorth'
@@ -218,8 +217,12 @@ export interface FutureView {
     people: { name: string; age: number; year: number; balanceToday: number }[]
     /** Monthly income the goal asks for, today's dollars. */
     goalMonthly:  number
-    /** Age (person 1) when combined super runs out; null = lasts past 100. */
+    /** Age (person 1) when money runs short in retirement; null = lasts to lastAge. */
     runsOutAt:    number | null
+    /** Person 1's age in the projection's last year. */
+    lastAge:      number
+    /** Year savings outside super run out before super can be reached (retiring before 60); null = they don't. */
+    bridgeShortYear: number | null
   }
   assumptions: { salaryGrowth: number; inflation: number; investReturn: number; savingsRate: number; propGrowth: number }
 }
@@ -243,6 +246,7 @@ export function futureView(h: HouseholdData, now: Date): FutureView {
     sfSchedule: feeScheduleFor(s.sfPresetKey, h.schoolFeeLevels),
     rent: h.rent, mortgage: { rate: h.mortgage?.rate ?? 0, payment: h.mortgage?.payment ?? 0 },
     currentYear: year,
+    life: { partnerEnabled: h.settings.partnerEnabled, person1Age: h.income.person1Age, person2Age: h.income.person2Age, super: h.superSettings },
   }))
   const run = out.withFees ?? out.base
   const end = run.nwArr[run.nwArr.length - 1] ?? baseline.netWorthToday
@@ -260,11 +264,16 @@ export function futureView(h: HouseholdData, now: Date): FutureView {
   }
   milestones.sort((a, b) => a.year - b.year)
 
-  const sup = superInputsFor(h.superSettings, h.settings.partnerEnabled, baseline.retirementMonthly, h.income, s)
-  const r = runHouseholdProjection(sup.inputs, { ...sup.ctx, startYear: year })
+  // Super at each person's retirement, from the same projection, in today's money.
+  const superAtRetirement = (balances: number[], today: number, retireYear: number) => {
+    const i = retireYear - year - 1
+    if (i < 0) return today
+    const at = Math.min(i, balances.length - 1)
+    return balances[at] / Math.pow(1 + s.expInfl / 100, at + 1)
+  }
   const people = [
-    { name: h.settings.person1Name, age: h.superSettings.person1RetirementAge, from: h.income.person1Age, res: r.person1 },
-    ...(h.settings.partnerEnabled && r.person2 ? [{ name: h.settings.person2Name, age: h.superSettings.person2RetirementAge, from: h.income.person2Age, res: r.person2 }] : []),
+    { name: h.settings.person1Name, age: h.superSettings.person1RetirementAge, from: h.income.person1Age, balances: run.super1Arr, today: h.superSettings.person1Balance },
+    ...(h.settings.partnerEnabled ? [{ name: h.settings.person2Name, age: h.superSettings.person2RetirementAge, from: h.income.person2Age, balances: run.super2Arr, today: h.superSettings.person2Balance }] : []),
   ]
 
   return {
@@ -278,9 +287,14 @@ export function futureView(h: HouseholdData, now: Date): FutureView {
     milestones,
     schoolFees: { on: s.schoolFeesOn, total: s.schoolFeesOn ? run.sfTotalArr.reduce((t, v) => t + v, 0) : 0 },
     retirement: {
-      people: people.map(x => ({ name: x.name, age: x.age, year: year + (x.age - x.from), balanceToday: x.res.retirementBalancePV })),
-      goalMonthly: r.monthlyIncomeGoal,
-      runsOutAt: r.combinedDepletionAge,
+      people: people.map(x => {
+        const retireYear = year + (x.age - x.from)
+        return { name: x.name, age: x.age, year: retireYear, balanceToday: superAtRetirement(x.balances, x.today, retireYear) }
+      }),
+      goalMonthly: retirementIncomeGoal(h.superSettings.desiredRetirementIncome, baseline.retirementMonthly) / 12,
+      runsOutAt: run.shortfallYr ? h.income.person1Age + (run.shortfallYr - year) : null,
+      lastAge: h.income.person1Age + run.nwArr.length,
+      bridgeShortYear: run.bridgeShortYr,
     },
     assumptions: { salaryGrowth: s.person1Growth, inflation: s.expInfl, investReturn: s.investReturn, savingsRate: s.savingsRate, propGrowth: s.propGrowth },
   }

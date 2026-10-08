@@ -74,8 +74,8 @@ export default function WhatIfSheet() {
           <NetWorthBars labels={tried.labels} values={tried.netWorth} height={48} />
           <T size="small" tone={tried.retirement.runsOutAt === null ? 't2' : 'amber'}>
             {tried.retirement.runsOutAt === null
-              ? `Retirement: ${fmt(tried.retirement.goalMonthly)} a month lasts past 100.`
-              : `Retirement: ${fmt(tried.retirement.goalMonthly)} a month runs super out around age ${tried.retirement.runsOutAt}.`}
+              ? `Retirement: ${fmt(tried.retirement.goalMonthly)} a month lasts to age ${tried.retirement.lastAge}.`
+              : `Retirement: ${fmt(tried.retirement.goalMonthly)} a month runs your money out around age ${tried.retirement.runsOutAt}.`}
             {tried.borrowing ? ` Savings run out in ${tried.borrowing.from}.` : ''}
           </T>
         </View>
@@ -87,7 +87,7 @@ export default function WhatIfSheet() {
 
         {group === 'basics' && (
           <Card>
-            <Stepper label="Years to look ahead" min={5} max={40} step={1} value={s.projYears} onChange={v => setProj({ projYears: v })} format={v => `${v} yrs`} />
+            <Stepper label="Look ahead until age" min={70} max={105} step={1} value={s.horizonAge} onChange={v => setProj({ horizonAge: v })} format={v => String(v)} />
             <Stepper label={`${possessive(h.settings.person1Name)} pay rise each year`} min={0} max={15} step={0.5} value={s.person1Growth} onChange={v => setProj({ person1Growth: v })} format={pct} />
             {h.settings.partnerEnabled && (
               <Stepper label={`${possessive(h.settings.person2Name)} pay rise each year`} min={0} max={15} step={0.5} value={s.person2Growth} onChange={v => setProj({ person2Growth: v })} format={pct} />

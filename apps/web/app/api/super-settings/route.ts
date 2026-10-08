@@ -19,6 +19,8 @@ const DB_DEFAULTS = {
   partnerBalance:            0,
   partnerRetirementAge:      67,
   partnerAdditionalContribs: 0,
+  drawdownStrategy:          'need',
+  drawdownPct:               5,
   // Orphaned — kept for DB compat
   currentAge:                30,
   salaryExcSuper:            0,
@@ -51,6 +53,8 @@ export const PUT = withErrors(async (req: NextRequest) => {
     partnerBalance:            body.person2Balance,
     partnerRetirementAge:      body.person2RetirementAge,
     partnerAdditionalContribs: body.person2AdditionalContribs,
+    drawdownStrategy:          body.drawdownStrategy,
+    drawdownPct:               body.drawdownPct,
   }
   const s = await prisma.superSettings.upsert({
     where:  { id: 1 },

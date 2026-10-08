@@ -79,6 +79,7 @@ export const projectionSettingsSchema = z
     sfInfl:               num,
     sfPresetKey:          z.string().nullable(),
     parentalLeaveEnabled: z.boolean(),
+    horizonAge:           int.min(50).max(110),
   })
   .partial()
 
@@ -294,6 +295,8 @@ export const superSettingsSchema = z.object({
   person2Balance:            money,
   person2RetirementAge:      z.number().int().min(18).max(100),
   person2AdditionalContribs: money,
+  drawdownStrategy:          z.enum(['need', 'fourPercent', 'percentOfBalance', 'minimum']),
+  drawdownPct:               z.number().min(0).max(30),
 }).partial()
 
 export const schoolFeeLevelSchema = z.object({

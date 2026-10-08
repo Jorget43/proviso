@@ -1,6 +1,12 @@
 # Plan: modelling depth, scenarios and UX (proposed 2026-10-08)
 
-**Status: agreed 2026-10-08. Step A done (Phases 37–39, see CLAUDE.md); next: step B (the life-course engine).**
+**Status: agreed 2026-10-08. Step A done (Phases 37–39, see CLAUDE.md). Step B: the life-course engine is Phase 40 (2026-10-09); birth years and the `child` table are next (Phase 41).**
+
+**Owner's decisions for step B (2026-10-09):**
+- Spending becomes the retirement goal once everyone has retired.
+- Extra super contributions are salary sacrifice.
+- "Spend what you need" is the default drawdown.
+- The engine comes before the schema work.
 
 **Owner's decisions (2026-10-08):**
 1. Engine changes show on the NAS charts first; new screens app-first (item 12).

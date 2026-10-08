@@ -237,7 +237,8 @@ export function mapLegacyHousehold(
       person1Balance: s.currentBalance, person1RetirementAge: s.retirementAge, person1AdditionalContribs: s.additionalContribs,
       person2Balance: s.partnerBalance, person2RetirementAge: s.partnerRetirementAge, person2AdditionalContribs: s.partnerAdditionalContribs,
       sgRate: s.sgRate, investmentReturn: s.investmentReturn, fundFeePercent: s.fundFeePercent,
-      inflationRate: s.inflationRate, desiredRetirementIncome: s.desiredRetirementIncome })
+      inflationRate: s.inflationRate, desiredRetirementIncome: s.desiredRetirementIncome,
+      drawdownStrategy: s.drawdownStrategy, drawdownPct: s.drawdownPct })
   }
   t.superHistory.push(...newest(L.superHistory.map(h => {
     const p = person(h.member, 'super history')

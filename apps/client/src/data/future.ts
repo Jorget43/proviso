@@ -11,7 +11,7 @@ export interface Assumptions {
   investReturn:  number
   savingsRate:   number
   propGrowth:    number
-  projYears:     number
+  horizonAge:    number   // look ahead until the younger adult is this age
   schoolFeesOn:  boolean
 }
 
