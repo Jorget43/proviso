@@ -473,6 +473,14 @@ The full list:
 | Backup / move data | Download all your data | Encrypted backup, import NAS export | |
 | Sync between devices | — | ✓ (relay) | The relay isn't running on the NAS yet |
 
+### Ideas to explore (not planned)
+Ideas that have been evaluated but aren't on the roadmap. Each links to its write-up in `docs/ideas/`. Promote one into a plan only when the owner decides to; until then, don't build towards it.
+- **Local LLM assistant** (2026-10-09): [`docs/ideas/local-llm-assistant.md`](docs/ideas/local-llm-assistant.md).
+  - Fully local, never edits stored data.
+  - Two jobs: better categorising of Actual spending, and plain-language "what if" scenarios translated into checked, engine-calculated drafts.
+  - Verdict: feasible, but best after saved scenarios (plan item 2).
+  - Categorising v2 without an LLM is worth doing regardless.
+
 ### Deferred (revisit only if needed)
 - `Transaction` `@@index([ym])` — premature at household scale (see Phase 15).
 - **Phase 3 — CDR bank feeds**: researched, not built; CSV import stays the core. See [`docs/phase3-cdr-research.md`](docs/phase3-cdr-research.md).

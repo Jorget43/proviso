@@ -54,6 +54,7 @@ Every `!` line needs fixing or an explanation for the owner. The script covers g
   - A feature built in only one product gets "—" for the other and a note on why or when.
 - **Known model simplifications**: every new shortcut in the maths.
 - **Every July**: every new government figure, with where it lives.
+- **Ideas to explore (not planned)**: an idea the owner wants kept but not planned gets a write-up in `docs/ideas/` and a line here.
 
 ## 4. Public and planning docs
 
