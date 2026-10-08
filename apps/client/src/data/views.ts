@@ -13,6 +13,7 @@ import { netPositionOf, computeCashOnHand, isHomeEquity } from '@proviso/core/ne
 import { findHelpDebt } from '@proviso/core/members'
 import { calcHELPRepayment } from '@proviso/core/tax'
 import { CATS, CAT_COLORS } from '@proviso/core/constants'
+import { computeCashflow, type Cashflow } from '@proviso/core/cashflow'
 import type { HouseholdRow } from '@proviso/core/schema'
 import type { HouseholdData } from './household'
 
@@ -283,4 +284,26 @@ export function futureView(h: HouseholdData, now: Date): FutureView {
     },
     assumptions: { salaryGrowth: s.person1Growth, inflation: s.expInfl, investReturn: s.investReturn, savingsRate: s.savingsRate, propGrowth: s.propGrowth },
   }
+}
+
+export interface CashflowView extends Cashflow {
+  person1Name: string
+  person2Name: string
+}
+
+/** The next two years month by month (Future → Next 2 years), the same as the NAS's page. */
+export function cashflowView(h: HouseholdData, now: Date): CashflowView {
+  const p = phases(h)
+  const year = now.getFullYear()
+  const budget = computeBudgetSummary({
+    expenses: h.expenses, annualExpenses: h.annualExpenses, income: h.income, childcare: h.childcare,
+    rentMonthly: rentMonthly(h),
+    person1Days: workDaysForYear(p.p1, year), person2Days: workDaysForYear(p.p2, year),
+    partnerEnabled: h.settings.partnerEnabled,
+  })
+  const cf = computeCashflow({
+    budget, annualExpenses: h.annualExpenses, cashOnHand: computeCashOnHand(h.assets),
+    parentalLeave: h.settings.partnerEnabled && h.projection.parentalLeaveEnabled, now,
+  })
+  return { ...cf, person1Name: h.settings.person1Name, person2Name: h.settings.person2Name }
 }

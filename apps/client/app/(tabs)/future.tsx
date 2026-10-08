@@ -7,7 +7,7 @@ import { Pressable, View } from 'react-native'
 import { router } from 'expo-router'
 import { fmt, fmtK } from '@proviso/core/formatting'
 import { useHousehold } from '@/data/DataProvider'
-import { futureView } from '@/data/views'
+import { futureView, cashflowView } from '@/data/views'
 import { Button, Card, H2, Screen, T } from '@/ui/kit'
 import { NetWorthBars } from '@/ui/NetWorthBars'
 import { usePalette, space, radius, touch } from '@/ui/theme'
@@ -16,6 +16,7 @@ export default function Future() {
   const { household } = useHousehold()
   const p = usePalette()
   const v = futureView(household, new Date())
+  const cf = cashflowView(household, new Date())
   const a = v.assumptions
 
   return (
@@ -32,6 +33,25 @@ export default function Future() {
           <Button title="What if?" onPress={() => router.push('/whatif')} />
         </View>
       </Card>
+
+      <Pressable accessibilityRole="button" accessibilityHint="Cash in the bank month by month" onPress={() => router.push('/cashflow')}
+        style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
+        <Card>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
+            <View style={{ flex: 1, gap: space.xs }}>
+              <T weight="600">The next two years</T>
+              <T tone={cf.runsOut ? 'red' : 't2'}>
+                {cf.runsOut
+                  ? `Cash runs out in ${cf.runsOut.label}.`
+                  : cf.lowest === cf.months[0]
+                    ? `Cash grows to ${fmtK(cf.months[cf.months.length - 1].balance)} in two years.`
+                    : `Cash dips to ${fmtK(cf.lowest.balance)} in ${cf.lowest.label}, and is ${fmtK(cf.months[cf.months.length - 1].balance)} in two years.`}
+              </T>
+            </View>
+            <T tone="t3">›</T>
+          </View>
+        </Card>
+      </Pressable>
 
       {v.shortYears.length > 0 && (
         <View style={{ backgroundColor: v.borrowing ? p.redLt : p.amberLt, borderRadius: radius.md, padding: space.md, gap: space.sm }}>

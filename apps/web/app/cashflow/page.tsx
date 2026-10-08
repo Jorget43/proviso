@@ -1,11 +1,11 @@
 export const dynamic = 'force-dynamic'
 import { prisma } from '@/lib/db'
 import { requireAdult } from '@/lib/auth'
-import { calcAfterTax } from '@proviso/core/tax'
-import { toMonthly } from '@proviso/core/formatting'
-import { CATS, PPL_TOTAL, PPL_MONTHS, PPL_WEEKS } from '@proviso/core/constants'
+import { CATS, PPL_WEEKS } from '@proviso/core/constants'
 import { workDaysForYear } from '@proviso/core/projections'
 import { computeCashOnHand } from '@proviso/core/netWorth'
+import { computeBudgetSummary } from '@proviso/core/budgetSummary'
+import { computeCashflow } from '@proviso/core/cashflow'
 import Panel from '@/components/ui/Panel'
 import CashflowBanner from '@/components/cashflow/CashflowBanner'
 import CashflowLineChart from '@/components/cashflow/CashflowLineChart'
@@ -13,7 +13,7 @@ import IncVsExpChart from '@/components/cashflow/IncVsExpChart'
 
 export default async function CashflowPage() {
   await requireAdult()
-  const [income, expenses, person1Phases, person2Phases, assets, hs, projSettings, annualExpenses] = await Promise.all([
+  const [income, expenses, person1Phases, person2Phases, assets, hs, projSettings, annualExpenses, rent, childcare] = await Promise.all([
     prisma.incomeSettings.findUniqueOrThrow({ where: { id: 1 } }),
     prisma.expense.findMany(),
     prisma.person1Phase.findMany(),
@@ -22,91 +22,43 @@ export default async function CashflowPage() {
     prisma.householdSettings.findUnique({ where: { id: 1 } }),
     prisma.projectionSettings.findUnique({ where: { id: 1 } }),
     prisma.annualExpense.findMany(),
+    prisma.rentSettings.findFirst(),
+    prisma.childcareSettings.upsert({ where: { id: 1 }, update: {}, create: { id: 1 } }),
   ])
   const person1Name = hs?.person1Name ?? 'Person 1'
   const person2Name = hs?.person2Name ?? 'Person 2'
-
   const partnerEnabled = hs?.partnerEnabled ?? false
-
-  // Same income rule as the Budget tab and the Projections engine: gross
-  // pro-rated by this year's work days, HELP applied per person.
-  const currentYear = new Date().getFullYear()
-  const person1Days = workDaysForYear(person1Phases, currentYear)
-  const person2Days = workDaysForYear(person2Phases, currentYear)
-
-  const cashOnHand = computeCashOnHand(assets)
-
-  // Monthly net income
-  const person1Net = income.taxMode
-    ? calcAfterTax(income.person1FTE * (person1Days / 5), income.person1HasHELP) / 12
-    : income.person1MonthlyNet
-
-  const person2Net = !partnerEnabled ? 0 : income.taxMode
-    ? calcAfterTax(income.person2FTE * (person2Days / 5), income.person2HasHELP) / 12
-    : income.person2MonthlyNet
-
-  const totalInc = person1Net + person2Net
-  // Annual expenses are NOT in totalExp — they're charged in their due month
-  // below (cumulatively), so the line shows the real dips.
-  const totalExp = expenses.reduce((s, e) => s + toMonthly(e.amt, e.freq), 0)
-  const delta = totalInc - totalExp
-
-  // PPL is taxable: spread its after-tax amount over the months it's paid.
-  const pplNetMonthly = calcAfterTax(PPL_TOTAL) / PPL_MONTHS
-  const leaveDelta = person1Net + pplNetMonthly - totalExp
-  const burnDelta  = person1Net - totalExp
-  const runway     = burnDelta < 0 ? cashOnHand / Math.abs(burnDelta) : Infinity
-
-  // Annual expense hits by calendar month (1-12)
-  const lumpyByMonth: Record<number, number> = {}
-  annualExpenses.forEach(l => { lumpyByMonth[l.month] = (lumpyByMonth[l.month] ?? 0) + l.amt })
-
-  // 24-month arrays
-  const now = new Date()
-  const n = 24
-
-  // Running total of annual-expense hits up to and including month i, so a
-  // payment keeps reducing the balance in every later month too.
-  const lumpyCumulative: number[] = []
-  for (let i = 0, run = 0; i < n; i++) {
-    const d = new Date(now)
-    d.setMonth(d.getMonth() + i + 1)
-    run += lumpyByMonth[d.getMonth() + 1] ?? 0
-    lumpyCumulative.push(run)
-  }
-  const labels = Array.from({ length: n }, (_, i) => {
-    const d = new Date(now)
-    d.setMonth(d.getMonth() + i + 1)
-    return d.toLocaleString('default', { month: 'short', year: '2-digit' })
-  })
-
-  const cfData = Array.from({ length: n }, (_, i) =>
-    Math.round(cashOnHand + delta * (i + 1) - lumpyCumulative[i])
-  )
-
-  const burnData = Array.from({ length: n }, (_, i) => {
-    const pm   = Math.min(i + 1, PPL_MONTHS)
-    const post = Math.max(0, i + 1 - PPL_MONTHS)
-    return Math.max(0, Math.round(
-      cashOnHand + pm * leaveDelta + post * (person1Net - totalExp) - lumpyCumulative[i]
-    ))
-  })
-
-  // Category monthly for inc vs exp chart
-  const catMonthly: Record<string, number> = {}
-  CATS.forEach(c => { catMonthly[c] = 0 })
-  expenses.forEach(e => { catMonthly[e.cat] = (catMonthly[e.cat] ?? 0) + toMonthly(e.amt, e.freq) })
-
   const showLeave = partnerEnabled && projSettings?.parentalLeaveEnabled === true
+
+  // The Budget's own figures (childcare after the subsidy, rent), so this
+  // page, Budget and Home agree; the month-by-month maths is shared with the
+  // app (@proviso/core/cashflow).
+  const year = new Date().getFullYear()
+  const budget = computeBudgetSummary({
+    expenses, annualExpenses, income, childcare,
+    rentMonthly: rent?.enabled ? rent.monthlyRent : null,
+    person1Days: workDaysForYear(person1Phases, year), person2Days: workDaysForYear(person2Phases, year),
+    partnerEnabled,
+  })
+  const cf = computeCashflow({ budget, annualExpenses, cashOnHand: computeCashOnHand(assets), parentalLeave: showLeave, now: new Date() })
+
+  const labels = cf.months.map(m => m.label)
+  const cfData = cf.months.map(m => m.balance)
+  const burnData = cf.months.map(m => Math.max(0, m.leaveBalance ?? 0))
+
+  // Income vs spending by category: regular lines only (yearly bills land in their months above).
+  const catMonthly: Record<string, number> = {}
+  CATS.forEach(c => { catMonthly[c] = budget.catMonthly[c] ?? 0 })
+  annualExpenses.forEach(a => { catMonthly[a.cat] = (catMonthly[a.cat] ?? 0) - a.amt / 12 })
 
   return (
     <div className="page">
       <CashflowBanner
-        delta={delta}
-        leaveDelta={leaveDelta}
-        burnDelta={burnDelta}
-        cashOnHand={cashOnHand}
-        runway={runway}
+        delta={cf.monthlySurplus}
+        leaveDelta={cf.leave?.onPplSurplus ?? 0}
+        burnDelta={cf.leave?.afterPplSurplus ?? 0}
+        cashOnHand={cf.cashOnHand}
+        runway={cf.leave?.runwayMonths ?? Infinity}
         person1Name={person1Name}
         person2Name={person2Name}
         showLeave={showLeave}
@@ -133,7 +85,7 @@ export default async function CashflowPage() {
       </div>
       <div style={{ marginTop: '1rem' }}>
         <Panel title="Income vs expenses by category" dotColor="var(--blue)">
-          <IncVsExpChart totalInc={totalInc} catMonthly={catMonthly} />
+          <IncVsExpChart totalInc={cf.monthlyIn} catMonthly={catMonthly} />
         </Panel>
       </div>
     </div>

@@ -9,7 +9,7 @@ import { savePeople, saveRent, saveChildcare } from '@/data/settings'
 import { encryptBackup, decryptBackup, newHouseholdKey } from '@proviso/core/backup'
 import { parseHouseholdExport } from '@proviso/core/householdExport'
 import { insertRow, updateRow, deleteRow, saveSettings } from '@/data/mutate'
-import { homeView, spendingView, wealthView, futureView } from '@/data/views'
+import { homeView, spendingView, wealthView, futureView, cashflowView } from '@/data/views'
 import { saveCost, removeCost, kindOf, type CostDraft } from '@/data/costs'
 import { startHousehold, savePay } from '@/data/setup'
 import { saveAsset, removeAsset, saveDebt, saveLoan, saveSuper } from '@/data/wealth'
@@ -343,6 +343,18 @@ describe('future', () => {
     expect(futureView(await loadHousehold(db), NOW).endNetWorth).toBeLessThan(before)
     await removeOneOff(db, id)
     expect(futureView(await loadHousehold(db), NOW).endNetWorth).toBe(before)
+  })
+
+  it('next 2 years: starts from Home’s cash, and a year later is a year of Home’s “left over” on', async () => {
+    const db = await setUp()
+    const h = await loadHousehold(db)
+    const home = homeView(h, NOW)
+    const cf = cashflowView(h, NOW)
+    expect(cf.cashOnHand).toBe(home.cash)
+    expect(cf.months[0].label).toBe('Nov 26')
+    expect(cf.months[11].balance).toBeCloseTo(home.cash + 12 * home.left, -1)
+    // A couple with parental leave on (the starter's default) gets the leave line.
+    expect(cf.leave === null).toBe(!h.projection.parentalLeaveEnabled)
   })
 
   it('saves the assumptions and the retirement goal', async () => {
