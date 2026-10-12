@@ -432,7 +432,7 @@ In [`docs/architecture.md`](docs/architecture.md) order. Phase 3 there (the sing
 3. **Owner decisions pending**: the home-purchase deposit gap (below). (The NAS "Next 2 years" change in Phase 36 — rent and after-subsidy childcare now counted — was pushed with the owner's go-ahead on 2026-10-08.)
 4. **Step B of [`docs/plan-modelling-and-ux.md`](docs/plan-modelling-and-ux.md)**:
    - The life-course engine shipped as Phase 40 (merged to master 2026-10-09 with the owner's OK).
-   - Phase 41 (birth years, the `child` table) is built on a branch, waiting for the owner's OK. Then step C: the cash-buffer rule and life-stage modifiers, which use the children's ages.
+   - Phase 41 (birth years, the `child` table) merged to master 2026-10-12 with the owner's OK. Next is step C: the cash-buffer rule and life-stage modifiers, which use the children's ages.
    - Step A (dark mode, editing, chart trim) shipped as Phases 37–39.
    - Also open: the relay enforcing roles, and the iOS build once the Apple account is ready.
 
@@ -558,6 +558,9 @@ Ideas that have been evaluated but aren't on the roadmap. Each links to its writ
 - Verified: 356 tests; the app at 390px (a Melbourne family of four: $2.32M in today's money in 20 years, HELP cleared 2028, school fees end 2039, loan paid off 2042; a $45k car in 2029 gives $2.28M); the NAS Projections and Super pages rendered against a scratch household. The NAS Super "consider a lower target" hint was fixed on the way (it would have subtracted the mortgage twice and suggested $0).
 
 ### Phase 41 — Plan step B, part 2: birth years and children (2026-10-12)
+
+Owner's OK to merge and push: 2026-10-12. On the NAS, the only change is that ages now move on each January.
+
 
 - **Schema v3** (Drizzle `0002_birth_years`, Prisma `0007_birth_years`):
   - `incomeSettings.person1BirthYear` / `person2BirthYear` (nullable).
