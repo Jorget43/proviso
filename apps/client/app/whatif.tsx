@@ -2,6 +2,7 @@
 // controls change as you go. Nothing is saved until "Keep these changes"; the
 // NAS's Projections page has the same controls (its What if? drawer).
 
+import type { PurchasePaid } from '@proviso/core/projections'
 import { useMemo, useState } from 'react'
 import { View } from 'react-native'
 import { router, Stack } from 'expo-router'
@@ -116,7 +117,7 @@ export default function WhatIfSheet() {
           </>
         )}
 
-        {group === 'home' && h.rent.enabled && <BuyPlan r={r} setRent={setRent} year={year} />}
+        {group === 'home' && h.rent.enabled && <BuyPlan r={r} setRent={setRent} year={year} paid={tried.purchase} />}
 
         <View style={{ gap: space.sm }}>
           <Button title="Keep these changes" disabled={!dirty} onPress={keep} />
@@ -164,7 +165,7 @@ function WorkChanges({ person, name, w, setW, year, leave }: {
   )
 }
 
-function BuyPlan({ r, setRent, year }: { r: WhatIf['rent']; setRent: (patch: Partial<WhatIf['rent']>) => void; year: number }) {
+function BuyPlan({ r, setRent, year, paid }: { r: WhatIf['rent']; setRent: (patch: Partial<WhatIf['rent']>) => void; year: number; paid: PurchasePaid | null }) {
   // Amounts are typed, so the fields keep their text; the draft takes each one once it's a number.
   const [price, setPrice] = useState(String(r.targetPropertyValue))
   const [fromCash, setFromCash] = useState(String(r.depositFromCash))
@@ -174,8 +175,6 @@ function BuyPlan({ r, setRent, year }: { r: WhatIf['rent']; setRent: (patch: Par
     const n = parseAmount(v)
     if (Number.isFinite(n) && n >= 0) setRent({ [key]: n })
   }
-  const deposit = r.targetPropertyValue * r.depositPct / 100
-
   return (
     <Card>
       <Field label="Plan to buy a home?">
@@ -188,18 +187,14 @@ function BuyPlan({ r, setRent, year }: { r: WhatIf['rent']; setRent: (patch: Par
             <NumberField label="Home price" value={price} onChange={amount(setPrice, 'targetPropertyValue')} />
           </Field>
           <Stepper label="Deposit" min={5} max={40} step={5} value={r.depositPct} onChange={v => setRent({ depositPct: v })} format={pct} />
-          <T size="small" tone="t2">A {fmt(deposit)} deposit and a {fmt(r.targetPropertyValue - deposit)} loan.</T>
-          {/* The projection only takes the deposit from what's entered above; flag a gap rather than let it look free. */}
-          {r.depositFromCash + r.depositFromInvestments < deposit && (
-            <T size="small" tone="amber">
-              {fmt(deposit - r.depositFromCash - r.depositFromInvestments)} of the deposit isn’t coming from savings or investments yet, so the result looks better than it should.
-            </T>
-          )}
-          <Field label="Deposit from savings">
-            <NumberField label="Deposit from savings" value={fromCash} onChange={amount(setFromCash, 'depositFromCash')} />
+          <Stepper label="Stamp duty and buying costs" min={0} max={8} step={0.5} value={r.stampDutyPct} onChange={v => setRent({ stampDutyPct: v })} format={pct} />
+          <T size="small" tone="t2">Stamp duty depends on your state and the price; first-home buyers often pay less or none. Legal and other costs add a little more.</T>
+          {paid && <PaidFor paid={paid} />}
+          <Field label="Set aside from savings" hint="Optional. Used first; anything still needed comes from your other savings, then investments.">
+            <NumberField label="Set aside from savings" value={fromCash} onChange={amount(setFromCash, 'depositFromCash')} />
           </Field>
-          <Field label="Deposit from selling investments" hint="About 12% of what’s sold goes in tax on the gains (a rough estimate).">
-            <NumberField label="Deposit from selling investments" value={fromInv} onChange={amount(setFromInv, 'depositFromInvestments')} />
+          <Field label="Set aside from selling investments" hint="About 12% of what’s sold goes in tax on the gains (a rough estimate).">
+            <NumberField label="Set aside from selling investments" value={fromInv} onChange={amount(setFromInv, 'depositFromInvestments')} />
           </Field>
           <Stepper label="Loan interest rate" min={3} max={12} step={0.25} value={r.newMortgageRate} onChange={v => setRent({ newMortgageRate: v })} format={pct} />
           <Field label="Loan length">
@@ -208,5 +203,26 @@ function BuyPlan({ r, setRent, year }: { r: WhatIf['rent']; setRent: (patch: Par
         </>
       )}
     </Card>
+  )
+}
+
+/** Where the money for the purchase comes from, as the projection works it out. */
+function PaidFor({ paid }: { paid: PurchasePaid }) {
+  const parts = [
+    paid.fromCash > 0 && `${fmt(paid.fromCash)} from savings`,
+    paid.fromInvestments > 0 && `${fmt(paid.fromInvestments)} from selling investments (about ${fmt(paid.cgt)} more goes in tax)`,
+  ].filter(Boolean)
+  return (
+    <View style={{ gap: space.xs }}>
+      <T size="small" tone="t2">
+        In {paid.year} you’d pay {fmt(paid.deposit + paid.duty)} upfront: a {fmt(paid.deposit)} deposit{paid.duty > 0 ? ` and ${fmt(paid.duty)} in stamp duty and costs` : ''}.
+        {parts.length ? ` It comes ${parts.join(' and ')}.` : ''}
+      </T>
+      {paid.borrowedExtra > 0 && (
+        <T size="small" tone="amber">
+          Your savings and investments would fall {fmt(paid.borrowedExtra)} short then, so that’s added to the loan. A lender may not allow it.
+        </T>
+      )}
+    </View>
   )
 }

@@ -1,0 +1,1 @@
+ALTER TABLE `rentSettings` ADD `stampDutyPct` real DEFAULT 4 NOT NULL;

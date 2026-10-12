@@ -407,6 +407,7 @@ model RentSettings {
   depositFromInvestments Float  @default(0)       // sold from investment portfolio (triggers CGT)
   newMortgageRate       Float   @default(6.0)
   newMortgageTermYrs    Int     @default(30)
+  stampDutyPct          Float   @default(4.0)    // stamp duty + buying costs, % of price (schema v4)
 }
 
 // Audit log (Phase 21): who did what, when. Security events (sign-ins,

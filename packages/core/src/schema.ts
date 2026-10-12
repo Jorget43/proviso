@@ -22,7 +22,7 @@
 import { sqliteTable, text, integer, real } from 'drizzle-orm/sqlite-core'
 
 /** Bumped by every migration. Travels with each sync message and export. */
-export const SCHEMA_VERSION = 3
+export const SCHEMA_VERSION = 4
 
 export type PersonKey = 'p1' | 'p2'
 export const PERSON_KEYS: readonly PersonKey[] = ['p1', 'p2']
@@ -326,6 +326,10 @@ export const rentSettings = sqliteTable('rentSettings', {
   depositFromInvestments: real('depositFromInvestments').notNull().default(0),
   newMortgageRate:        real('newMortgageRate').notNull().default(6.0),
   newMortgageTermYrs:     integer('newMortgageTermYrs').notNull().default(30),
+  // v4: stamp duty and other buying costs, as a % of the price, paid upfront
+  // with the deposit (projections.ts). Duty differs by state and first-home
+  // buyers often pay less; 4% is a middle-of-the-road figure.
+  stampDutyPct:           real('stampDutyPct').notNull().default(4.0),
 })
 
 // ── Pocket-money space: shared between the parents and that child only ──────

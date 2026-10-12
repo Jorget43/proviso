@@ -39,7 +39,7 @@ function sampleExport(): HouseholdExport {
     childcareInfl: 6, propGrowth: 3.5, savingsRate: 10, investReturn: 3.5, projYears: 20, schoolFeesOn: false, sfC1Start: 2032, sfC1ExitIdx: 13,
     sfC2Start: 2035, sfC2ExitIdx: 13, sfInfl: 5, sfPresetKey: null, parentalLeaveEnabled: false, horizonAge: 95 })
   h.rentSettings.push({ id: SETTINGS_ID.rent, deletedAt: null, enabled: true, monthlyRent: 2400, annualIncreaseRate: 5, purchasePlanEnabled: false,
-    targetPurchaseYear: 2031, targetPropertyValue: 800000, depositPct: 20, depositFromCash: 0, depositFromInvestments: 0, newMortgageRate: 6, newMortgageTermYrs: 30 })
+    targetPurchaseYear: 2031, targetPropertyValue: 800000, depositPct: 20, depositFromCash: 0, depositFromInvestments: 0, newMortgageRate: 6, newMortgageTermYrs: 30, stampDutyPct: 4 })
   return {
     format: EXPORT_FORMAT, version: EXPORT_VERSION, schemaVersion: SCHEMA_VERSION, exportedAt: NOW.toISOString(), householdId: ID(0),
     source: { app: 'test', version: '0' }, household: h, pocketMoney: [], notes: ['A sample note'],
@@ -419,6 +419,22 @@ describe('what if', () => {
     expect(futureView(after, NOW).milestones.find(m => m.text === 'You buy your home')?.year).toBe(2030)
   })
 
+  it('a purchase is paid for: deposit and stamp duty from savings, the rest on the loan', async () => {
+    const db = await setUp()   // a renting couple with 15,000 in cash
+    const h = await loadHousehold(db)
+    const w = startWhatIf(h)
+    w.rent = { ...w.rent, purchasePlanEnabled: true, targetPurchaseYear: 2027, targetPropertyValue: 800_000, depositPct: 20, depositFromCash: 0, depositFromInvestments: 0 }
+    const p = futureView(applyWhatIf(h, w), NOW).purchase!
+    expect(p).toMatchObject({ year: 2027, deposit: 160_000, duty: 32_000 })   // the default 4%
+    // Nothing comes from nowhere: what savings can't cover goes on the loan.
+    expect(p.fromCash + p.fromInvestments + p.borrowedExtra).toBeCloseTo(192_000)
+    expect(p.fromCash).toBeGreaterThan(0)
+    expect(p.borrowedExtra).toBeGreaterThan(0)
+    // Less stamp duty, less upfront.
+    w.rent.stampDutyPct = 0
+    expect(futureView(applyWhatIf(h, w), NOW).purchase!.duty).toBe(0)
+  })
+
   it('work changes: fewer days lower the result; keeping adds, changes and removes rows', async () => {
     const db = await setUp()
     const h = await loadHousehold(db)
@@ -521,6 +537,16 @@ describe('settings and backups', () => {
     expect(futureView(h, NOW).schoolFees.total).toBeCloseTo(one)
     expect(await saveChild(db, null, { name: '', birthYear: 1950, birthMonth: null }, 2026)).toMatch(/year they were born/)
     expect(await saveChild(db, null, { name: '', birthYear: 2020, birthMonth: 13 }, 2026)).toMatch(/month/)
+  })
+
+  it('asks for the children while school fees are planned without them', async () => {
+    const db = await setUp()
+    const asks = async () => homeView(await loadHousehold(db), NOW).checks.some(c => c.target === 'children')
+    expect(await asks()).toBe(false)   // no school fees planned
+    await saveAssumptions(db, { person1Growth: 3, person2Growth: 3, expInfl: 2.5, investReturn: 5, savingsRate: 10, propGrowth: 3.5, horizonAge: 95, schoolFeesOn: true }, 60_000)
+    expect(await asks()).toBe(true)
+    await saveChild(db, null, { name: '', birthYear: 2019, birthMonth: null }, 2026)
+    expect(await asks()).toBe(false)
   })
 
   it('refuses names that can’t be told apart', async () => {

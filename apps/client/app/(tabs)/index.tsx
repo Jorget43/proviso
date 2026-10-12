@@ -14,7 +14,7 @@ import { usePalette, space, radius } from '@/ui/theme'
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
 
 // Where Home's prompts lead in the app. Savings and tax time arrive with the Wealth and EOFY screens.
-const TARGET: Record<OverviewTarget, '/income' | '/spending' | '/wealth'> = { income: '/income', budget: '/spending', savings: '/wealth', eofy: '/wealth' }
+const TARGET: Record<OverviewTarget, '/income' | '/spending' | '/wealth' | '/child'> = { income: '/income', budget: '/spending', savings: '/wealth', eofy: '/wealth', children: '/child' }
 
 export default function Home() {
   const { household } = useHousehold()

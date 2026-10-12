@@ -399,6 +399,7 @@ The assumptions watchdog (`/admin/watchdog` for the CFO when `WATCHDOG_ENABLED=t
 - Projection shortfalls (Phase 29) are carried as money owed with no interest, and repaid before anything is invested.
 - The projection's school-fee model covers the two eldest children; a third child's school costs stay in the spending base as an ordinary, inflating line.
 - One-off costs aren't inflated: the amount is what's paid in that year.
+- Stamp duty is one percentage of the price (default 4%), not each state's duty scale or first-home-buyer concessions; the app doesn't store the state.
 - `marginalRate()` ignores the LITO taper and the Medicare shade-in band (headline rate only — used for guidance figures).
 - Life course (Phase 40):
   - No Age Pension yet.
@@ -429,7 +430,7 @@ In [`docs/architecture.md`](docs/architecture.md) order. Phase 3 there (the sing
 **Start here next session**, in this order:
 1. **⏰ Remind the owner first — phone test still to do** (deferred 2026-10-08, "soon"). **The Android development build with Phases 34–35** (sync, camera, key backup): it built successfully on EAS on 2026-10-08 (so the key-backup Kotlin module and expo-camera compile); `npm run eas -w @proviso/client -- build:list --limit 1` shows the APK link. Install it and check on the phone: Settings → Recovery phrase → Save to Google Password Manager; Settings → Sync; Join a household (camera scan).
 2. **Run the relay on the NAS** with the owner: `docker compose --profile sync up -d` (image `ghcr.io/jorget43/proviso-relay`, published by CI from master since 2026-10-08), then `tailscale serve --bg --https=8443 http://localhost:8787` (README "Sync relay for the app"). Turn sync on in the app with the `https://<machine>.<tailnet>.ts.net:8443` address, then join from a second phone. Phones need Tailscale running to reach it.
-3. **Owner decisions pending**: the home-purchase deposit gap (below). (The NAS "Next 2 years" change in Phase 36 — rent and after-subsidy childcare now counted — was pushed with the owner's go-ahead on 2026-10-08.)
+3. **Owner decisions pending**: none. (The home-purchase deposit was decided and built in Phase 42.)
 4. **Step B of [`docs/plan-modelling-and-ux.md`](docs/plan-modelling-and-ux.md)**:
    - The life-course engine shipped as Phase 40 (merged to master 2026-10-09 with the owner's OK).
    - Phase 41 (birth years, the `child` table) merged to master 2026-10-12 with the owner's OK. Next is step C: the cash-buffer rule and life-stage modifiers, which use the children's ages.
@@ -438,8 +439,6 @@ In [`docs/architecture.md`](docs/architecture.md) order. Phase 3 there (the sing
 
 The full list:
 - **First development build with EAS** (Expo's build service): configured (see "EAS" above); Android built 2026-10-08, not yet checked on the phone. iOS needs the Apple Developer account (A$149 a year).
-- **Phantom second child's school fees (app, households set up before Phase 41)**: the questionnaire stored a default `sfC2Start` even with one child, so the projection charges a second child's fees. New households have child records, which fix it. Existing ones are fixed once their children are added under Settings, or by a one-off prompt (not built: needs the owner's call).
-- **Home purchase deposit**: the projection takes the deposit only from the amounts entered as coming from savings and investments; any rest appears from nowhere (NAS and app alike). The app's What if? warns about the gap; the engine should probably take the rest from cash, then investments (a behaviour change for the NAS too: decide with the owner, re-pin the tests). Stamp duty isn't modelled either.
 - **Key backup** (Phase 35): built, not yet compiled — check it in the next Android development build (Settings → Recovery phrase → Save to Google Password Manager; then on a fresh install, Restore or Join → "Use the key saved in …"), and on iOS once the Apple account is ready.
 - **Sync, what's left after Phase 34**: run the relay on the NAS (`docker compose --profile sync up -d` + Tailscale Serve, README) and try it with two phones; the relay enforcing roles (D6: a Partner's devices may not write some tables); pocket-money spaces for children; the relay serving the web build; turning an existing NAS household into the synced one (today: import the NAS export on one phone, turn sync on there, others join).
 - **Where each feature lives (NAS ↔ app)**: see the table below. Keep it current whenever a phase ships. The rule (plan decision 1): engine changes show on the NAS charts first; new screens are built in the app first. All maths stays in `packages/core`, so both give the same numbers.
@@ -447,7 +446,7 @@ The full list:
 - **Dependency advisories**: GitHub lists some on master, believed to be all in Expo's build and dev-server tools (`braces`, `node-forge`, `uuid` via `xcode`, `decode-uri-component`), several with no fixed version yet. They don't reach the NAS image (CI audits exactly what it ships). Dependabot was preparing a security update for them on 2026-10-06: review it carefully, because Expo pins some of them, and React / React Native / `expo*` move only with the Expo SDK (`proviso-release` skill).
 - **Starter estimates** (`packages/core/src/starter.ts`): re-check the figures yearly with the July recalibration; electricity still uses the AER's 2020 usage benchmarks (no longer updated).
 
-### Where each feature lives (NAS ↔ app), as of Phase 41
+### Where each feature lives (NAS ↔ app), as of Phase 42
 
 | Feature | NAS web app | The app | Notes |
 |---|---|---|---|
@@ -462,7 +461,7 @@ The full list:
 | Investments (parcels, CGT) | ✓ | — | |
 | Future: net worth, money in & out | ✓ charts | Net worth bars, short years, milestones | Same engine; app charts wait on plan item 2 |
 | Future: Retirement (chart, drawdown strategy) | ✓ | Summary text only | App needs the chart component (plan item 2) and the strategy choice |
-| Future: look-ahead age, work changes, rent-then-buy | ✓ | ✓ (What if?) | |
+| Future: look-ahead age, work changes, rent-then-buy | ✓ | ✓ (What if?) | Buying: deposit + stamp duty, paid from savings then investments, any rest on the loan (`buyHome`) |
 | Future: school fees | ✓ chart | Total only | |
 | Birth years (ages move on each year) | Set at onboarding; kept in step | ✓ edit (Settings → People) | `core/people.ts` |
 | Children (birth year, month, name) | — | ✓ edit (Settings); drive school-fee years | NAS keeps its school start years |
@@ -556,6 +555,25 @@ Ideas that have been evaluated but aren't on the roadmap. Each links to its writ
 - **School fees decided**: the questionnaire's school-cost lines stay in today's budget; the projection models the two eldest children's fees year by year (ending after Year 12) and leaves those lines out (`isModelledSchoolLine`), so nothing is counted twice. The questionnaire switches `schoolFeesOn` on when there are children.
 - Typed routes are off in `apps/client` (the generated file only existed where a dev server ran, never in CI, and misread the monorepo).
 - Verified: 356 tests; the app at 390px (a Melbourne family of four: $2.32M in today's money in 20 years, HELP cleared 2028, school fees end 2039, loan paid off 2042; a $45k car in 2029 gives $2.28M); the NAS Projections and Super pages rendered against a scratch household. The NAS Super "consider a lower target" hint was fixed on the way (it would have subtracted the mortgage twice and suggested $0).
+
+### Phase 42 — Paying for a home purchase; asking for the children (2026-10-12)
+
+Owner's decisions (2026-10-12): the deposit takes the rest from cash, then investments; stamp duty is modelled.
+
+- **Engine** (`projections.ts` `buyHome`, output `purchase: PurchasePaid`):
+  - The deposit plus stamp duty is paid in this order: the amounts set aside from savings and investments, then other cash, then other investments. Investments lose `SALE_CGT_HAIRCUT` (12%) to capital gains tax, as before.
+  - Whatever is still missing is added to the loan (`borrowedExtra`). Before, it came from nowhere.
+  - Set-aside amounts beyond what's needed are left alone. Before, they were all taken and the excess vanished.
+- **Schema v4** (Drizzle `0003_stamp_duty`, Prisma `0008_stamp_duty`): `rentSettings.stampDutyPct` (default 4: one figure, not state scales). The engine defaults it to 0, so pinned fixtures without a purchase are unchanged.
+- **Screens:**
+  - App What if? → Home and the NAS Future → Home panel gain a "Stamp duty & buying costs" control.
+  - The deposit fields are renamed "Set aside from savings / investments".
+  - Both show where the money comes from, and an amber note when some of it goes on the loan. The app's old "isn't coming from savings" warning is gone.
+- **Children prompt** (`overview.ts`, `childrenMissing`, target `children`): the app's Home asks for the children while school fees are planned but none are recorded. This fixes the phantom second child for households from before Phase 41. The NAS never shows it.
+- **Numbers change** (owner's OK 2026-10-12): renters with a buy plan, on the NAS and in the app. Net worth from the purchase year is lower by the deposit when it used to come from nowhere, by the stamp duty, and by the interest on any extra borrowing.
+- **Verified:**
+  - 470 tests. S4 and S4b were re-pinned with hand-worked comments, and `buyHome` has its own cases.
+  - App What if? checked at 390px in headless Chrome.
 
 ### Phase 41 — Plan step B, part 2: birth years and children (2026-10-12)
 

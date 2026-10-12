@@ -4,7 +4,7 @@
 
 import { computeHomeOverview, type HomeOverview } from '@proviso/core/overview'
 import { computeBudgetSummary, isManagedChildcare } from '@proviso/core/budgetSummary'
-import { workDaysForYear, runProjections } from '@proviso/core/projections'
+import { workDaysForYear, runProjections, type PurchasePaid } from '@proviso/core/projections'
 import { projectionBaseline, buildProjectionInputs, feeScheduleFor, retirementIncomeGoal } from '@proviso/core/future'
 import { currentAges } from '@proviso/core/people'
 import { situationFrom, situationLabels } from '@proviso/core/situation'
@@ -42,6 +42,7 @@ export function homeView(h: HouseholdData, now: Date): HomeView {
     assets: h.assets, debts: h.debts, mortgage: h.mortgage,
     superBalances: { p1: h.superSettings.person1Balance, p2: h.superSettings.person2Balance },
     snapshots: h.netWorthSnapshots,
+    childrenMissing: h.projection.schoolFeesOn && h.children.length === 0,
   })
   const situation = situationFrom({ partnerEnabled: h.settings.partnerEnabled, childcare: h.childcare, rent: h.rent, projection: h.projection })
   return { ...o, person1Name: h.settings.person1Name, person2Name: h.settings.person2Name, situation: situationLabels(situation, h.settings.person2Name) }
@@ -201,6 +202,8 @@ export interface FutureMilestone { year: number; text: string; tone: 'good' | 'n
 
 export interface FutureView {
   years:          number
+  /** How a planned home purchase is paid for; null without one. */
+  purchase:       PurchasePaid | null
   labels:         string[]
   /** Net worth at the end of each year, in that year's dollars. */
   netWorth:       number[]
@@ -288,6 +291,7 @@ export function futureView(h: HouseholdData, now: Date): FutureView {
       return i < 0 ? null : { from: out.labels[i], owedAtEnd: run.owedArr[run.owedArr.length - 1] }
     })(),
     milestones,
+    purchase: run.purchase,
     schoolFees: { on: s.schoolFeesOn, total: s.schoolFeesOn ? run.sfTotalArr.reduce((t, v) => t + v, 0) : 0 },
     retirement: {
       people: people.map(x => {

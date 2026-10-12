@@ -134,6 +134,8 @@ export interface ProjectionInputs {
   depositPct:            number;  // % of property value
   depositFromCash:       number;
   depositFromInvestments: number; // triggers CGT — approx 12% haircut applied
+  /** Stamp duty and buying costs, % of the price, paid upfront (default 0). */
+  stampDutyPct?:         number;
   newMortgageRate:       number;  // as percent (e.g. 6.0)
   newMortgageTermYrs:    number;
 
@@ -166,6 +168,8 @@ export interface ProjectionResult {
   person2HelpClearedYr: number | null;
   rentArr:        number[];   // annual rent paid each year (0 for homeowners / post-purchase)
   purchaseYr:     number | null; // year of rent→own transition (null if no purchase plan)
+  /** How the purchase was paid for (null without one): see buyHome. */
+  purchase:       PurchasePaid | null;
 
   // ── Life course (zeros / nulls without one) ──
   /** Super balances at the end of each year. Not in nwArr: super is shown separately. */
@@ -182,6 +186,51 @@ export interface ProjectionResult {
   shortfallYr:    number | null;
   /** First year money runs short while someone has retired but can't yet reach their super (the "bridge" years). */
   bridgeShortYr:  number | null;
+}
+
+/** How the deposit and buying costs were met in the purchase year. */
+export interface PurchasePaid {
+  year:            number
+  deposit:         number
+  duty:            number
+  /** Taken from cash: the amount set aside for it first, then any other cash. */
+  fromCash:        number
+  /** Raised by selling investments (the set-aside amount first, then any others). */
+  fromInvestments: number
+  /** Capital gains tax on those sales (the ~12% haircut). */
+  cgt:             number
+  /** What cash and investments couldn't cover, added to the home loan. */
+  borrowedExtra:   number
+}
+
+/** Rough effective CGT on investments sold (held over 12 months, a high marginal rate). */
+export const SALE_CGT_HAIRCUT = 0.12
+
+/**
+ * Pays a deposit plus buying costs: first the cash and investments set
+ * aside for it, then any other cash, then any other investments. Whatever
+ * is still missing is added to the loan, so the money never comes from
+ * nowhere. Set-aside amounts beyond what's needed stay where they are.
+ */
+export function buyHome(p: {
+  price: number; depositPct: number; stampDutyPct: number
+  setAsideCash: number; setAsideInvestments: number
+  cash: number; invest: number
+}): Omit<PurchasePaid, 'year'> & { cash: number; invest: number; loan: number } {
+  const deposit = p.price * p.depositPct / 100
+  const duty    = p.price * p.stampDutyPct / 100
+  let need = deposit + duty, cash = p.cash, invest = p.invest, fromCash = 0, fromInvestments = 0
+  const takeCash = (limit: number) => { const x = Math.max(0, Math.min(limit, cash, need)); cash -= x; need -= x; fromCash += x }
+  const sell     = (limit: number) => {
+    const x = Math.max(0, Math.min(limit, invest / (1 + SALE_CGT_HAIRCUT), need))
+    invest -= x * (1 + SALE_CGT_HAIRCUT); need -= x; fromInvestments += x
+  }
+  takeCash(p.setAsideCash); sell(p.setAsideInvestments)
+  takeCash(Infinity);       sell(Infinity)
+  return {
+    deposit, duty, fromCash, fromInvestments, cgt: fromInvestments * SALE_CGT_HAIRCUT, borrowedExtra: need,
+    cash, invest: Math.max(0, invest), loan: p.price - deposit + need,
+  }
 }
 
 export interface ProjectionOutput {
@@ -228,7 +277,7 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
     lifePhases, currentYear,
     rentMode, monthlyRent, rentIncreaseRate,
     purchasePlanEnabled, targetPurchaseYear, targetPropertyValue, depositPct,
-    depositFromCash, depositFromInvestments, newMortgageRate, newMortgageTermYrs,
+    depositFromCash, depositFromInvestments, newMortgageRate, newMortgageTermYrs, stampDutyPct,
   } = inputs;
 
   const cy          = currentYear;
@@ -315,6 +364,7 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
     let   shortfallYr:    number | null = null;
     let   bridgeShortYr:  number | null = null;
     const purchaseYr:     number | null = (rentMode && purchasePlanEnabled) ? targetPurchaseYear : null;
+    let purchase:         PurchasePaid | null = null;
 
     for (let i = 0; i < projYears; i++) {
       const yr          = cy + i + 1;
@@ -336,15 +386,16 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
       // ── Rent → own transition ──────────────────────────────────────────────
       if (isRenting && purchasePlanEnabled && yr === targetPurchaseYear) {
         isRenting = false;
-        // Deduct deposit from savings and investments
-        const fromCash   = Math.min(depositFromCash, cash);
-        cash             = Math.max(0, cash - fromCash);
-        const fromAssets = Math.min(depositFromInvestments, invest);
-        // Rough 12% effective CGT haircut (assumes assets held >12 months, ~45% marginal rate)
-        const cgtHaircut = fromAssets * 0.12;
-        invest           = Math.max(0, invest - fromAssets - cgtHaircut);
+        const paid = buyHome({
+          price: targetPropertyValue, depositPct, stampDutyPct: stampDutyPct ?? 0,
+          setAsideCash: depositFromCash, setAsideInvestments: depositFromInvestments, cash, invest,
+        });
+        cash             = paid.cash;
+        invest           = paid.invest;
+        purchase         = { year: yr, deposit: paid.deposit, duty: paid.duty, fromCash: paid.fromCash,
+          fromInvestments: paid.fromInvestments, cgt: paid.cgt, borrowedExtra: paid.borrowedExtra };
         // Start mortgage
-        mb               = targetPropertyValue * (1 - depositPct / 100);
+        mb               = paid.loan;
         lMortRate        = newMortgageRate / 100;
         lMortPayment     = computeMonthlyRepayment(mb, newMortgageRate, newMortgageTermYrs * 12);
         pVal             = targetPropertyValue * (1 + pG);  // property starts growing from purchase year
@@ -555,7 +606,7 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
       nwArr, incArr, expArr, mortArr, cashArr, investArr,
       person1Arr, person2Arr, phaseArr, deficitArr, cashRunningArr, owedArr, mortStressArr,
       sfC1Arr, sfC2Arr, sfSibArr, sfTotalArr, leaveYrs, person1HelpClearedYr, person2HelpClearedYr,
-      rentArr, purchaseYr,
+      rentArr, purchaseYr, purchase,
       super1Arr, super2Arr, superArr, superDrawArr, retiredArr,
       person1RetireYr: lc ? cy + lc.person1RetirementAge - lc.person1Age : null,
       person2RetireYr: lc && lc.partnerEnabled ? cy + lc.person2RetirementAge - lc.person2Age : null,

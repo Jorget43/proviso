@@ -1,6 +1,6 @@
 'use client'
 import { useState, useMemo, useCallback } from 'react'
-import { fmtK, possessive } from '@proviso/core/formatting'
+import { fmt, fmtK, possessive } from '@proviso/core/formatting'
 import { runProjections } from '@proviso/core/projections'
 import { buildProjectionInputs, type ProjectionBaseline, type SuperSettingsLike } from '@proviso/core/future'
 import { asDrawdownStrategy, PRESERVATION_AGE, DEFAULT_HORIZON_AGE, type DrawdownStrategy } from '@proviso/core/retirement'
@@ -67,6 +67,7 @@ interface RentSettingsType {
   depositFromInvestments: number
   newMortgageRate:       number
   newMortgageTermYrs:    number
+  stampDutyPct:          number
 }
 
 interface ProjectionsClientProps {
@@ -113,7 +114,7 @@ const DEFAULT_RENT: RentSettingsType = {
   purchasePlanEnabled: false, targetPurchaseYear: new Date().getFullYear() + 5,
   targetPropertyValue: 800000, depositPct: 20.0,
   depositFromCash: 0, depositFromInvestments: 0,
-  newMortgageRate: 6.0, newMortgageTermYrs: 30,
+  newMortgageRate: 6.0, newMortgageTermYrs: 30, stampDutyPct: 4.0,
 }
 
 // Declared at module level: defined inside ProjectionsClient it was a new
@@ -731,8 +732,17 @@ export default function ProjectionsClient({
                           value={rentSt.depositPct} cls="amber-t" fmt={v => v + '%'}
                           onChange={v => patchRent({ depositPct: v })}
                         />
+                        <Slider
+                          label="Stamp duty & buying costs" id="stampDutyPct" min={0} max={8} step={0.5}
+                          value={rentSt.stampDutyPct} cls="amber-t" fmt={v => v + '%'}
+                          onChange={v => patchRent({ stampDutyPct: v })}
+                        />
+                        <p style={{ fontSize: '0.67rem', color: 'var(--t3)', margin: '2px 0', lineHeight: 1.4 }}>
+                          Stamp duty depends on your state and the price; first-home buyers often pay less or none.
+                          The amounts set aside below are used first, then other savings, then investments; anything still missing goes on the loan.
+                        </p>
                         <div className="da-row">
-                          <label style={{ flex: 1, color: 'var(--t2)', fontSize: '0.74rem' }}>Deposit from savings</label>
+                          <label style={{ flex: 1, color: 'var(--t2)', fontSize: '0.74rem' }}>Set aside from savings</label>
                           <div className="input-prefix" style={{ width: 110 }}>
                             <span>$</span>
                             <input
@@ -744,7 +754,7 @@ export default function ProjectionsClient({
                           </div>
                         </div>
                         <div className="da-row">
-                          <label style={{ flex: 1, color: 'var(--t2)', fontSize: '0.74rem' }}>Deposit from investments</label>
+                          <label style={{ flex: 1, color: 'var(--t2)', fontSize: '0.74rem' }}>Set aside from investments</label>
                           <div className="input-prefix" style={{ width: 110 }}>
                             <span>$</span>
                             <input
@@ -779,9 +789,22 @@ export default function ProjectionsClient({
                           fontSize: '0.72rem', color: 'var(--t2)', lineHeight: 1.5,
                         }}>
                           <strong>Purchase {rentSt.targetPurchaseYear}</strong><br/>
-                          Property: ${rentSt.targetPropertyValue.toLocaleString('en-AU')}<br/>
-                          Deposit ({rentSt.depositPct}%): ${Math.round(rentSt.targetPropertyValue * rentSt.depositPct / 100).toLocaleString('en-AU')}<br/>
-                          Mortgage: ${Math.round(rentSt.targetPropertyValue * (1 - rentSt.depositPct / 100)).toLocaleString('en-AU')} @ {rentSt.newMortgageRate}%
+                          Property: {fmt(rentSt.targetPropertyValue)}<br/>
+                          {main.purchase ? (
+                            <>
+                              Upfront: {fmt(main.purchase.deposit)} deposit + {fmt(main.purchase.duty)} stamp duty &amp; costs<br/>
+                              Paid from: {fmt(main.purchase.fromCash)} savings
+                              {main.purchase.fromInvestments > 0 && <>, {fmt(main.purchase.fromInvestments)} investments ({fmt(main.purchase.cgt)} tax)</>}<br/>
+                              Mortgage: {fmt(rentSt.targetPropertyValue - main.purchase.deposit + main.purchase.borrowedExtra)} @ {rentSt.newMortgageRate}%
+                              {main.purchase.borrowedExtra > 0 && (
+                                <span style={{ display: 'block', color: 'var(--amber)', marginTop: 4 }}>
+                                  Savings and investments fall {fmt(main.purchase.borrowedExtra)} short then, so that’s added to the loan. A lender may not allow it.
+                                </span>
+                              )}
+                            </>
+                          ) : (
+                            <>The purchase year is outside the projection.</>
+                          )}
                         </div>
                       </div>
                     )}

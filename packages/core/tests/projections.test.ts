@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { runProjections, type ProjectionResult } from '../src/projections'
+import { buyHome, runProjections, type ProjectionResult } from '../src/projections'
 import { computeMonthlyRepayment } from '../src/mortgage'
 import { calcAfterTax } from '../src/tax'
 import { PPL_TOTAL } from '../src/constants'
@@ -23,7 +23,7 @@ function expectShape(r: ProjectionResult, years: number) {
     'bridgeShortYr', 'cashArr', 'cashRunningArr', 'deficitArr', 'expArr', 'incArr',
     'investArr', 'leaveYrs', 'mortArr', 'mortStressArr', 'nwArr', 'owedArr', 'person1Arr',
     'person1HelpClearedYr', 'person1RetireYr', 'person2Arr', 'person2HelpClearedYr', 'person2RetireYr',
-    'phaseArr', 'purchaseYr', 'rentArr', 'retiredArr', 'sfC1Arr', 'sfC2Arr',
+    'phaseArr', 'purchase', 'purchaseYr', 'rentArr', 'retiredArr', 'sfC1Arr', 'sfC2Arr',
     'sfSibArr', 'sfTotalArr', 'shortfallYr', 'super1Arr', 'super2Arr', 'superArr', 'superDrawArr',
   ])
   for (const k of ['nwArr', 'incArr', 'expArr', 'mortArr', 'cashArr', 'investArr'] as const) {
@@ -160,10 +160,19 @@ describe('runProjections — S4 renter transitioning to owner at year 3 (2029)',
     expect(base.mortStressArr).toEqual([0, 0, 19.2, 19.2, 19.2])
   })
 
+  it('pays the deposit from cash: nothing set aside, so ordinary savings are used', () => {
+    // Cash at the start of 2029 is 162,320; the 160,000 deposit leaves 2,320.
+    expect(base.purchase).toEqual({ year: 2029, deposit: 160_000, duty: 0, fromCash: 160_000, fromInvestments: 0, cgt: 0, borrowedExtra: 0 })
+  })
+
   it('CHARACTERIZED: post-purchase mortgage/cash/nw trajectory', () => {
-    expect(base.mortArr).toEqual([0, 0, 621009, 598372, 571865])
-    expect(base.cashArr).toEqual([106160, 162320, 202436, 242552, 282668])
-    expect(base.nwArr).toEqual([116160, 172320, 391427, 454180, 520803])
+    // Before Phase 42 the deposit came from nowhere (cash 202,436 in 2029).
+    // Now cash is 160,000 lower, and less cash offsets the loan, so the
+    // balance is higher (630,877 vs 621,009) and net worth lower by
+    // 160,000 + that 9,868: 391,427 → 221,559.
+    expect(base.mortArr).toEqual([0, 0, 630877, 618718, 603334])
+    expect(base.cashArr).toEqual([106160, 162320, 42436, 82552, 122668])
+    expect(base.nwArr).toEqual([116160, 172320, 221559, 273834, 329334])
   })
 })
 
@@ -172,25 +181,59 @@ describe('runProjections — S4b purchase deposit funded from investments (12% C
     renterBuyingIn(3, { savingsRate: 100, investReturn: 0, depositFromInvestments: 50_000 }),
   )
 
-  it('deducts the deposit plus a 12% haircut from accumulated investments, then resumes investing', () => {
+  it('takes the set-aside investments first, then other cash, other investments, then the loan', () => {
     // Pre-purchase, 100% of surplus is invested each year at 0% return:
-    // investArr[0] = surplus_2027 = 56160; investArr[1] = 56160×2 = 112320
+    // investArr[0] = surplus_2027 = 56160; investArr[1] = 56160×2 = 112320. Cash stays at 50,000.
     expect(base.investArr[0]).toBe(56160)
     expect(base.investArr[1]).toBe(112320)
-    // At purchase: 112320 − 50000 (deposit) − 6000 (12% haircut on 50000) = 56320,
-    // then this year's own surplus (40116, since sR=100%) is invested on top:
-    // 56320 + 40116 = 96436
-    expect(base.investArr[2]).toBe(96436)
+    // Deposit 160,000:
+    //   set-aside investments 50,000 (selling costs 56,000 with the 12% CGT haircut), 56,320 left
+    //   other cash 50,000
+    //   other investments: 56,320 / 1.12 = 50,285.71 raised, nothing left
+    //   still missing 160,000 − 50,000 − 50,000 − 50,285.71 = 9,714.29 → added to the loan
+    const p = base.purchase!
+    expect(p.fromCash).toBe(50_000)
+    expect(p.fromInvestments).toBeCloseTo(100_285.71, 2)
+    expect(p.cgt).toBeCloseTo(12_034.29, 2)
+    expect(p.borrowedExtra).toBeCloseTo(9_714.29, 2)
+    // This year's own surplus (39,420: lower than before, as no cash offsets the larger loan) is invested.
+    expect(base.investArr[2]).toBe(39420)
+    expect(base.cashArr[2]).toBe(0)
   })
 
-  it('never goes negative even when the deposit exceeds accumulated investments', () => {
-    const clamped = runProjections(
+  it('never takes more than is needed, and never goes negative', () => {
+    // 200,000 set aside from investments, but only 160,000 is needed: same result as above.
+    const capped = runProjections(
       renterBuyingIn(3, { savingsRate: 100, investReturn: 0, depositFromInvestments: 200_000 }),
     ).base
-    // Accumulated (112320) is entirely consumed by the oversized deposit + haircut,
-    // clamped to 0 (never negative), then the same year's surplus (40116) is added.
-    expect(clamped.investArr[2]).toBe(40116)
-    expect(clamped.investArr.every(v => v >= 0)).toBe(true)
+    expect(capped.purchase!.fromInvestments).toBeCloseTo(100_285.71, 2)
+    expect(capped.investArr[2]).toBe(39420)
+    expect(capped.investArr.every(v => v >= 0)).toBe(true)
+  })
+})
+
+describe('buyHome — paying the deposit and stamp duty', () => {
+  const base = { price: 800_000, depositPct: 20, stampDutyPct: 4, setAsideCash: 0, setAsideInvestments: 0 }
+
+  it('adds stamp duty to what has to be paid upfront', () => {
+    // 160,000 deposit + 32,000 duty, all from 250,000 of cash.
+    const r = buyHome({ ...base, cash: 250_000, invest: 0 })
+    expect(r).toMatchObject({ deposit: 160_000, duty: 32_000, fromCash: 192_000, borrowedExtra: 0, cash: 58_000, loan: 640_000 })
+  })
+
+  it('uses the set-aside amounts first, and leaves the rest of the cash alone when they cover it', () => {
+    const r = buyHome({ ...base, stampDutyPct: 0, setAsideCash: 60_000, setAsideInvestments: 112_000, cash: 100_000, invest: 200_000 })
+    // 60,000 cash, then 100,000 from investments (costing 112,000 with CGT): 160,000.
+    expect(r).toMatchObject({ fromCash: 60_000, cash: 40_000 })
+    expect(r.fromInvestments).toBeCloseTo(100_000)
+    expect(r.invest).toBeCloseTo(88_000)
+    expect(r.cgt).toBeCloseTo(12_000)
+    expect(r.borrowedExtra).toBeCloseTo(0)
+  })
+
+  it('borrows what cash and investments can’t cover', () => {
+    const r = buyHome({ ...base, cash: 50_000, invest: 0 })
+    expect(r).toMatchObject({ fromCash: 50_000, borrowedExtra: 142_000, cash: 0, loan: 640_000 + 142_000 })
   })
 })
 

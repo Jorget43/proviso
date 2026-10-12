@@ -281,6 +281,7 @@ export const rentSettingsSchema = z.object({
   depositFromInvestments: money,
   newMortgageRate:        pct(0, 30),
   newMortgageTermYrs:     z.number().int().min(1).max(40),
+  stampDutyPct:           pct(0, 15),
 }).partial()
 
 // Body uses HouseholdSuperInputs field names (rates as decimals).

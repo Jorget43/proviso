@@ -9,7 +9,7 @@ import { isEofySeason } from './eofy'
 import { fmt } from './formatting'
 
 /** Where a prompt's button leads — each platform maps these to its own screens. */
-export type OverviewTarget = 'income' | 'budget' | 'savings' | 'eofy'
+export type OverviewTarget = 'income' | 'budget' | 'savings' | 'eofy' | 'children'
 
 export interface OverviewCheck {
   tone:   'red' | 'amber' | 'blue'
@@ -33,6 +33,13 @@ export interface OverviewInputs<E extends BudgetExpense> {
   mortgage:       { balance: number; endDate: string } | null
   superBalances:  { p1: number; p2: number }
   snapshots:      { takenAt: Date | string; netWorth: number; totalAssets: number | null; totalDebts: number | null }[]
+  /**
+   * School fees are planned but no children are recorded (the app; the NAS
+   * has no child records). Without them the projection falls back to stored
+   * start years, which charged one-child households from before Phase 41 a
+   * second child's fees.
+   */
+  childrenMissing?: boolean
 }
 
 export interface HomeOverview<E extends BudgetExpense> {
@@ -95,6 +102,9 @@ export function computeHomeOverview<E extends BudgetExpense>(i: OverviewInputs<E
   }
   if (coverMonths !== null && coverMonths < 3) {
     checks.push({ tone: 'amber', text: `Your cash would cover about ${coverMonths < 1 ? 'less than a month' : `${coverMonths.toFixed(1)} months`} of spending. Three to six months is a common safety net.`, target: 'savings', cta: 'See savings' })
+  }
+  if (i.childrenMissing) {
+    checks.push({ tone: 'amber', text: 'School fees are planned, but your children aren’t recorded yet. Add them so the fees start and stop in the right years.', target: 'children', cta: 'Add children' })
   }
   if (isEofySeason(i.now)) {
     checks.push({ tone: 'blue', text: 'Tax time is coming up. The end-of-year checklist helps you get ready.', target: 'eofy', cta: 'Open checklist' })

@@ -118,6 +118,8 @@ export interface RentSettingsLike {
   purchasePlanEnabled: boolean; targetPurchaseYear: number; targetPropertyValue: number
   depositPct: number; depositFromCash: number; depositFromInvestments: number
   newMortgageRate: number; newMortgageTermYrs: number
+  /** Stamp duty and buying costs, % of the price (schema v4). */
+  stampDutyPct?: number
 }
 
 export type IncomeLike = Pick<BudgetIncome, 'taxMode' | 'person1FTE' | 'person2FTE' | 'person1MonthlyNet' | 'person2MonthlyNet'>
@@ -203,6 +205,7 @@ export function buildProjectionInputs(b: ProjectionBaseline, l: ProjectionLive):
     targetPropertyValue: l.rent.targetPropertyValue, depositPct: l.rent.depositPct,
     depositFromCash: l.rent.depositFromCash, depositFromInvestments: l.rent.depositFromInvestments,
     newMortgageRate: l.rent.newMortgageRate, newMortgageTermYrs: l.rent.newMortgageTermYrs,
+    stampDutyPct: l.rent.stampDutyPct ?? 0,
     lifeCourse: life && sup ? {
       partnerEnabled: life.partnerEnabled,
       person1Age: life.person1Age, person2Age: life.person2Age,
