@@ -15,6 +15,13 @@
       "when": 1791461755387,
       "tag": "0001_life_course",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1791803127461,
+      "tag": "0002_birth_years",
+      "breakpoints": true
     }
   ]
 }

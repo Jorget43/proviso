@@ -1,6 +1,6 @@
 # Plan: modelling depth, scenarios and UX (proposed 2026-10-08)
 
-**Status: agreed 2026-10-08. Step A done (Phases 37–39, see CLAUDE.md). Step B: the life-course engine is Phase 40 (2026-10-09); birth years and the `child` table are next (Phase 41).**
+**Status: agreed 2026-10-08. Step A done (Phases 37–39, see CLAUDE.md). Step B: the life-course engine is Phase 40 (2026-10-09); birth years and the `child` table are Phase 41 (2026-10-12). Next: step C.**
 
 **Owner's decisions for step B (2026-10-09):**
 - Spending becomes the retirement goal once everyone has retired.

@@ -4,6 +4,7 @@ import { requireAdult } from '@/lib/auth'
 import { computeBudgetSummary } from '@proviso/core/budgetSummary'
 import { retirementIncomeGoal, spendingInRetirement } from '@proviso/core/future'
 import { workDaysForYear } from '@proviso/core/projections'
+import { currentAges } from '@proviso/core/people'
 import SuperClient from '@/components/super/SuperClient'
 import type { HouseholdSuperInputs, ProjectionContext } from '@proviso/core/super'
 
@@ -29,6 +30,7 @@ export default async function SuperPage() {
   // costs, it stands in for the retirement income goal until one is saved
   // (@proviso/core/future, shared with the app).
   const year = new Date().getFullYear()
+  const ages = currentAges(inc, year)   // this year's, from the birth years
   const budget = computeBudgetSummary({
     expenses, annualExpenses, income: inc, childcare,
     rentMonthly: rent?.enabled ? rent.monthlyRent : null,
@@ -54,10 +56,10 @@ export default async function SuperPage() {
   }
 
   const context: ProjectionContext = {
-    person1Age:          inc.person1Age,
+    person1Age:          ages.person1Age,
     person1Salary:       inc.person1FTE,
     person1SalaryGrowth: proj.person1Growth / 100,
-    person2Age:          inc.person2Age,
+    person2Age:          ages.person2Age,
     person2Salary:       inc.person2FTE,
     person2SalaryGrowth: proj.person2Growth / 100,
   }

@@ -22,6 +22,7 @@ import { MODEL_BASE_YEAR } from './constants'
 import { EDUCATION_PRESETS, type SchoolType } from './educationCosts'
 import { computeMonthlyRepayment } from './mortgage'
 import { helpDebtName } from './members'
+import { SCHOOL_START_AGE, SCHOOL_END_AGE, birthYearFromAge } from './people'
 
 export type StateKey = 'nsw' | 'vic' | 'qld' | 'sa' | 'wa' | 'tas' | 'act' | 'nt'
 
@@ -124,8 +125,7 @@ export interface StarterAnswers {
   investments: number
 }
 
-export const SCHOOL_START_AGE = 5   // Prep / Kindergarten (first year of school)
-export const SCHOOL_END_AGE   = 17  // Year 12
+export { SCHOOL_START_AGE, SCHOOL_END_AGE }
 
 /** Not at school yet (childcare-age). */
 export const isPreschool = (c: StarterChild) => c.age < SCHOOL_START_AGE
@@ -254,7 +254,9 @@ function homeEquity(a: StarterAnswers): number {
 
 export interface StarterHousehold {
   household:  { person1Name: string; person2Name: string; partnerEnabled: boolean; onboardingDone: true }
-  income:     { taxMode: true; person1FTE: number; person2FTE: number; person1HasHELP: boolean; person2HasHELP: boolean; person1Age: number; person2Age: number }
+  income:     { taxMode: true; person1FTE: number; person2FTE: number; person1HasHELP: boolean; person2HasHELP: boolean; person1Age: number; person2Age: number; person1BirthYear: number; person2BirthYear: number }
+  /** Eldest first, birth year from the age given (the month isn't asked). */
+  children:   { name: null; birthYear: number; birthMonth: null }[]
   workPhases: { person: 'p1' | 'p2'; year: number; days: number }[]
   super:      { person1Balance: number; person2Balance: number }
   childcare:  { enabled: boolean; costPerDay: number; daysPerWeek: number; numChildren: number }
@@ -296,7 +298,9 @@ export function buildStarterHousehold(a: StarterAnswers, lines: StarterLine[], n
       person1FTE: a.you.salary, person2FTE: p?.salary ?? 0,
       person1HasHELP: a.you.hasHelp, person2HasHELP: p?.hasHelp ?? false,
       person1Age: a.you.age, person2Age: p?.age ?? 30,
+      person1BirthYear: birthYearFromAge(a.you.age, year), person2BirthYear: birthYearFromAge(p?.age ?? 30, year),
     },
+    children: childOrder(a.children).map(({ child }) => ({ name: null, birthYear: birthYearFromAge(child.age, year), birthMonth: null })),
     workPhases: [
       { person: 'p1', year, days: a.you.days },
       ...(p ? [{ person: 'p2' as const, year, days: p.days }] : []),

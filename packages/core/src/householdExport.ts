@@ -9,7 +9,7 @@
 
 import { getTableColumns, type Table } from 'drizzle-orm'
 import {
-  HOUSEHOLD_TABLES, POCKET_MONEY_TABLES, SCHEMA_VERSION, SETTINGS_ID,
+  HOUSEHOLD_TABLES, POCKET_MONEY_TABLES, SCHEMA_VERSION, SETTINGS_ID, TABLE_SINCE,
   type HouseholdRow, type HouseholdTableName, type PocketMoneyRow, type PocketMoneyTableName,
 } from './schema'
 import { isRowId } from './ids'
@@ -79,7 +79,12 @@ export function parseHouseholdExport(input: unknown): HouseholdExport {
   if (typeof source.app !== 'string' || typeof source.version !== 'string') throw new ExportFormatError('The export’s "source" is incomplete.')
   if (!Array.isArray(doc.notes) || !doc.notes.every(n => typeof n === 'string')) throw new ExportFormatError('The export’s "notes" must be a list of text.')
 
-  checkTables(obj(doc.household, 'household'), HOUSEHOLD_TABLES, 'household')
+  const household = obj(doc.household, 'household')
+  // Files from before a table existed don't have it: it starts empty.
+  for (const [name, since] of Object.entries(TABLE_SINCE)) {
+    if (doc.schemaVersion < since! && !(name in household)) household[name] = []
+  }
+  checkTables(household, HOUSEHOLD_TABLES, 'household')
   if (!Array.isArray(doc.pocketMoney)) throw new ExportFormatError('The export’s "pocketMoney" must be a list.')
   doc.pocketMoney.forEach((space, i) => {
     const s = obj(space, `pocketMoney[${i}]`)

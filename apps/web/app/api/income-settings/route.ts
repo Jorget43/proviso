@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/db'
 import { withErrors, parseBody } from '@/lib/apiHandler'
 import { incomeSettingsSchema } from '@proviso/core/schemas'
+import { agesInStep } from '@proviso/core/people'
 import { authorize, requireAdultRead } from '@/lib/rbac'
 import { NextRequest } from 'next/server'
 
@@ -17,7 +18,7 @@ export const PUT = withErrors(async (request: NextRequest) => {
   const body = await parseBody(request, incomeSettingsSchema)
   const updated = await prisma.incomeSettings.update({
     where: { id: 1 },
-    data: body,
+    data: { ...body, ...agesInStep(body, new Date().getFullYear()) },
   })
   return Response.json(updated)
 })

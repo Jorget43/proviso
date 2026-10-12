@@ -63,6 +63,29 @@ describe('projectionBaseline', () => {
 })
 
 describe('buildProjectionInputs', () => {
+  it('takes school-fee years from the children when there are any', () => {
+    const b = projectionBaseline(source())
+    const two = buildProjectionInputs(b, live({ children: [
+      { name: null, birthYear: 2022, birthMonth: null }, { name: null, birthYear: 2018, birthMonth: 4 },
+    ] }))
+    expect([two.sfC1Start, two.sfC2Start, two.sfC2ExitIdx]).toEqual([2022, 2026, 13])
+    // Without children the stored years stand (NAS households, older app households).
+    const none = buildProjectionInputs(b, live({ children: [] }))
+    expect([none.sfC1Start, none.sfC2Start]).toEqual([2030, 2033])
+  })
+
+  it('charges one child’s fees, not two, when there is one child', () => {
+    const b = projectionBaseline(source())
+    const on = { ...settings, schoolFeesOn: true }
+    const out = runProjections(buildProjectionInputs(b, live({ settings: on, children: [{ name: null, birthYear: 2020, birthMonth: null }] })))
+    const one = out.withFees!
+    // Born 2020: Prep in 2025, so Year 3 in 2028 ($10,000 + $1,000), plus the $350 household levy, both from 2026 prices at 5%.
+    const i2028 = out.labels.indexOf('2028')
+    expect(one.sfC2Arr.every(v => v === 0)).toBe(true)
+    expect(one.sfC1Arr[i2028]).toBeCloseTo(11_000 * 1.05 ** 2, -1)
+    expect(one.sfTotalArr[i2028]).toBeCloseTo((11_000 + 350) * 1.05 ** 2, -1)
+  })
+
   it('takes the loan repayment out while the engine pays the loan', () => {
     const i = buildProjectionInputs(projectionBaseline(source()), live())
     expect(i.baseMonthlyExpenses).toBe(1100)

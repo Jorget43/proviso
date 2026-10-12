@@ -184,4 +184,25 @@ describe('changes that can’t be applied yet are kept, never lost', () => {
     expect((await loadHousehold(db)).oneOffs).toMatchObject([{ name: 'Boat', amt: 9_000, year: 2030 }])
     expect(await syncState(db)).toMatchObject({ waiting: 2, needsUpdate: true })
   })
+
+  it('birth years and children (v3) live alongside a v2 device’s age edits', async () => {
+    const db = (await migratedTestDb()).db
+    await prepareJoin(db, RELAY)
+    const settings = (n: number, column: string, value: number | null, schema: number) =>
+      ({ change: { hlc: at(n), table: 'incomeSettings', row: 'income', column, value }, schema })
+    await applyChanges(db, [
+      settings(1, 'deletedAt', null, SCHEMA_VERSION),
+      settings(2, 'person1BirthYear', 1980, SCHEMA_VERSION),
+      // An older device that knows only ages: its edit lands, and the birth year stays.
+      settings(3, 'person1Age', 47, SCHEMA_VERSION - 1),
+      { change: { hlc: at(4), table: 'child', row: 'k1', column: 'birthYear', value: 2019 }, schema: SCHEMA_VERSION },
+      { change: { hlc: at(5), table: 'child', row: 'k1', column: 'name', value: null }, schema: SCHEMA_VERSION },
+      { change: { hlc: at(6), table: 'child', row: 'k1', column: 'birthMonth', value: 7 }, schema: SCHEMA_VERSION },
+      { change: { hlc: at(7), table: 'child', row: 'k1', column: 'deletedAt', value: null }, schema: SCHEMA_VERSION },
+    ])
+    const h = await loadHousehold(db)
+    expect(h.income).toMatchObject({ person1BirthYear: 1980, person1Age: 47 })
+    expect(h.children).toEqual([{ id: 'k1', deletedAt: null, name: null, birthYear: 2019, birthMonth: 7 }])
+    expect((await syncState(db))!.waiting).toBe(0)
+  })
 })

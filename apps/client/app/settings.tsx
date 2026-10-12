@@ -7,6 +7,7 @@ import { router, Stack, useFocusEffect } from 'expo-router'
 import Constants from 'expo-constants'
 import { encryptBackup } from '@proviso/core/backup'
 import { fmt } from '@proviso/core/formatting'
+import { childAge, childLabel } from '@proviso/core/people'
 import { useHousehold } from '@/data/DataProvider'
 import { useIdentity } from '@/data/useIdentity'
 import { exportHousehold } from '@/data/importExport'
@@ -93,6 +94,10 @@ export default function Settings() {
         <H2>Household</H2>
         <Card style={{ gap: 0, paddingVertical: space.xs }}>
           <Row label="People" value={people} onPress={() => router.push('/people')} first />
+          {h.children.map((c, i) => (
+            <Row key={c.id} label={childLabel(c, i + 1)} value={`Born ${c.birthYear}, ${childAge(c, new Date())} now`} onPress={() => router.push({ pathname: '/child', params: { id: c.id } })} />
+          ))}
+          <Row label="Children" value={h.children.length ? 'Add another' : 'Add a child'} onPress={() => router.push('/child')} />
           <Row label="Rent" value={h.rent.enabled ? `${fmt(h.rent.monthlyRent)} a month` : 'Not renting'} onPress={() => router.push('/rent')} />
           <Row label="Childcare" value={h.childcare.enabled ? `${h.childcare.daysPerWeek} days a week` : 'None'} onPress={() => router.push('/childcare')} />
           <Row label="Pay" value="Salaries and days worked" onPress={() => router.push('/income')} />

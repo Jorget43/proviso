@@ -22,6 +22,8 @@ export class SyncScheduler {
     private onStatus: (s: SyncStatus) => void,
     /** Called when other devices' changes arrived, so screens reload. */
     private onReceived: () => Promise<void>,
+    /** Called after each successful sync, once this device has everyone's changes. */
+    private onSynced: () => Promise<void> = async () => {},
   ) {}
 
   private set(patch: Partial<SyncStatus>) {
@@ -58,6 +60,7 @@ export class SyncScheduler {
       try {
         const r = await runSync(this.db)
         if (r && r.received > 0) await this.onReceived()
+        if (r) await this.onSynced()
         this.set({ error: null })
       } catch (e) {
         this.set({ error: e instanceof Error ? e.message : String(e) })

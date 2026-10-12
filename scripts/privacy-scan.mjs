@@ -91,6 +91,15 @@ function escapeRe(s) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
+// A match inside a long base64/hex run (lockfile integrity hashes, keys) is
+// chance, not data: short names turn up in random checksums.
+function inChecksum(text, index, length) {
+  let a = index, b = index + length
+  while (a > 0 && /[A-Za-z0-9+/=]/.test(text[a - 1])) a--
+  while (b < text.length && /[A-Za-z0-9+/=]/.test(text[b])) b++
+  return b - a >= 40
+}
+
 // Word terms: must start a word (not preceded by a letter) and not continue
 // in lowercase — so "Alex" hits "AlexPhase"/"alex_fte" but not "alexandria".
 // Numeric terms: must stand alone (no adjacent alphanumerics, no decimal
@@ -107,7 +116,7 @@ function denyHits(text, deny) {
       const ok = d.numeric
         ? !/[A-Za-z0-9.]/.test(before) && !/[A-Za-z0-9]/.test(after) && !(after === '.' && /\d/.test(after2))
         : !/[A-Za-z]/.test(before) && !/[a-z]/.test(after)
-      if (ok) hits.push({ index: m.index, rule: 'denylist', value: m[0] })
+      if (ok && !inChecksum(text, m.index, m[0].length)) hits.push({ index: m.index, rule: 'denylist', value: m[0] })
     }
   }
   return hits

@@ -5,7 +5,7 @@ import { contentId } from '@proviso/core/ids'
 import type { Db } from '@/data/db'
 import { loadHousehold } from '@/data/household'
 import { importHousehold, exportHousehold, restoreHousehold, eraseHousehold } from '@/data/importExport'
-import { savePeople, saveRent, saveChildcare } from '@/data/settings'
+import { savePeople, saveRent, saveChildcare, fillBirthYears, saveChild, removeChild } from '@/data/settings'
 import { encryptBackup, decryptBackup, newHouseholdKey } from '@proviso/core/backup'
 import { parseHouseholdExport } from '@proviso/core/householdExport'
 import { insertRow, updateRow, deleteRow, saveSettings } from '@/data/mutate'
@@ -27,7 +27,7 @@ function sampleExport(): HouseholdExport {
   const h = emptyHouseholdTables()
   h.householdSettings.push({ id: SETTINGS_ID.household, deletedAt: null, person1Name: 'Alex', person2Name: 'Sam', partnerEnabled: true, onboardingDone: true })
   h.incomeSettings.push({ id: SETTINGS_ID.income, deletedAt: null, taxMode: false, person1FTE: 0, person2FTE: 0, person1HasHELP: false, person2HasHELP: false,
-    person1MonthlyNet: 5000, person2MonthlyNet: 3000, person1Age: 35, person2Age: 34 })
+    person1MonthlyNet: 5000, person2MonthlyNet: 3000, person1Age: 35, person2Age: 34, person1BirthYear: null, person2BirthYear: null })
   h.expense.push(
     { id: ID(1), deletedAt: null, cat: 'Food', name: 'Groceries', freq: 'weekly', amt: 300 },
     { id: ID(2), deletedAt: null, cat: 'Utilities', name: 'Power', freq: 'quarterly', amt: 600 },
@@ -192,6 +192,16 @@ describe('setting up a new household', () => {
     expect(v.noIncome).toBe(false)
     expect(v.budget.childcareNet).toBeGreaterThan(0)
     expect(v.situation).toEqual(['With Sam', 'Own our home', 'Paying for childcare', 'Planning school fees'])
+  })
+
+  it('records birth years and the children, eldest first', async () => {
+    const { db } = await migratedTestDb()
+    await startHousehold(db, buildStarterHousehold(answers, estimateLivingCosts(answers), NOW))
+    const h = await loadHousehold(db)
+    expect(h.income).toMatchObject({ person1BirthYear: 1992, person2BirthYear: 1993, person1Age: 34 })
+    expect(h.children.map(c => [c.birthYear, c.name])).toEqual([[2020, null], [2024, null]])
+    // The fee years the projection uses are the ones set up before children were records.
+    expect(h.projection).toMatchObject({ sfC1Start: 2024, sfC2Start: 2028 })
   })
 
   it('replaces a household that was started but never set up', async () => {
@@ -461,6 +471,56 @@ describe('settings and backups', () => {
     expect(h.settings.person1Name).toBe('Alexandra')
     expect(h.debts.map(d => d.name)).toEqual(['Alexandra HELP debt'])
     expect(wealthView(h, NOW).help[0]).toMatchObject({ name: 'Alexandra', balance: 20_000 })
+  })
+
+  it('saves birth years with the age they mean, and refuses ones out of range', async () => {
+    const db = await setUp()
+    expect(await savePeople(db, { person1Name: 'Alex', person2Name: 'Sam', partnerEnabled: true, person1BirthYear: 1980, person2BirthYear: 1985 }, 2026)).toBeNull()
+    expect((await loadHousehold(db)).income).toMatchObject({ person1BirthYear: 1980, person1Age: 46, person2BirthYear: 1985, person2Age: 41 })
+    expect(await savePeople(db, { person1Name: 'Alex', person2Name: 'Sam', partnerEnabled: true, person1BirthYear: 2015 }, 2026)).toMatch(/between 1926 and 2010/)
+  })
+
+  it('ages move on with the calendar: retirement is a year nearer next year', async () => {
+    const db = await setUp()
+    const h = await loadHousehold(db)
+    const now = futureView(h, NOW).retirement.people[0]
+    const later = futureView(h, new Date('2027-10-15T00:00:00Z')).retirement.people[0]
+    expect(later.year).toBe(now.year)   // same retirement year, seen a year on
+  })
+
+  it('fills in birth years once for households from before them', async () => {
+    const db = await migratedTestDb().then(x => x.db)
+    await importHousehold(db, sampleExport())   // ages 35 and 34, no birth years
+    expect(await fillBirthYears(db, 2026)).toBe(true)
+    expect((await loadHousehold(db)).income).toMatchObject({ person1BirthYear: 1991, person2BirthYear: 1992, person1Age: 35 })
+    expect(await fillBirthYears(db, 2027)).toBe(false)   // done; a year on it doesn't move them
+    const empty = (await migratedTestDb()).db
+    expect(await fillBirthYears(empty, 2026)).toBe(false)   // nothing set up yet
+  })
+
+  it('children: add, change, remove; a single child pays one set of school fees', async () => {
+    const db = await setUp()
+    await saveAssumptions(db, { person1Growth: 3, person2Growth: 3, expInfl: 2.5, investReturn: 5, savingsRate: 10, propGrowth: 3.5, horizonAge: 95, schoolFeesOn: true }, 60_000)
+    expect(await saveChild(db, null, { name: '', birthYear: 2019, birthMonth: null }, 2026)).toBeNull()
+    let h = await loadHousehold(db)
+    expect(h.children).toHaveLength(1)
+    const one = futureView(h, NOW).schoolFees.total
+    // A second child adds their fees.
+    expect(await saveChild(db, null, { name: 'Alex jr', birthYear: 2022, birthMonth: 5 }, 2026)).toBeNull()
+    h = await loadHousehold(db)
+    const two = futureView(h, NOW).schoolFees.total
+    expect(two).toBeGreaterThan(one * 1.5)
+    // Changing a birth year moves the fees; removing a child takes theirs away.
+    const younger = h.children[1]
+    expect(await saveChild(db, younger.id, { name: 'Alex jr', birthYear: 2008, birthMonth: 5 }, 2026)).toBeNull()
+    h = await loadHousehold(db)
+    expect(h.children.map(c => c.birthYear)).toEqual([2008, 2019])   // eldest first
+    await removeChild(db, h.children[0].id)
+    h = await loadHousehold(db)
+    expect(h.children.map(c => c.birthYear)).toEqual([2019])
+    expect(futureView(h, NOW).schoolFees.total).toBeCloseTo(one)
+    expect(await saveChild(db, null, { name: '', birthYear: 1950, birthMonth: null }, 2026)).toMatch(/year they were born/)
+    expect(await saveChild(db, null, { name: '', birthYear: 2020, birthMonth: 13 }, 2026)).toMatch(/month/)
   })
 
   it('refuses names that can’t be told apart', async () => {

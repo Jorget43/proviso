@@ -24,6 +24,7 @@ import { SF_BASE, type FeeSchedule } from './schoolFees'
 import type { LifePhaseOverlay } from './lifephases'
 import type { HouseholdSuperInputs, ProjectionContext } from './super'
 import { asDrawdownStrategy, yearsToAge, DEFAULT_HORIZON_AGE } from './retirement'
+import { schoolStartsFromChildren, type ChildLike } from './people'
 
 /** The budget's home-loan repayment line(s). */
 export const isMortgageLine = (e: { cat: string; name: string }) => e.cat === 'Home' && /mortgage/i.test(e.name)
@@ -140,6 +141,12 @@ export interface ProjectionLive {
   currentYear:    number
   /** People, retirement and super. Without it the projection runs as before Phase 40 (pay never stops). */
   life?:          LifeLive
+  /**
+   * The household's children (schema v3). When there are any, the school-fee
+   * years follow their birth years instead of the stored start years, and a
+   * single child is charged as one.
+   */
+  children?:      ChildLike[]
 }
 
 export interface LifeLive {
@@ -161,6 +168,12 @@ export function buildProjectionInputs(b: ProjectionBaseline, l: ProjectionLive):
     - (s.schoolFeesOn ? b.modelledSchoolMonthly : 0)
   const life = l.life
   const sup  = life?.super
+  const kids = l.children?.length ? schoolStartsFromChildren(l.children, l.currentYear) : null
+  const school = kids
+    ? { sfC1Start: kids.sfC1Start, sfC2Start: kids.sfC2Start ?? kids.sfC1Start,
+        // No second child at school: an exit before the first level turns it off.
+        sfC2ExitIdx: kids.sfC2Start === null ? -1 : s.sfC2ExitIdx }
+    : { sfC1Start: s.sfC1Start, sfC2Start: s.sfC2Start, sfC2ExitIdx: s.sfC2ExitIdx }
   return {
     person1FTE: l.income.person1FTE, person2FTE: l.income.person2FTE, taxMode: l.income.taxMode,
     // HELP is modelled whenever a balance is recorded: repayments are compulsory.
@@ -181,7 +194,7 @@ export function buildProjectionInputs(b: ProjectionBaseline, l: ProjectionLive):
     oneoffs: l.oneoffs,
     parentalLeaveEnabled: s.parentalLeaveEnabled,
     schoolFeesOn: s.schoolFeesOn,
-    sfC1Start: s.sfC1Start, sfC1ExitIdx: s.sfC1ExitIdx, sfC2Start: s.sfC2Start, sfC2ExitIdx: s.sfC2ExitIdx,
+    sfC1Start: school.sfC1Start, sfC1ExitIdx: s.sfC1ExitIdx, sfC2Start: school.sfC2Start, sfC2ExitIdx: school.sfC2ExitIdx,
     sfInfl: s.sfInfl, sfSchedule: l.sfSchedule,
     lifePhases: l.lifePhases,
     currentYear: l.currentYear,

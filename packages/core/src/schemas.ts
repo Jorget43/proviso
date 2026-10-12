@@ -57,6 +57,8 @@ export const incomeSettingsSchema = z
     person2MonthlyNet: num,
     person1Age:        int,
     person2Age:        int,
+    person1BirthYear:  int.min(1900).max(2100).nullable(),
+    person2BirthYear:  int.min(1900).max(2100).nullable(),
   })
   .partial()
 

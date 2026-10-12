@@ -69,6 +69,22 @@ describe('parseHouseholdExport', () => {
     expect(bad(d => { d.household.session = [] })).toThrow(/unknown table "session"/)
   })
 
+  it('reads a table added after the file was made as empty (v2 files have no children)', () => {
+    const v2 = viaJson(sample()); v2.schemaVersion = 2; delete v2.household.child
+    expect(parseHouseholdExport(v2).household.child).toEqual([])
+    // A v3 file must have it.
+    expect(bad(d => { delete d.household.child })).toThrow(/missing the "child" table/)
+  })
+
+  it('accepts adults’ birth years and children (v3)', () => {
+    const d = viaJson(sample())
+    d.household.incomeSettings = [{ id: SETTINGS_ID.income, deletedAt: null, person1Age: 40, person2Age: 38, person1BirthYear: 1986, person2BirthYear: 1988 }]
+    d.household.child = [{ id: ID(5), deletedAt: null, name: null, birthYear: 2020, birthMonth: 3 }]
+    const parsed = parseHouseholdExport(d)
+    expect(parsed.household.child[0].birthYear).toBe(2020)
+    expect(bad(x => { x.household.child = [{ id: ID(5), deletedAt: null, name: 'Alex' }] })).toThrow(/birthYear/)
+  })
+
   it('throws ExportFormatError, so callers can show the message', () => {
     expect(bad(d => { d.household = 'x' })).toThrow(ExportFormatError)
   })

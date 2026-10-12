@@ -2,13 +2,14 @@ export const dynamic = 'force-dynamic'
 import { prisma } from '@/lib/db'
 import { requireAdult } from '@/lib/auth'
 import { projectionBaseline } from '@proviso/core/future'
+import { currentAges } from '@proviso/core/people'
 import { workDaysForYear } from '@proviso/core/projections'
 import type { LifePhase } from '@proviso/core/lifephases'
 import ProjectionsClient from '@/components/projections/ProjectionsClient'
 
 export default async function ProjectionsPage() {
   const me = await requireAdult()
-  const [income, settings, person1Phases, person2Phases, oneoffs, lifePhases, expenses, debts, assets, mortgage, hs, feeSchedule, rentSettings, snapshots, annualExpenses, childcare, sup] = await Promise.all([
+  const [savedIncome, settings, person1Phases, person2Phases, oneoffs, lifePhases, expenses, debts, assets, mortgage, hs, feeSchedule, rentSettings, snapshots, annualExpenses, childcare, sup] = await Promise.all([
     prisma.incomeSettings.findUniqueOrThrow({ where: { id: 1 } }),
     prisma.projectionSettings.findUniqueOrThrow({ where: { id: 1 } }),
     prisma.person1Phase.findMany({ orderBy: { year: 'asc' } }),
@@ -31,6 +32,8 @@ export default async function ProjectionsPage() {
   const person1Name = hs?.person1Name ?? 'Person 1'
   const person2Name = hs?.person2Name ?? 'Person 2'
   const currentYear = new Date().getFullYear()
+  // Ages this year, from the birth years.
+  const income = { ...savedIncome, ...currentAges(savedIncome, currentYear) }
 
   // Today's position, assembled the same way as the app's Future screen
   // (@proviso/core/future): the budget's spending (yearly bills and

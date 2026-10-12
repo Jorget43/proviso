@@ -67,9 +67,11 @@ export const POST = withErrors(async (req: Request) => {
       data: {
         person1FTE:     person1Income,
         person1Age:     person1Age,
+        person1BirthYear: new Date().getFullYear() - person1Age,
         person1HasHELP: person1HasHELP,
         person2FTE:     person2Income,
         person2Age:     person2Age,
+        person2BirthYear: new Date().getFullYear() - person2Age,
         person2HasHELP: person2HasHELP,
       },
     })

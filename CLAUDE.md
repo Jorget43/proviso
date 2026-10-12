@@ -404,7 +404,7 @@ The assumptions watchdog (`/admin/watchdog` for the CFO when `WATCHDOG_ENABLED=t
   - No Age Pension yet.
   - Investments outside super grow untaxed.
   - Super withdrawals are tax-free (true at 60+).
-  - Ages are whole years from `incomeSettings` and go stale each year until Phase 41's birth years.
+  - Ages are whole years "this year", from birth years since Phase 41 (no birth month for adults).
   - The minimum drawdown uses the start-of-year balance.
   - Spending switches to the retirement goal only once everyone has retired.
   - Retirement before 60 leaves super in accumulation (taxed at 15%) until 60.
@@ -423,7 +423,7 @@ Tracked in [`docs/security-privacy-legal.md`](docs/security-privacy-legal.md) §
 - ~~Small-text desktop layouts on phones~~ — done (v1.12.0), checked at 390px: Own & owe rows restacked, Investments labels/dropdowns fixed, work-pattern wording plain; EOFY, Super and the school-fee controls were already fine. Investment parcel cards rebuilt in Phase 24.
 - ~~Native app: token auth alongside the cookie session~~ — done (Phase 24), see [`docs/app-api.md`](docs/app-api.md). Still open for the app: passkey sign-in (WebAuthn from a native app needs the platform APIs and an associated domain), and CORS if the app is ever a web view on another origin.
 
-### The app — next steps (as of 2026-10-09)
+### The app — next steps (as of 2026-10-12)
 In [`docs/architecture.md`](docs/architecture.md) order. Phase 3 there (the single-device app) is built except for a store build; Phase 4 (sync) is built (Phases 34–35) and needs its first real run on the NAS. Settings passed the owner's phone check on 2026-10-07. The owner is enrolling in the Apple Developer Program.
 
 **Start here next session**, in this order:
@@ -432,12 +432,13 @@ In [`docs/architecture.md`](docs/architecture.md) order. Phase 3 there (the sing
 3. **Owner decisions pending**: the home-purchase deposit gap (below). (The NAS "Next 2 years" change in Phase 36 — rent and after-subsidy childcare now counted — was pushed with the owner's go-ahead on 2026-10-08.)
 4. **Step B of [`docs/plan-modelling-and-ux.md`](docs/plan-modelling-and-ux.md)**:
    - The life-course engine shipped as Phase 40 (merged to master 2026-10-09 with the owner's OK).
-   - Next is Phase 41: birth years (so ages don't go stale each year) and a `child` table.
+   - Phase 41 (birth years, the `child` table) is built on a branch, waiting for the owner's OK. Then step C: the cash-buffer rule and life-stage modifiers, which use the children's ages.
    - Step A (dark mode, editing, chart trim) shipped as Phases 37–39.
    - Also open: the relay enforcing roles, and the iOS build once the Apple account is ready.
 
 The full list:
 - **First development build with EAS** (Expo's build service): configured (see "EAS" above); Android built 2026-10-08, not yet checked on the phone. iOS needs the Apple Developer account (A$149 a year).
+- **Phantom second child's school fees (app, households set up before Phase 41)**: the questionnaire stored a default `sfC2Start` even with one child, so the projection charges a second child's fees. New households have child records, which fix it. Existing ones are fixed once their children are added under Settings, or by a one-off prompt (not built: needs the owner's call).
 - **Home purchase deposit**: the projection takes the deposit only from the amounts entered as coming from savings and investments; any rest appears from nowhere (NAS and app alike). The app's What if? warns about the gap; the engine should probably take the rest from cash, then investments (a behaviour change for the NAS too: decide with the owner, re-pin the tests). Stamp duty isn't modelled either.
 - **Key backup** (Phase 35): built, not yet compiled — check it in the next Android development build (Settings → Recovery phrase → Save to Google Password Manager; then on a fresh install, Restore or Join → "Use the key saved in …"), and on iOS once the Apple account is ready.
 - **Sync, what's left after Phase 34**: run the relay on the NAS (`docker compose --profile sync up -d` + Tailscale Serve, README) and try it with two phones; the relay enforcing roles (D6: a Partner's devices may not write some tables); pocket-money spaces for children; the relay serving the web build; turning an existing NAS household into the synced one (today: import the NAS export on one phone, turn sync on there, others join).
@@ -446,7 +447,7 @@ The full list:
 - **Dependency advisories**: GitHub lists some on master, believed to be all in Expo's build and dev-server tools (`braces`, `node-forge`, `uuid` via `xcode`, `decode-uri-component`), several with no fixed version yet. They don't reach the NAS image (CI audits exactly what it ships). Dependabot was preparing a security update for them on 2026-10-06: review it carefully, because Expo pins some of them, and React / React Native / `expo*` move only with the Expo SDK (`proviso-release` skill).
 - **Starter estimates** (`packages/core/src/starter.ts`): re-check the figures yearly with the July recalibration; electricity still uses the AER's 2020 usage benchmarks (no longer updated).
 
-### Where each feature lives (NAS ↔ app), as of Phase 40
+### Where each feature lives (NAS ↔ app), as of Phase 41
 
 | Feature | NAS web app | The app | Notes |
 |---|---|---|---|
@@ -463,6 +464,8 @@ The full list:
 | Future: Retirement (chart, drawdown strategy) | ✓ | Summary text only | App needs the chart component (plan item 2) and the strategy choice |
 | Future: look-ahead age, work changes, rent-then-buy | ✓ | ✓ (What if?) | |
 | Future: school fees | ✓ chart | Total only | |
+| Birth years (ages move on each year) | Set at onboarding; kept in step | ✓ edit (Settings → People) | `core/people.ts` |
+| Children (birth year, month, name) | — | ✓ edit (Settings); drive school-fee years | NAS keeps its school start years |
 | Life phases (calendar rows) | ✓ edit | Read only | Step C turns these into age-based modifiers |
 | Next 2 years | ✓ | ✓ | `core/cashflow.ts` |
 | Parental-leave switch | ✓ | Read only | |
@@ -553,6 +556,38 @@ Ideas that have been evaluated but aren't on the roadmap. Each links to its writ
 - **School fees decided**: the questionnaire's school-cost lines stay in today's budget; the projection models the two eldest children's fees year by year (ending after Year 12) and leaves those lines out (`isModelledSchoolLine`), so nothing is counted twice. The questionnaire switches `schoolFeesOn` on when there are children.
 - Typed routes are off in `apps/client` (the generated file only existed where a dev server ran, never in CI, and misread the monorepo).
 - Verified: 356 tests; the app at 390px (a Melbourne family of four: $2.32M in today's money in 20 years, HELP cleared 2028, school fees end 2039, loan paid off 2042; a $45k car in 2029 gives $2.28M); the NAS Projections and Super pages rendered against a scratch household. The NAS Super "consider a lower target" hint was fixed on the way (it would have subtracted the mortgage twice and suggested $0).
+
+### Phase 41 — Plan step B, part 2: birth years and children (2026-10-12)
+
+- **Schema v3** (Drizzle `0002_birth_years`, Prisma `0007_birth_years`):
+  - `incomeSettings.person1BirthYear` / `person2BirthYear` (nullable).
+  - A new `child` table (Drizzle only): `name` (optional), `birthYear`, `birthMonth` (optional, 1–12).
+  - `TABLE_SINCE` in `schema.ts`: export files and backups from before a table existed read it as empty, so v2 files still import.
+- **`packages/core/src/people.ts`**:
+  - `currentAges` gives this year's ages from birth years, falling back to the stored age.
+  - `birthYearPatch` and `agesInStep` keep age and birth year together, so app versions that only read ages stay close.
+  - `missingBirthYears` fills them in for older households.
+  - `sortChildren` (eldest first), `childLabel` ("Child 2" when unnamed), `childAge`, `schoolStartsFromChildren`.
+  - `SCHOOL_START_AGE` / `SCHOOL_END_AGE` now live here; `starter.ts` re-exports them.
+- **Projection** (`future.ts` `buildProjectionInputs`): with `children`, the school-fee years follow the two eldest children still at or before school. A single child is charged as one (`sfC2ExitIdx: -1`); before this, the app's one-child households were also charged a phantom second child's fees (see Backlog). Without children (every NAS household), the stored start years stand, so NAS numbers don't move.
+- **App**:
+  - The questionnaire writes birth years and child records.
+  - Settings → People asks the year each adult was born.
+  - Settings lists the children; `app/child.tsx` adds, changes and removes them.
+  - Views use `currentAges`.
+- **Filling in birth years** (`fillBirthYears`):
+  - When sync is off, it runs when the app opens, and after an import or restore.
+  - When sync is on, it runs only after a successful sync (`SyncScheduler`'s `onSynced`), so it can't overwrite a birth year another device has just set.
+- **NAS**:
+  - The migration backfills birth years from the saved ages.
+  - Projections and Super use `currentAges`.
+  - Onboarding and `PUT /api/income-settings` keep age and birth year in step.
+  - The export carries the birth years.
+  - No child records on the NAS yet: school fees v2 (plan item 7) adds them where needed.
+- **Verified**:
+  - 464 tests in total; new: people helpers, school years from children, a single child's fees, v2 exports, filling in, child edits, v2 and v3 sync messages together, the NAS export.
+  - Prisma migration run on a scratch database: ages 45/43 became 1981/1983.
+  - Headless Chrome at 390px (dark): setup with one child, then People, Add a child and Settings.
 
 ### Phase 40 — Plan step B, part 1: the life-course engine (2026-10-09)
 

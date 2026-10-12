@@ -5,6 +5,7 @@
 import { isNull } from 'drizzle-orm'
 import * as s from '@proviso/core/schema'
 import { withDefaults } from '@proviso/core/rows'
+import { sortChildren } from '@proviso/core/people'
 import type { Db } from './db'
 
 type R<T extends s.HouseholdTableName> = s.HouseholdRow<T>
@@ -19,6 +20,8 @@ export interface HouseholdData {
   debts:          R<'debt'>[]
   assets:         R<'asset'>[]
   workPhases:     R<'workPhase'>[]
+  /** Eldest first. */
+  children:       R<'child'>[]
   netWorthSnapshots: R<'netWorthSnapshot'>[]
   oneOffs:        R<'oneOff'>[]
   lifePhases:     R<'lifePhase'>[]
@@ -45,13 +48,13 @@ async function one<T extends s.HouseholdTableName>(db: Db, name: T): Promise<R<T
 export async function loadHousehold(db: Db): Promise<HouseholdData> {
   const [
     settings, members, expenses, annualExpenses, debts, assets, workPhases, netWorthSnapshots,
-    income, childcare, mortgage, projection, superSettings, rent, oneOffs, lifePhases, schoolFeeLevels,
+    income, childcare, mortgage, projection, superSettings, rent, oneOffs, lifePhases, schoolFeeLevels, children,
   ] = await Promise.all([
     one(db, 'householdSettings'), live(db, 'member'), live(db, 'expense'), live(db, 'annualExpense'),
     live(db, 'debt'), live(db, 'asset'), live(db, 'workPhase'), live(db, 'netWorthSnapshot'),
     one(db, 'incomeSettings'), one(db, 'childcareSettings'), one(db, 'mortgageSettings'),
     one(db, 'projectionSettings'), one(db, 'superSettings'), one(db, 'rentSettings'),
-    live(db, 'oneOff'), live(db, 'lifePhase'), live(db, 'schoolFeeLevel'),
+    live(db, 'oneOff'), live(db, 'lifePhase'), live(db, 'schoolFeeLevel'), live(db, 'child'),
   ])
   const id = s.SETTINGS_ID
   return {
@@ -59,6 +62,7 @@ export async function loadHousehold(db: Db): Promise<HouseholdData> {
     settings:      withDefaults(s.householdSettings, id.household, settings),
     members, expenses, annualExpenses, debts, assets, workPhases, netWorthSnapshots, oneOffs,
     lifePhases: lifePhases.sort((a, b) => a.sortOrder - b.sortOrder), schoolFeeLevels,
+    children: sortChildren(children),
     income:        withDefaults(s.incomeSettings, id.income, income),
     childcare:     withDefaults(s.childcareSettings, id.childcare, childcare),
     mortgage:      mortgage ?? null,

@@ -6,6 +6,7 @@ import { computeHomeOverview, type HomeOverview } from '@proviso/core/overview'
 import { computeBudgetSummary, isManagedChildcare } from '@proviso/core/budgetSummary'
 import { workDaysForYear, runProjections } from '@proviso/core/projections'
 import { projectionBaseline, buildProjectionInputs, feeScheduleFor, retirementIncomeGoal } from '@proviso/core/future'
+import { currentAges } from '@proviso/core/people'
 import { situationFrom, situationLabels } from '@proviso/core/situation'
 import { toMonthly, possessive } from '@proviso/core/formatting'
 import { netPositionOf, computeCashOnHand, isHomeEquity } from '@proviso/core/netWorth'
@@ -231,6 +232,7 @@ export function futureView(h: HouseholdData, now: Date): FutureView {
   const year = now.getFullYear()
   const p = phases(h)
   const s = h.projection
+  const ages = currentAges(h.income, year)
   const baseline = projectionBaseline({
     expenses: h.expenses, annualExpenses: h.annualExpenses, income: h.income, childcare: h.childcare,
     rentMonthly: rentMonthly(h),
@@ -246,7 +248,8 @@ export function futureView(h: HouseholdData, now: Date): FutureView {
     sfSchedule: feeScheduleFor(s.sfPresetKey, h.schoolFeeLevels),
     rent: h.rent, mortgage: { rate: h.mortgage?.rate ?? 0, payment: h.mortgage?.payment ?? 0 },
     currentYear: year,
-    life: { partnerEnabled: h.settings.partnerEnabled, person1Age: h.income.person1Age, person2Age: h.income.person2Age, super: h.superSettings },
+    life: { partnerEnabled: h.settings.partnerEnabled, ...ages, super: h.superSettings },
+    children: h.children,
   }))
   const run = out.withFees ?? out.base
   const end = run.nwArr[run.nwArr.length - 1] ?? baseline.netWorthToday
@@ -272,8 +275,8 @@ export function futureView(h: HouseholdData, now: Date): FutureView {
     return balances[at] / Math.pow(1 + s.expInfl / 100, at + 1)
   }
   const people = [
-    { name: h.settings.person1Name, age: h.superSettings.person1RetirementAge, from: h.income.person1Age, balances: run.super1Arr, today: h.superSettings.person1Balance },
-    ...(h.settings.partnerEnabled ? [{ name: h.settings.person2Name, age: h.superSettings.person2RetirementAge, from: h.income.person2Age, balances: run.super2Arr, today: h.superSettings.person2Balance }] : []),
+    { name: h.settings.person1Name, age: h.superSettings.person1RetirementAge, from: ages.person1Age, balances: run.super1Arr, today: h.superSettings.person1Balance },
+    ...(h.settings.partnerEnabled ? [{ name: h.settings.person2Name, age: h.superSettings.person2RetirementAge, from: ages.person2Age, balances: run.super2Arr, today: h.superSettings.person2Balance }] : []),
   ]
 
   return {
@@ -292,8 +295,8 @@ export function futureView(h: HouseholdData, now: Date): FutureView {
         return { name: x.name, age: x.age, year: retireYear, balanceToday: superAtRetirement(x.balances, x.today, retireYear) }
       }),
       goalMonthly: retirementIncomeGoal(h.superSettings.desiredRetirementIncome, baseline.retirementMonthly) / 12,
-      runsOutAt: run.shortfallYr ? h.income.person1Age + (run.shortfallYr - year) : null,
-      lastAge: h.income.person1Age + run.nwArr.length,
+      runsOutAt: run.shortfallYr ? ages.person1Age + (run.shortfallYr - year) : null,
+      lastAge: ages.person1Age + run.nwArr.length,
       bridgeShortYear: run.bridgeShortYr,
     },
     assumptions: { salaryGrowth: s.person1Growth, inflation: s.expInfl, investReturn: s.investReturn, savingsRate: s.savingsRate, propGrowth: s.propGrowth },

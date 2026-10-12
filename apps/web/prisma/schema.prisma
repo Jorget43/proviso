@@ -72,6 +72,10 @@ model IncomeSettings {
   person2MonthlyNet Float   @default(0)
   person1Age        Int     @default(30)
   person2Age        Int     @default(30)
+  // Schema v3: the year each adult was born, so ages move on by themselves
+  // (core people.ts currentAges). The ages above are kept in step.
+  person1BirthYear  Int?
+  person2BirthYear  Int?
 }
 
 model Person1Phase {

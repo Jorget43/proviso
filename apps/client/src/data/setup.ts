@@ -33,6 +33,7 @@ export async function startHousehold(db: Db, h: StarterHousehold): Promise<void>
     for (const e of h.expenses)   await insertRow(db, 'expense', e)
     for (const a of h.assets)     await insertRow(db, 'asset', a)
     for (const d of h.debts)      await insertRow(db, 'debt', d)
+    for (const c of h.children)   await insertRow(db, 'child', c)
     await db.run(sql`COMMIT`)
   } catch (err) {
     await db.run(sql`ROLLBACK`)

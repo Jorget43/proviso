@@ -22,7 +22,7 @@
 import { sqliteTable, text, integer, real } from 'drizzle-orm/sqlite-core'
 
 /** Bumped by every migration. Travels with each sync message and export. */
-export const SCHEMA_VERSION = 2
+export const SCHEMA_VERSION = 3
 
 export type PersonKey = 'p1' | 'p2'
 export const PERSON_KEYS: readonly PersonKey[] = ['p1', 'p2']
@@ -118,6 +118,12 @@ export const incomeSettings = sqliteTable('incomeSettings', {
   person2MonthlyNet: real('person2MonthlyNet').notNull().default(0),
   person1Age:        integer('person1Age').notNull().default(30),
   person2Age:        integer('person2Age').notNull().default(30),
+  // v3: the year each adult was born, so ages move on by themselves
+  // (people.ts currentAges). Null on rows made before v3; the age above is
+  // then used, and devices fill the year in from it (it's also kept in step,
+  // for older versions that only read the age).
+  person1BirthYear:  integer('person1BirthYear'),
+  person2BirthYear:  integer('person2BirthYear'),
 })
 
 /** Days a week each person works, from a given year (replaces Person1Phase / Person2Phase). */
@@ -126,6 +132,14 @@ export const workPhase = sqliteTable('workPhase', {
   person: text('person', { enum: ['p1', 'p2'] }).notNull(),
   year:   integer('year').notNull(),
   days:   integer('days').notNull(),
+})
+
+/** v3: a child of the household. Eldest first by birth date (people.ts sortChildren). */
+export const child = sqliteTable('child', {
+  id: id(), deletedAt: deletedAt(),
+  name:       text('name'),                // optional; "Child 1" etc. when empty
+  birthYear:  integer('birthYear').notNull(),
+  birthMonth: integer('birthMonth'),       // 1–12, optional
 })
 
 export const projectionSettings = sqliteTable('projectionSettings', {
@@ -339,11 +353,17 @@ export const pocketMoneyTx = sqliteTable('pocketMoneyTx', {
 /** Tables in the household space, in an order that respects references. */
 export const HOUSEHOLD_TABLES = {
   householdSettings, member, expense, annualExpense, debt, asset, mortgageSettings,
-  childcareSettings, incomeSettings, workPhase, projectionSettings, lifePhase, oneOff,
+  childcareSettings, incomeSettings, workPhase, child, projectionSettings, lifePhase, oneOff,
   transaction, categorisationRule, suggestionState, actualsSettings, schoolFeeLevel,
   helpDebtDetail, superSettings, superHistory, investmentParcel, netWorthSnapshot,
   donation, workExpense, rentSettings,
 } as const
+
+/**
+ * The schema version that added each table after the baseline. Export files
+ * and backups from before it don't have the table; it's read as empty.
+ */
+export const TABLE_SINCE: Partial<Record<keyof typeof HOUSEHOLD_TABLES, number>> = { child: 3 }
 
 /** Tables in a pocket-money space. */
 export const POCKET_MONEY_TABLES = { allowanceSchedule, pocketMoneyTx } as const

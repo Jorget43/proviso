@@ -14,6 +14,7 @@ import { importHousehold, restoreHousehold, eraseHousehold, type ImportResult } 
 import { decryptBackup, keyFromPhrase } from '@proviso/core/backup'
 import { freshIdentity, saveIdentity, forgetIdentity } from './identity'
 import { syncState, stopSync, type SyncState } from './sync'
+import { fillBirthYears } from './settings'
 import { turnOnSync, joinHousehold, recoverFromRelay, currentJoinCode, deleteFromRelay } from './syncRunner'
 import { SyncScheduler, type SyncStatus } from './syncScheduler'
 
@@ -72,10 +73,17 @@ export function DataProvider({ children, loading, failed }: {
     let alive = true
     openHouseholdDb()
       .then(async d => {
+        // Ages from before birth years are turned into birth years once. While
+        // syncing, that waits until this device has pulled (below), so it can't
+        // overwrite a birth year another device has just set.
+        if (!(await syncState(d))) await fillBirthYears(d, new Date().getFullYear())
         const h = await loadHousehold(d)
         if (!alive) return
-        setDb(d); setHousehold(h)
-        setScheduler(new SyncScheduler(d, setSync, async () => setHousehold(await loadHousehold(d))))
+        const reloadHere = async () => setHousehold(await loadHousehold(d))
+        const sched: SyncScheduler = new SyncScheduler(d, setSync, reloadHere, async () => {
+          if (await fillBirthYears(d, new Date().getFullYear())) { await reloadHere(); sched.changed() }
+        })
+        setDb(d); setHousehold(h); setScheduler(sched)
       })
       .catch((e: unknown) => { if (alive) setError(e instanceof Error ? e.message : String(e)) })
     return () => { alive = false }
@@ -101,6 +109,7 @@ export function DataProvider({ children, loading, failed }: {
     importFile: async json => {
       await notWhileSyncing(db)
       const r = await importHousehold(db, json)
+      await fillBirthYears(db, new Date().getFullYear())   // files from before birth years
       await saveIdentity(freshIdentity(r.householdId))
       await reload(db)
       return r
@@ -110,6 +119,7 @@ export function DataProvider({ children, loading, failed }: {
       const doc = decryptBackup(file, key)         // then that they open this backup
       await notWhileSyncing(db)
       const r = await restoreHousehold(db, doc)
+      await fillBirthYears(db, new Date().getFullYear())
       await saveIdentity({ householdId: r.householdId, key, phraseSaved: true })
       await reload(db)
       return r

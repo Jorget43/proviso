@@ -23,7 +23,7 @@ function legacy(): LegacyHousehold {
     mortgage: { id: 1, balance: 400000, rate: 6, payment: 2800, offsetBal: 0, endDate: '2050-01' },
     childcare: { id: 1, enabled: true, costPerDay: 140, daysPerWeek: 3, numChildren: 1 },
     income: { id: 1, taxMode: true, person1FTE: 100000, person2FTE: 80000, person1HasHELP: true, person2HasHELP: false,
-      person1MonthlyNet: 0, person2MonthlyNet: 0, person1Age: 35, person2Age: 34 },
+      person1MonthlyNet: 0, person2MonthlyNet: 0, person1Age: 35, person2Age: 34, person1BirthYear: 1991, person2BirthYear: null },
     person1Phases: [{ id: 1, year: 2026, days: 5 }],
     person2Phases: [{ id: 1, year: 2026, days: 3 }],
     projection: null,
@@ -93,6 +93,12 @@ describe('mapLegacyHousehold', () => {
       + exp.pocketMoney.reduce((s, sp) => s + insertAll(db, sp.tables as unknown as Record<string, Record<string, unknown>[]>), 0)
     expect(n).toBeGreaterThan(20)
     expect((db.prepare('SELECT count(*) c FROM "transaction"').get() as { c: number }).c).toBe(2)
+  })
+
+  it('carries birth years across; the NAS has no child records yet', () => {
+    const t = exportOf().household
+    expect(t.incomeSettings[0]).toMatchObject({ person1Age: 35, person1BirthYear: 1991, person2BirthYear: null })
+    expect(t.child).toEqual([])
   })
 
   it('gives the same ids every time it runs', () => {
