@@ -558,7 +558,7 @@ Ideas that have been evaluated but aren't on the roadmap. Each links to its writ
 
 ### Phase 42 — Paying for a home purchase; asking for the children (2026-10-12)
 
-Owner's decisions (2026-10-12): the deposit takes the rest from cash, then investments; stamp duty is modelled.
+Owner's decisions (2026-10-12): the deposit takes the rest from cash, then investments; stamp duty is modelled. Merged and pushed with the owner's OK the same day.
 
 - **Engine** (`projections.ts` `buyHome`, output `purchase: PurchasePaid`):
   - The deposit plus stamp duty is paid in this order: the amounts set aside from savings and investments, then other cash, then other investments. Investments lose `SALE_CGT_HAIRCUT` (12%) to capital gains tax, as before.
