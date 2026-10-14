@@ -20,7 +20,7 @@ import {
 
 function expectShape(r: ProjectionResult, years: number) {
   expect(Object.keys(r).sort()).toEqual([
-    'bridgeShortYr', 'cashArr', 'cashRunningArr', 'deficitArr', 'expArr', 'incArr',
+    'bridgeShortYr', 'bufferArr', 'cashArr', 'cashRunningArr', 'deficitArr', 'expArr', 'funArr', 'incArr',
     'investArr', 'leaveYrs', 'mortArr', 'mortStressArr', 'nwArr', 'owedArr', 'person1Arr',
     'person1HelpClearedYr', 'person1RetireYr', 'person2Arr', 'person2HelpClearedYr', 'person2RetireYr',
     'phaseArr', 'purchase', 'purchaseYr', 'rentArr', 'retiredArr', 'sfC1Arr', 'sfC2Arr',
@@ -441,5 +441,60 @@ describe('shortfalls', () => {
   it('a household with a surplus never owes anything', () => {
     const r = runProjections(makeProjectionInputs()).base
     expect(r.owedArr.every(v => v === 0)).toBe(true)
+  })
+})
+
+describe('cash buffer, then invest or enjoy (Phase 43)', () => {
+  // No loan, no growth: $182,160 a year in (2 × 91,080), $60,000 out
+  // (5,000 × 12), so $122,160 left over each year. Cash starts at 0.
+  const owned = (over: Partial<Parameters<typeof makeProjectionInputs>[0]> = {}) => makeProjectionInputs({
+    mortBalance: 0, cashOnHand: 0, savingsRate: 50, ...over,
+  })
+
+  it('with no buffer and no fun, numbers are exactly as before', () => {
+    const before = runProjections(owned()).base
+    const after  = runProjections(owned({ cashBufferMonths: 0, funPct: 0 })).base
+    expect(after).toEqual(before)
+    expect(after.funArr).toEqual([0, 0, 0, 0, 0])
+    expect(after.bufferArr).toEqual([0, 0, 0, 0, 0])
+    // 50% of 122,160 = 61,080 invested a year
+    expect(after.investArr).toEqual([61080, 122160, 183240, 244320, 305400])
+  })
+
+  it('keeps the buffer, then splits what is above it', () => {
+    const r = runProjections(owned({ cashBufferMonths: 6, funPct: 20 })).base
+    // Buffer: 6 × 60,000 / 12 = 30,000.
+    expect(r.bufferArr[0]).toBe(30000)
+    // Year 1: cash 122,160; above the buffer 92,160 → invest 50% = 46,080,
+    // fun 20% = 18,432, cash 122,160 − 64,512 = 57,648 (30,000 + 30% of 92,160).
+    // Year 2: cash 57,648 + 122,160 = 179,808; the whole 122,160 is above the
+    // buffer → invest 61,080, fun 24,432, cash 179,808 − 85,512 = 94,296.
+    expect(r.investArr.slice(0, 2)).toEqual([46080, 107160])
+    expect(r.funArr.slice(0, 2)).toEqual([18432, 24432])
+    expect(r.cashArr.slice(0, 2)).toEqual([57648, 94296])
+  })
+
+  it('fun leaves net worth: it falls by exactly what was spent', () => {
+    const keep = runProjections(owned({ cashBufferMonths: 6 })).base
+    const fun  = runProjections(owned({ cashBufferMonths: 6, funPct: 20 })).base
+    const spent = fun.funArr.reduce((a, b) => a + b, 0)
+    expect(keep.nwArr.at(-1)! - fun.nwArr.at(-1)!).toBeCloseTo(spent, -1)
+  })
+
+  it('tops the buffer up before investing anything', () => {
+    // $14,000 a month out → $168,000 a year; $14,160 left over.
+    // Buffer 6 × 14,000 = 84,000. Cash: 14,160, 28,320, … 70,800 (year 5),
+    // 84,960 (year 6): only the 960 above the buffer is split → 480 invested.
+    const r = runProjections(owned({ baseMonthlyExpenses: 14_000, cashBufferMonths: 6, projYears: 6 })).base
+    expect(r.investArr).toEqual([0, 0, 0, 0, 0, 480])
+    expect(r.cashArr.at(-1)).toBe(84480)
+  })
+
+  it('fun can only take what investing leaves', () => {
+    // Invest 80%, fun asked 50% → capped at 20%. Year 1 above the buffer: 92,160.
+    const r = runProjections(owned({ savingsRate: 80, cashBufferMonths: 6, funPct: 50 })).base
+    expect(r.investArr[0]).toBe(73728)  // 80% of 92,160
+    expect(r.funArr[0]).toBe(18432)     // 20% of 92,160
+    expect(r.cashArr[0]).toBe(30000)    // just the buffer
   })
 })

@@ -31,7 +31,7 @@ export default function AssumptionsSheet() {
 
   const [f, setF] = useState({
     p1: String(s.person1Growth), p2: String(s.person2Growth), infl: String(s.expInfl), ret: String(s.investReturn),
-    save: String(s.savingsRate), prop: String(s.propGrowth), age: String(s.horizonAge), monthly: String(Math.round(goal / 12)),
+    save: String(s.savingsRate), buffer: String(s.cashBufferMonths), fun: String(s.funPct), prop: String(s.propGrowth), age: String(s.horizonAge), monthly: String(Math.round(goal / 12)),
     fees: s.schoolFeesOn,
   })
   const [error, setError] = useState<string | null>(null)
@@ -45,9 +45,12 @@ export default function AssumptionsSheet() {
     const age = n(f.age)
     if (!Number.isInteger(age) || age < 70 || age > 105) { setError('Look ahead to an age between 70 and 105.'); return }
     if (!(n(f.monthly) >= 0)) { setError('Check the retirement income.'); return }
+    const buffer = n(f.buffer), fun = n(f.fun)
+    if (!(buffer >= 0 && buffer <= 60)) { setError('Keep a safety net of 0 to 60 months.'); return }
+    if (!(fun >= 0 && fun + pct[4] <= 100)) { setError('Investing and fun together can’t be more than 100%.'); return }
     await change(db => saveAssumptions(db, {
       person1Growth: pct[0], person2Growth: pct[1], expInfl: pct[2], investReturn: pct[3], savingsRate: pct[4], propGrowth: pct[5],
-      horizonAge: age, schoolFeesOn: f.fees,
+      cashBufferMonths: buffer, funPct: fun, horizonAge: age, schoolFeesOn: f.fees,
     }, Math.round(n(f.monthly) * 12)))
     router.back()
   }
@@ -69,14 +72,20 @@ export default function AssumptionsSheet() {
       <Field label="Investments return" hint="After fees, before tax.">
         <NumberField unit="%" label="Investment return, percent a year" value={f.ret} onChange={set('ret')} />
       </Field>
-      <Field label="Share of what’s left over that’s invested" hint="The rest stays as cash.">
+      <Field label="Safety net kept as cash" hint="Months of spending. What’s left over each year tops it up first; 0 for none.">
+        <NumberField unit="" label="Safety net, months of spending" value={f.buffer} onChange={set('buffer')} />
+      </Field>
+      <Field label="Share of what’s left over that’s invested" hint="Of what’s above the safety net. The rest stays as cash.">
         <NumberField unit="%" label="Share invested, percent" value={f.save} onChange={set('save')} />
+      </Field>
+      <Field label="Share spent on fun" hint="Holidays, treats, upgrades. It’s spent, so it doesn’t add to what you own.">
+        <NumberField unit="%" label="Share spent on fun, percent" value={f.fun} onChange={set('fun')} />
       </Field>
       <Field label="Home values grow">
         <NumberField unit="%" label="Home values grow, percent a year" value={f.prop} onChange={set('prop')} />
       </Field>
       <Field label="Look ahead until age" hint={h.settings.partnerEnabled ? 'The age the younger of you reaches by the last year shown.' : 'Your age in the last year shown.'}>
-        <NumberField label="Look ahead until age" value={f.age} onChange={set('age')} />
+        <NumberField unit="" label="Look ahead until age" value={f.age} onChange={set('age')} />
       </Field>
       <Field label="Income you’d like in retirement" hint="A month, in today’s money, for the household. It starts as what you spend now, less the home loan and the children’s costs.">
         <NumberField label="Retirement income a month" value={f.monthly} onChange={set('monthly')} />

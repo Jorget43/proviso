@@ -10,6 +10,8 @@ export interface Assumptions {
   expInfl:       number
   investReturn:  number
   savingsRate:   number
+  cashBufferMonths?: number  // months of spending kept as cash before investing
+  funPct?:       number      // % of what's above the safety net spent on fun
   propGrowth:    number
   horizonAge:    number   // look ahead until the younger adult is this age
   schoolFeesOn:  boolean

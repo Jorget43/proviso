@@ -22,7 +22,7 @@
 import { sqliteTable, text, integer, real } from 'drizzle-orm/sqlite-core'
 
 /** Bumped by every migration. Travels with each sync message and export. */
-export const SCHEMA_VERSION = 4
+export const SCHEMA_VERSION = 5
 
 export type PersonKey = 'p1' | 'p2'
 export const PERSON_KEYS: readonly PersonKey[] = ['p1', 'p2']
@@ -164,6 +164,11 @@ export const projectionSettings = sqliteTable('projectionSettings', {
   // v2: the projection runs until the younger adult reaches this age
   // (retirement.ts yearsToAge). projYears is no longer read.
   horizonAge:           integer('horizonAge').notNull().default(95),
+  // v5: the savings rule (projections.ts). Keep this many months of spending
+  // as cash first; of what's above it, savingsRate % is invested and funPct %
+  // spent on lifestyle. Both 0 by default, which is the rule before v5.
+  cashBufferMonths:     real('cashBufferMonths').notNull().default(0),
+  funPct:               real('funPct').notNull().default(0),
 })
 
 export const lifePhase = sqliteTable('lifePhase', {

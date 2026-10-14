@@ -37,7 +37,7 @@ function sampleExport(): HouseholdExport {
   // A NAS household always has this row (seeded); parental leave is off here.
   h.projectionSettings.push({ id: SETTINGS_ID.projections, deletedAt: null, person1Growth: 3.5, person2Growth: 3, expInflNear: 4, expInfl: 2.5,
     childcareInfl: 6, propGrowth: 3.5, savingsRate: 10, investReturn: 3.5, projYears: 20, schoolFeesOn: false, sfC1Start: 2032, sfC1ExitIdx: 13,
-    sfC2Start: 2035, sfC2ExitIdx: 13, sfInfl: 5, sfPresetKey: null, parentalLeaveEnabled: false, horizonAge: 95 })
+    sfC2Start: 2035, sfC2ExitIdx: 13, sfInfl: 5, sfPresetKey: null, parentalLeaveEnabled: false, horizonAge: 95, cashBufferMonths: 0, funPct: 0 })
   h.rentSettings.push({ id: SETTINGS_ID.rent, deletedAt: null, enabled: true, monthlyRent: 2400, annualIncreaseRate: 5, purchasePlanEnabled: false,
     targetPurchaseYear: 2031, targetPropertyValue: 800000, depositPct: 20, depositFromCash: 0, depositFromInvestments: 0, newMortgageRate: 6, newMortgageTermYrs: 30, stampDutyPct: 4 })
   return {
@@ -377,6 +377,20 @@ describe('future', () => {
     const v = futureView(h, NOW)
     expect(v.years).toBe(90 - 36)
     expect(v.retirement.goalMonthly).toBe(7_500)
+  })
+
+  it('saves a safety net and fun share, and the Future screen shows them (Phase 43)', async () => {
+    const db = await setUp()
+    const before = futureView(await loadHousehold(db), NOW)
+    expect(before.assumptions).toMatchObject({ cashBufferMonths: 0, funPct: 0 })
+    expect(before.funTotal).toBe(0)
+    await saveAssumptions(db, { person1Growth: 3, person2Growth: 3, expInfl: 2.5, investReturn: 5, savingsRate: 50, propGrowth: 3.5,
+      horizonAge: 95, schoolFeesOn: false, cashBufferMonths: 6, funPct: 20 }, 60_000)
+    const h = await loadHousehold(db)
+    expect(h.projection).toMatchObject({ cashBufferMonths: 6, funPct: 20 })
+    const v = futureView(h, NOW)
+    expect(v.assumptions).toMatchObject({ cashBufferMonths: 6, funPct: 20 })
+    expect(v.funTotal).toBeGreaterThan(0)
   })
 })
 

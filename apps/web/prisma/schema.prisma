@@ -110,6 +110,8 @@ model ProjectionSettings {
   sfPresetKey          String? // e.g. "vic|independent"; null = custom schedule
   parentalLeaveEnabled Boolean @default(true)
   horizonAge           Int     @default(95) // project until the younger adult reaches this age; projYears no longer read
+  cashBufferMonths     Float   @default(0)  // months of spending kept as cash before investing (schema v5)
+  funPct               Float   @default(0)  // % of the surplus above the buffer spent on lifestyle (schema v5)
 }
 
 model LifePhase {

@@ -29,6 +29,13 @@
       "when": 1791807252514,
       "tag": "0003_stamp_duty",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1791972444302,
+      "tag": "0004_cash_buffer",
+      "breakpoints": true
     }
   ]
 }

@@ -78,6 +78,14 @@ export interface ProjectionInputs {
   childcareInfl:      number;
   propGrowth:         number;
   savingsRate:        number;   // % of annual surplus to invest
+  /**
+   * Months of spending kept as cash before anything is invested or spent on
+   * fun (default 0). The year's money out (spending, rent, repayments) sets
+   * the month, so the buffer grows with prices.
+   */
+  cashBufferMonths?:  number;
+  /** % of the surplus above the buffer spent on fun / lifestyle (default 0); it leaves net worth. Capped at 100 - savingsRate. */
+  funPct?:            number;
   investReturn:       number;
 
   projYears:          number;
@@ -156,6 +164,10 @@ export interface ProjectionResult {
   phaseArr:       number[];
   deficitArr:     number[];
   cashRunningArr: number[];
+  /** Spent on fun / lifestyle out of the surplus above the cash buffer (not in expArr). */
+  funArr:         number[];
+  /** The cash buffer aimed for at the end of each year (0 without one). */
+  bufferArr:      number[];
   /** Shortfalls not covered by cash or investments, carried as money owed (in net worth). */
   owedArr:        number[];
   mortStressArr:  number[];
@@ -292,7 +304,9 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
   const eI     = expInfl      / 100;
   const cI     = childcareInfl / 100;
   const pG     = propGrowth   / 100;
-  const sR     = savingsRate  / 100;
+  const sR     = Math.min(1, Math.max(0, savingsRate / 100));
+  const fR     = Math.min(1 - sR, Math.max(0, (inputs.funPct ?? 0) / 100));
+  const bufMonths = Math.max(0, inputs.cashBufferMonths ?? 0);
   const iR     = investReturn / 100;
   const mRate  = mortRate     / 100;
 
@@ -346,6 +360,8 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
     const phaseArr:       number[] = [];
     const deficitArr:     number[] = [];
     const cashRunningArr: number[] = [];
+    const funArr:         number[] = [];
+    const bufferArr:      number[] = [];
     const owedArr:        number[] = [];
     const mortStressArr:  number[] = [];
     const sfC1Arr:        number[] = [];
@@ -565,13 +581,20 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
       }
 
       // ── Invest surplus ── (after repaying anything owed)
+      // With a cash buffer, the surplus first tops cash up to the buffer;
+      // only what's above it is split between investing, fun and cash kept.
+      // Without one, the whole surplus is split, as before.
       const repaid          = Math.min(owed, cash);
       owed -= repaid;
       cash -= repaid;
       const moneyIn         = annualInc + superDraw;
       const surplusThisYear = moneyIn - annualExp - oneoffTotal;
-      const invested        = Math.max(0, surplusThisYear - repaid) * sR;
-      cash    = Math.max(0, cash - invested);
+      const buffer          = bufMonths * annualExp / 12;
+      const available       = Math.max(0, surplusThisYear - repaid);
+      const splittable      = bufMonths > 0 ? Math.min(available, Math.max(0, cash - buffer)) : available;
+      const invested        = splittable * sR;
+      const fun             = splittable * fR;
+      cash    = Math.max(0, cash - invested - fun);
       invest  = invest * (1 + iR) + invested;
 
       const equity = pVal - mb;
@@ -580,6 +603,8 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
       phaseArr.push(Math.round(phaseOverlay));
       deficitArr.push(Math.round(moneyIn - annualExp));
       cashRunningArr.push(Math.round(cash));
+      funArr.push(Math.round(fun));
+      bufferArr.push(Math.round(buffer));
       owedArr.push(Math.round(owed));
 
       // Mortgage stress: annual repayments / gross household income (standard AU definition)
@@ -604,7 +629,7 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
 
     return {
       nwArr, incArr, expArr, mortArr, cashArr, investArr,
-      person1Arr, person2Arr, phaseArr, deficitArr, cashRunningArr, owedArr, mortStressArr,
+      person1Arr, person2Arr, phaseArr, deficitArr, cashRunningArr, funArr, bufferArr, owedArr, mortStressArr,
       sfC1Arr, sfC2Arr, sfSibArr, sfTotalArr, leaveYrs, person1HelpClearedYr, person2HelpClearedYr,
       rentArr, purchaseYr, purchase,
       super1Arr, super2Arr, superArr, superDrawArr, retiredArr,

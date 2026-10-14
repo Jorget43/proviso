@@ -33,6 +33,8 @@ interface ProjSettings {
   investReturn:  number
   projYears:     number
   horizonAge:    number
+  cashBufferMonths: number
+  funPct:        number
   parentalLeaveEnabled: boolean
   schoolFeesOn:  boolean
   sfC1Start:     number
@@ -204,6 +206,7 @@ export default function ProjectionsClient({
   const nwNoFeesFinal = output.base.nwArr[output.base.nwArr.length - 1]
   const nwFeeCost   = sfOn ? nwNoFeesFinal - finalNW : 0
   const totalRentPaid = main.rentArr.reduce((s, v) => s + v, 0)
+  const totalFun      = main.funArr.reduce((s, v) => s + v, 0)
 
   // ── Actual net worth history, bucketed to one point per calendar year ──
   // (latest snapshot within each year; "now" falls back to the live baseline
@@ -453,6 +456,7 @@ export default function ProjectionsClient({
         <p className="proj-lede-sub">
           {hasLoan && (clearedIdx >= 0 ? `Home loan paid off in ${mortCleared}. ` : 'Home loan still being paid off. ')}
           {rentSt.enabled && `${fmtK(totalRentPaid)} paid in rent along the way. `}
+          {totalFun > 0 && `${fmtK(totalFun)} spent on fun along the way. `}
           {deficitIdx.length > 0 ? `${plural(deficitIdx.length, 'tight year')} where spending beats income while you work.` : 'No working years where spending beats income.'}
           {main.shortfallYr ? ` Money runs short in retirement from ${main.shortfallYr}.` : ''}
         </p>
@@ -600,7 +604,14 @@ export default function ProjectionsClient({
               {income.person2FTE > 0 && (
                 <Slider label={`${possessive(person2Name)} pay rise each year`} min={0} max={15} step={0.5} value={settings.person2Growth} cls="green-t" onChange={v => patchSettings({ person2Growth: v })} />
               )}
-              <Slider label="Leftover money you invest" hint="The rest stays as cash." min={0} max={100} step={5} value={settings.savingsRate} cls="purple-t" onChange={v => patchSettings({ savingsRate: v })} />
+              <Slider label="Safety net kept as cash" hint="Months of spending. Leftover money tops it up first, before anything is invested."
+                min={0} max={24} step={1} value={settings.cashBufferMonths ?? 0} cls="purple-t"
+                fmt={v => v === 0 ? 'None' : `${v} month${v === 1 ? '' : 's'}`} onChange={v => patchSettings({ cashBufferMonths: v })} />
+              <Slider label="Leftover money you invest" hint={(settings.cashBufferMonths ?? 0) > 0 ? 'Of what’s above the safety net. The rest stays as cash.' : 'The rest stays as cash.'}
+                min={0} max={100} step={5} value={settings.savingsRate} cls="purple-t" onChange={v => patchSettings({ savingsRate: v })} />
+              <Slider label="Leftover money you spend on fun" hint="Holidays, treats, upgrades. It’s spent, so it doesn’t add to what you own."
+                min={0} max={100 - settings.savingsRate} step={5} value={Math.min(settings.funPct ?? 0, 100 - settings.savingsRate)} cls="purple-t"
+                onChange={v => patchSettings({ funPct: v })} />
               <Slider label="Investment growth each year" min={0} max={15} step={0.5} value={settings.investReturn} cls="purple-t" onChange={v => patchSettings({ investReturn: v })} />
               <details className="wi-more">
                 <summary>More assumptions</summary>

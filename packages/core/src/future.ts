@@ -111,6 +111,10 @@ export interface ProjectionSettingsLike {
   parentalLeaveEnabled: boolean
   /** With a life course, the projection runs until the younger adult reaches this age (projYears is ignored). */
   horizonAge?: number
+  /** Months of spending kept as cash before investing (schema v5). */
+  cashBufferMonths?: number
+  /** % of the surplus above the buffer spent on fun (schema v5). */
+  funPct?: number
 }
 
 export interface RentSettingsLike {
@@ -185,6 +189,7 @@ export function buildProjectionInputs(b: ProjectionBaseline, l: ProjectionLive):
     person1GrowthRate: s.person1Growth, person2GrowthRate: s.person2Growth,
     expInflNear: s.expInflNear, expInfl: s.expInfl, childcareInfl: s.childcareInfl,
     propGrowth: s.propGrowth, savingsRate: s.savingsRate, investReturn: s.investReturn,
+    cashBufferMonths: s.cashBufferMonths ?? 0, funPct: s.funPct ?? 0,
     projYears: life
       ? yearsToAge(s.horizonAge ?? DEFAULT_HORIZON_AGE, life.person1Age, life.partnerEnabled ? life.person2Age : null)
       : s.projYears,

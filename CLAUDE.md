@@ -409,7 +409,8 @@ The assumptions watchdog (`/admin/watchdog` for the CFO when `WATCHDOG_ENABLED=t
   - The minimum drawdown uses the start-of-year balance.
   - Spending switches to the retirement goal only once everyone has retired.
   - Retirement before 60 leaves super in accumulation (taxed at 15%) until 60.
-  - Excess minimum drawdowns pile up in cash, like any surplus (step C's cash-buffer rule will fix that).
+  - Excess minimum drawdowns pile up in cash, like any surplus. Since Phase 43, a safety net with invest + fun at 100% stops that; the share not invested or spent still stays as cash, by design.
+  - Cash above the safety net from earlier years isn't swept into investments; only each year's surplus is split (Phase 43).
 
 ### Security hardening still open
 Tracked in [`docs/security-privacy-legal.md`](docs/security-privacy-legal.md) § Cybersecurity. Phase 21 closed headers/CSP, HSTS, the audit log, session lifetime and automated dependency updates. Left:
@@ -424,7 +425,7 @@ Tracked in [`docs/security-privacy-legal.md`](docs/security-privacy-legal.md) §
 - ~~Small-text desktop layouts on phones~~ — done (v1.12.0), checked at 390px: Own & owe rows restacked, Investments labels/dropdowns fixed, work-pattern wording plain; EOFY, Super and the school-fee controls were already fine. Investment parcel cards rebuilt in Phase 24.
 - ~~Native app: token auth alongside the cookie session~~ — done (Phase 24), see [`docs/app-api.md`](docs/app-api.md). Still open for the app: passkey sign-in (WebAuthn from a native app needs the platform APIs and an associated domain), and CORS if the app is ever a web view on another origin.
 
-### The app — next steps (as of 2026-10-12)
+### The app — next steps (as of 2026-10-14)
 In [`docs/architecture.md`](docs/architecture.md) order. Phase 3 there (the single-device app) is built except for a store build; Phase 4 (sync) is built (Phases 34–35) and needs its first real run on the NAS. Settings passed the owner's phone check on 2026-10-07. The owner is enrolling in the Apple Developer Program.
 
 **Start here next session**, in this order:
@@ -433,7 +434,8 @@ In [`docs/architecture.md`](docs/architecture.md) order. Phase 3 there (the sing
 3. **Owner decisions pending**: none. (The home-purchase deposit was decided and built in Phase 42.)
 4. **Step B of [`docs/plan-modelling-and-ux.md`](docs/plan-modelling-and-ux.md)**:
    - The life-course engine shipped as Phase 40 (merged to master 2026-10-09 with the owner's OK).
-   - Phase 41 (birth years, the `child` table) merged to master 2026-10-12 with the owner's OK. Next is step C: the cash-buffer rule and life-stage modifiers, which use the children's ages.
+   - Phase 41 (birth years, the `child` table) merged to master 2026-10-12 with the owner's OK.
+5. **Step C**: the cash-buffer rule is Phase 43 (2026-10-14, branch `phase-43-cash-buffer`). Next is Phase 44: life-stage modifiers (plan item 10), tied to the children's and adults' ages. Ask the owner first: the starter amounts, the leaving-home age, and what happens to the existing calendar life phases.
    - Step A (dark mode, editing, chart trim) shipped as Phases 37–39.
    - Also open: the relay enforcing roles, and the iOS build once the Apple account is ready.
 
@@ -446,7 +448,7 @@ The full list:
 - **Dependency advisories**: GitHub lists some on master, believed to be all in Expo's build and dev-server tools (`braces`, `node-forge`, `uuid` via `xcode`, `decode-uri-component`), several with no fixed version yet. They don't reach the NAS image (CI audits exactly what it ships). Dependabot was preparing a security update for them on 2026-10-06: review it carefully, because Expo pins some of them, and React / React Native / `expo*` move only with the Expo SDK (`proviso-release` skill).
 - **Starter estimates** (`packages/core/src/starter.ts`): re-check the figures yearly with the July recalibration; electricity still uses the AER's 2020 usage benchmarks (no longer updated).
 
-### Where each feature lives (NAS ↔ app), as of Phase 42
+### Where each feature lives (NAS ↔ app), as of Phase 43
 
 | Feature | NAS web app | The app | Notes |
 |---|---|---|---|
@@ -462,6 +464,7 @@ The full list:
 | Future: net worth, money in & out | ✓ charts | Net worth bars, short years, milestones | Same engine; app charts wait on plan item 2 |
 | Future: Retirement (chart, drawdown strategy) | ✓ | Summary text only | App needs the chart component (plan item 2) and the strategy choice |
 | Future: look-ahead age, work changes, rent-then-buy | ✓ | ✓ (What if?) | Buying: deposit + stamp duty, paid from savings then investments, any rest on the loan (`buyHome`) |
+| Future: safety net, invest share, fun share | ✓ (What if? → Basics) | ✓ (What if?, Assumptions) | Phase 43; both off by default |
 | Future: school fees | ✓ chart | Total only | |
 | Birth years (ages move on each year) | Set at onboarding; kept in step | ✓ edit (Settings → People) | `core/people.ts` |
 | Children (birth year, month, name) | — | ✓ edit (Settings); drive school-fee years | NAS keeps its school start years |
@@ -555,6 +558,24 @@ Ideas that have been evaluated but aren't on the roadmap. Each links to its writ
 - **School fees decided**: the questionnaire's school-cost lines stay in today's budget; the projection models the two eldest children's fees year by year (ending after Year 12) and leaves those lines out (`isModelledSchoolLine`), so nothing is counted twice. The questionnaire switches `schoolFeesOn` on when there are children.
 - Typed routes are off in `apps/client` (the generated file only existed where a dev server ran, never in CI, and misread the monorepo).
 - Verified: 356 tests; the app at 390px (a Melbourne family of four: $2.32M in today's money in 20 years, HELP cleared 2028, school fees end 2039, loan paid off 2042; a $45k car in 2029 gives $2.28M); the NAS Projections and Super pages rendered against a scratch household. The NAS Super "consider a lower target" hint was fixed on the way (it would have subtracted the mortgage twice and suggested $0).
+
+### Phase 43 — Plan step C, part 1: a cash safety net, then invest or enjoy (2026-10-14)
+
+Plan item 9. The defaults reproduce the old rule exactly, so no numbers move until someone changes a setting.
+
+- **Engine** (`projections.ts`, inputs `cashBufferMonths`, `funPct`; outputs `funArr`, `bufferArr`):
+  - The safety net is N months of the year's money out (spending, rent, loan repayments), so it grows with prices.
+  - Each year's surplus (after repaying anything owed) first tops cash up to the safety net. Only the part above it is split: `savingsRate`% invested, `funPct`% spent on fun, and the rest kept as cash.
+  - Fun leaves net worth and isn't in `expArr`. `funPct` is capped at 100 − `savingsRate`.
+  - With no safety net, the whole surplus is split, as before.
+- **Schema v5** (Drizzle `0004_cash_buffer`, Prisma `0009_cash_buffer`): `projectionSettings.cashBufferMonths` and `funPct`, both default 0. The NAS export carries them (checked: export → app import).
+- **Screens:**
+  - NAS Future → What if? → Basics: "Safety net kept as cash" (0–24 months), "Leftover money you invest", "Leftover money you spend on fun". The headline adds "$X spent on fun along the way".
+  - App What if? → Basics: the same three steppers. Assumptions: safety net and fun fields, and the Future summary sentence describes the rule plus the fun total.
+  - The Assumptions sheet no longer shows a "$" on the months and age fields.
+- **Verified:**
+  - 476 tests. The core cases are hand-worked: defaults equal the old output, the split above the safety net, top-up before investing, fun lowering net worth, and the fun cap.
+  - NAS (scratch DB) at 390px and the app's web build at 390px and 1280px, in headless Edge. Both show the same fun total for the same household.
 
 ### Phase 42 — Paying for a home purchase; asking for the children (2026-10-12)
 

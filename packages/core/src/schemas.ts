@@ -82,6 +82,8 @@ export const projectionSettingsSchema = z
     sfPresetKey:          z.string().nullable(),
     parentalLeaveEnabled: z.boolean(),
     horizonAge:           int.min(50).max(110),
+    cashBufferMonths:     num.min(0).max(60),
+    funPct:               num.min(0).max(100),
   })
   .partial()
 

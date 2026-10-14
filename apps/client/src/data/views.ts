@@ -228,7 +228,9 @@ export interface FutureView {
     /** Year savings outside super run out before super can be reached (retiring before 60); null = they don't. */
     bridgeShortYear: number | null
   }
-  assumptions: { salaryGrowth: number; inflation: number; investReturn: number; savingsRate: number; propGrowth: number }
+  /** Spent on fun out of what's left over, over the whole projection. */
+  funTotal:       number
+  assumptions: { salaryGrowth: number; inflation: number; investReturn: number; savingsRate: number; propGrowth: number; cashBufferMonths: number; funPct: number }
 }
 
 export function futureView(h: HouseholdData, now: Date): FutureView {
@@ -303,7 +305,9 @@ export function futureView(h: HouseholdData, now: Date): FutureView {
       lastAge: ages.person1Age + run.nwArr.length,
       bridgeShortYear: run.bridgeShortYr,
     },
-    assumptions: { salaryGrowth: s.person1Growth, inflation: s.expInfl, investReturn: s.investReturn, savingsRate: s.savingsRate, propGrowth: s.propGrowth },
+    funTotal: run.funArr.reduce((t, v) => t + v, 0),
+    assumptions: { salaryGrowth: s.person1Growth, inflation: s.expInfl, investReturn: s.investReturn, savingsRate: s.savingsRate, propGrowth: s.propGrowth,
+      cashBufferMonths: s.cashBufferMonths, funPct: Math.min(s.funPct, 100 - s.savingsRate) },
   }
 }
 

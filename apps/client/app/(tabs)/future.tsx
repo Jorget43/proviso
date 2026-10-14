@@ -7,7 +7,7 @@ import { Pressable, View } from 'react-native'
 import { router } from 'expo-router'
 import { fmt, fmtK } from '@proviso/core/formatting'
 import { useHousehold } from '@/data/DataProvider'
-import { futureView, cashflowView } from '@/data/views'
+import { futureView, cashflowView, type FutureView } from '@/data/views'
 import { Button, Card, H2, Screen, T } from '@/ui/kit'
 import { NetWorthBars } from '@/ui/NetWorthBars'
 import { usePalette, space, radius, touch } from '@/ui/theme'
@@ -134,7 +134,7 @@ export default function Future() {
         <Card>
           <T tone="t2">
             Pay rises {a.salaryGrowth}% a year, prices {a.inflation}%, investments return {a.investReturn}%,
-            homes grow {a.propGrowth}%. {a.savingsRate}% of what’s left over each year is invested.
+            homes grow {a.propGrowth}%. {savingsText(a, v.funTotal)}
           </T>
           <View style={{ alignItems: 'flex-start', marginTop: space.sm }}>
             <Button kind="quiet" title="Change assumptions" onPress={() => router.push('/assumptions')} />
@@ -143,4 +143,14 @@ export default function Future() {
       </View>
     </Screen>
   )
+}
+
+/** What happens to what's left over each year, in one or two sentences. */
+function savingsText(a: FutureView['assumptions'], funTotal: number): string {
+  const net = a.cashBufferMonths > 0
+    ? `You keep ${a.cashBufferMonths} month${a.cashBufferMonths === 1 ? '' : 's'} of spending as a safety net; of what’s left over above it, `
+    : 'Of what’s left over each year, '
+  const fun = a.funPct > 0 ? `, ${a.funPct}% goes on fun` : ''
+  const spent = funTotal > 0 ? ` That’s ${fmtK(funTotal)} on fun along the way.` : ''
+  return `${net}${a.savingsRate}% is invested${fun} and the rest stays as cash.${spent}`
 }

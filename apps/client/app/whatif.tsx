@@ -17,6 +17,7 @@ import { usePalette, space } from '@/ui/theme'
 const YES_NO = [{ key: 'no', label: 'No' }, { key: 'yes', label: 'Yes' }]
 const TERMS = [20, 25, 30, 35].map(y => ({ key: String(y), label: `${y} yrs` }))
 const pct = (v: number) => `${v}%`
+const months = (v: number) => v === 0 ? 'None' : `${v} month${v === 1 ? '' : 's'}`
 const daysLabel = (d: number) => (d === 0 ? 'Not working' : d === 5 ? 'Full-time' : `${d} days`)
 
 type Group = 'basics' | 'work' | 'home'
@@ -93,7 +94,9 @@ export default function WhatIfSheet() {
             {h.settings.partnerEnabled && (
               <Stepper label={`${possessive(h.settings.person2Name)} pay rise each year`} min={0} max={15} step={0.5} value={s.person2Growth} onChange={v => setProj({ person2Growth: v })} format={pct} />
             )}
-            <Stepper label="Share of what’s left over that’s invested" min={0} max={100} step={5} value={s.savingsRate} onChange={v => setProj({ savingsRate: v })} format={pct} />
+            <Stepper label="Safety net kept as cash" min={0} max={24} step={1} value={s.cashBufferMonths} onChange={v => setProj({ cashBufferMonths: v })} format={months} />
+            <Stepper label={s.cashBufferMonths > 0 ? 'Share of what’s above it that’s invested' : 'Share of what’s left over that’s invested'} min={0} max={100} step={5} value={s.savingsRate} onChange={v => setProj({ savingsRate: v, funPct: Math.min(s.funPct, 100 - v) })} format={pct} />
+            <Stepper label="Share spent on fun" min={0} max={100 - s.savingsRate} step={5} value={Math.min(s.funPct, 100 - s.savingsRate)} onChange={v => setProj({ funPct: v })} format={pct} />
             <Stepper label="Investment growth each year" min={0} max={15} step={0.5} value={s.investReturn} onChange={v => setProj({ investReturn: v })} format={pct} />
             {/* One inflation figure in the app, as on the Assumptions sheet. */}
             <Stepper label="Prices rise each year" min={0} max={8} step={0.5} value={s.expInfl} onChange={v => setProj({ expInfl: v, expInflNear: v })} format={pct} />
