@@ -432,11 +432,11 @@ In [`docs/architecture.md`](docs/architecture.md) order. Phase 3 there (the sing
 **Start here next session**, in this order:
 1. **⏰ Remind the owner first — phone test still to do** (deferred 2026-10-08, "soon"). **The Android development build with Phases 34–35** (sync, camera, key backup): it built successfully on EAS on 2026-10-08 (so the key-backup Kotlin module and expo-camera compile); `npm run eas -w @proviso/client -- build:list --limit 1` shows the APK link. Install it and check on the phone: Settings → Recovery phrase → Save to Google Password Manager; Settings → Sync; Join a household (camera scan).
 2. **Run the relay on the NAS** with the owner: `docker compose --profile sync up -d` (image `ghcr.io/jorget43/proviso-relay`, published by CI from master since 2026-10-08), then `tailscale serve --bg --https=8443 http://localhost:8787` (README "Sync relay for the app"). Turn sync on in the app with the `https://<machine>.<tailnet>.ts.net:8443` address, then join from a second phone. Phones need Tailscale running to reach it.
-3. **Owner decisions pending**: Phase 44 (life stages) changes NAS and app numbers for households with children or work; it's on branch `phase-44-life-stages`, awaiting the owner's OK to merge.
+3. **Owner decisions pending**: none. (Phase 44 life stages: owner OK 2026-10-14, merged.)
 4. **Step B of [`docs/plan-modelling-and-ux.md`](docs/plan-modelling-and-ux.md)**:
    - The life-course engine shipped as Phase 40 (merged to master 2026-10-09 with the owner's OK).
    - Phase 41 (birth years, the `child` table) merged to master 2026-10-12 with the owner's OK.
-5. **Step C**: the cash-buffer rule is Phase 43 (merged to master 2026-10-14). Life stages are Phase 44 (2026-10-14, branch `phase-44-life-stages`, not merged). After that, step D of the plan: scenarios (save and compare) and school fees v2.
+5. **Step C**: the cash-buffer rule is Phase 43 (merged to master 2026-10-14). Life stages are Phase 44 (merged to master 2026-10-14 with the owner's OK). After that, step D of the plan: scenarios (save and compare) and school fees v2.
    - Step A (dark mode, editing, chart trim) shipped as Phases 37–39.
    - Also open: the relay enforcing roles, and the iOS build once the Apple account is ready.
 
@@ -581,7 +581,7 @@ Owner's decisions (2026-10-14): research typical costs for metro and regional ar
 - **Screens:**
   - NAS Future → What if? → **Family** (new tab): life stages on or off, capital city or regional, children and planned babies (birth year, optional name), a "stay at home past 18" switch with the age, and a "typical costs used" list with sources. The calendar life-phase panel is renamed "Extra costs by year".
   - App: Assumptions has where you live, life stages, and stay past 18 with the age. What if? → Basics has life stages and the leave-home age. Future milestones add "Child N is born" and "… leaves home". A child's birth year can be up to 10 years ahead, for planning.
-- **Numbers change** (owner's OK needed before merge):
+- **Numbers change** (owner's OK 2026-10-14; merged and pushed the same day):
   - On by default for households with a life course, NAS and app.
   - Households with children see costs rise as they grow and fall when they leave.
   - Childcare stops at school age, where before it ran forever.
