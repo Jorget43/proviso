@@ -12,6 +12,7 @@ import { futureView } from '@/data/views'
 import { addWorkChange, applyWhatIf, hasChanges, keepWhatIf, startWhatIf, type WhatIf } from '@/data/whatif'
 import { Button, Card, Choice, Field, H2, NumberField, Sheet, Stepper, T, parseAmount } from '@/ui/kit'
 import { NetWorthBars } from '@/ui/NetWorthBars'
+import { DEFAULT_LEAVE_HOME_AGE, MAX_LEAVE_HOME_AGE } from '@proviso/core/lifeStages'
 import { usePalette, space } from '@/ui/theme'
 
 const YES_NO = [{ key: 'no', label: 'No' }, { key: 'yes', label: 'Yes' }]
@@ -105,6 +106,12 @@ export default function WhatIfSheet() {
               <Field label="Include school fees?">
                 <Choice label="Include school fees" options={YES_NO} value={s.schoolFeesOn ? 'yes' : 'no'} onChange={k => setProj({ schoolFeesOn: k === 'yes' })} />
               </Field>
+            )}
+            <Field label="Costs change as everyone gets older?" hint="Children’s costs follow their age, childcare stops at school, work costs stop at retirement.">
+              <Choice label="Costs change with age" options={YES_NO} value={s.lifeStagesOn ? 'yes' : 'no'} onChange={k => setProj({ lifeStagesOn: k === 'yes' })} />
+            </Field>
+            {s.lifeStagesOn && h.children.length > 0 && (
+              <Stepper label="Children leave home at" min={DEFAULT_LEAVE_HOME_AGE} max={MAX_LEAVE_HOME_AGE} step={1} value={s.childLeavesHomeAge} onChange={v => setProj({ childLeavesHomeAge: v })} format={v => String(v)} />
             )}
           </Card>
         )}

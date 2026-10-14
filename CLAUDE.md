@@ -390,6 +390,7 @@ The assumptions watchdog (`/admin/watchdog` for the CFO when `WATCHDOG_ENABLED=t
 - **Medicare levy low-income thresholds for FY2026-27** weren't announced at the time of Phase 20; the FY2025-26 figures are in use. Update when legislated (often retrospectively).
 - Annual indexation: HELP thresholds (1 Jul) and HELP CPI (1 Jun — the most time-sensitive), CCS thresholds and caps (first Monday of July), PPL (minimum wage, 1 Jul), concessional cap (AWOTE steps).
 - Retirement rules (`packages/core/src/retirement.ts`): minimum pension drawdown rates, preservation age (60 for everyone born after 30 June 1964), and the 65 unrestricted-access age. These rarely change, but check them.
+- Life-stage costs (`packages/core/src/lifeStages.ts`): bring the CPI factor up to date (ABS CPI, June quarter); check for a newer cost-of-children study than NATSEM 2013 and a newer Real Commute Report; update the ASFA 85+ ratio from the latest detailed budgets.
 
 ### Known model simplifications (by design, not bugs)
 - Projections apply today's tax rates and thresholds to every future year (no bracket indexation), so far-out years overstate tax slightly.
@@ -431,11 +432,11 @@ In [`docs/architecture.md`](docs/architecture.md) order. Phase 3 there (the sing
 **Start here next session**, in this order:
 1. **⏰ Remind the owner first — phone test still to do** (deferred 2026-10-08, "soon"). **The Android development build with Phases 34–35** (sync, camera, key backup): it built successfully on EAS on 2026-10-08 (so the key-backup Kotlin module and expo-camera compile); `npm run eas -w @proviso/client -- build:list --limit 1` shows the APK link. Install it and check on the phone: Settings → Recovery phrase → Save to Google Password Manager; Settings → Sync; Join a household (camera scan).
 2. **Run the relay on the NAS** with the owner: `docker compose --profile sync up -d` (image `ghcr.io/jorget43/proviso-relay`, published by CI from master since 2026-10-08), then `tailscale serve --bg --https=8443 http://localhost:8787` (README "Sync relay for the app"). Turn sync on in the app with the `https://<machine>.<tailnet>.ts.net:8443` address, then join from a second phone. Phones need Tailscale running to reach it.
-3. **Owner decisions pending**: none. (The home-purchase deposit was decided and built in Phase 42.)
+3. **Owner decisions pending**: Phase 44 (life stages) changes NAS and app numbers for households with children or work; it's on branch `phase-44-life-stages`, awaiting the owner's OK to merge.
 4. **Step B of [`docs/plan-modelling-and-ux.md`](docs/plan-modelling-and-ux.md)**:
    - The life-course engine shipped as Phase 40 (merged to master 2026-10-09 with the owner's OK).
    - Phase 41 (birth years, the `child` table) merged to master 2026-10-12 with the owner's OK.
-5. **Step C**: the cash-buffer rule is Phase 43 (merged to master 2026-10-14). Next is Phase 44: life-stage modifiers (plan item 10), tied to the children's and adults' ages. Ask the owner first: the starter amounts, the leaving-home age, and what happens to the existing calendar life phases.
+5. **Step C**: the cash-buffer rule is Phase 43 (merged to master 2026-10-14). Life stages are Phase 44 (2026-10-14, branch `phase-44-life-stages`, not merged). After that, step D of the plan: scenarios (save and compare) and school fees v2.
    - Step A (dark mode, editing, chart trim) shipped as Phases 37–39.
    - Also open: the relay enforcing roles, and the iOS build once the Apple account is ready.
 
@@ -448,7 +449,7 @@ The full list:
 - **Dependency advisories**: GitHub lists some on master, believed to be all in Expo's build and dev-server tools (`braces`, `node-forge`, `uuid` via `xcode`, `decode-uri-component`), several with no fixed version yet. They don't reach the NAS image (CI audits exactly what it ships). Dependabot was preparing a security update for them on 2026-10-06: review it carefully, because Expo pins some of them, and React / React Native / `expo*` move only with the Expo SDK (`proviso-release` skill).
 - **Starter estimates** (`packages/core/src/starter.ts`): re-check the figures yearly with the July recalibration; electricity still uses the AER's 2020 usage benchmarks (no longer updated).
 
-### Where each feature lives (NAS ↔ app), as of Phase 43
+### Where each feature lives (NAS ↔ app), as of Phase 44
 
 | Feature | NAS web app | The app | Notes |
 |---|---|---|---|
@@ -467,8 +468,9 @@ The full list:
 | Future: safety net, invest share, fun share | ✓ (What if? → Basics) | ✓ (What if?, Assumptions) | Phase 43; both off by default |
 | Future: school fees | ✓ chart | Total only | |
 | Birth years (ages move on each year) | Set at onboarding; kept in step | ✓ edit (Settings → People) | `core/people.ts` |
-| Children (birth year, month, name) | — | ✓ edit (Settings); drive school-fee years | NAS keeps its school start years |
-| Life phases (calendar rows) | ✓ edit | Read only | Step C turns these into age-based modifiers |
+| Children (birth year, month, name; planned babies) | ✓ (What if? → Family) | ✓ edit (Settings); drive school-fee years | NAS `Child` table since Phase 44; with children recorded, school-fee years follow them on both |
+| Costs that change with age (life stages), where you live | ✓ (What if? → Family) | ✓ (Assumptions; What if? leave-home age); milestones | `core/lifeStages.ts`, Phase 44 |
+| Life phases (calendar rows) | ✓ toggle ("Extra costs by year") | Read only | Kept as custom extras; life stages do the automatic part |
 | Next 2 years | ✓ | ✓ | `core/cashflow.ts` |
 | Parental-leave switch | ✓ | Read only | |
 | EOFY | ✓ | — | |
@@ -558,6 +560,37 @@ Ideas that have been evaluated but aren't on the roadmap. Each links to its writ
 - **School fees decided**: the questionnaire's school-cost lines stay in today's budget; the projection models the two eldest children's fees year by year (ending after Year 12) and leaves those lines out (`isModelledSchoolLine`), so nothing is counted twice. The questionnaire switches `schoolFeesOn` on when there are children.
 - Typed routes are off in `apps/client` (the generated file only existed where a dev server ran, never in CI, and misread the monorepo).
 - Verified: 356 tests; the app at 390px (a Melbourne family of four: $2.32M in today's money in 20 years, HELP cleared 2028, school fees end 2039, loan paid off 2042; a $45k car in 2029 gives $2.28M); the NAS Projections and Super pages rendered against a scratch household. The NAS Super "consider a lower target" hint was fixed on the way (it would have subtracted the mortgage twice and suggested $0).
+
+### Phase 44 — Plan step C, part 2: costs that change with age (2026-10-14)
+
+Owner's decisions (2026-10-14): research typical costs for metro and regional areas; children leave home at 18 by default, with a switch to stay longer; make it as automatic as possible ("if you have kids you're going to need nappies").
+
+- **Core** (`lifeStages.ts`, cited in the file):
+  - Children by age band, a month in 2026 dollars, metro / regional: 0–4 $695 / $555, 5–9 $1,035 / $830, 10–14 $1,195 / $955, 15–17 $2,165 / $1,735, 18+ at home $3,550 / $2,840. These are from AMP.NATSEM Cost of Kids (2013, middle income) × CPI to June 2026 (1.442), less childcare, education and housing (−21.7%, the report's Table 6 shares, because those are modelled separately). The metro / regional split uses the ABS HES 2015–16 non-housing spending ratio (0.80).
+  - Working costs: $395 / $295 a month full-time (Real Commute Report 2025; regional leaves out tolls).
+  - From 85 (the younger adult), retirement spending falls 7% for a couple and 5% for a single person (ASFA detailed budgets, June quarter 2025).
+- **Engine** (`projections.ts` input `lifeStages`, output `stageArr`, which is included in `expArr`):
+  - Today's budget already reflects the household as it is, so the engine adds only the change from today, inflated. When a child moves up an age band, it adds the difference. When they leave home, it removes their whole current cost. A planned baby (a future birth year) adds their full cost from birth.
+  - Childcare in the budget stops for each child in care as they reach school age (5).
+  - Working costs follow each adult's work days (part-time, parental leave) and stop at retirement.
+  - Once everyone has retired, a child still at home adds their whole cost, because the retirement goal leaves children out.
+- **Schema v6** (Drizzle `0005_life_stages`, Prisma `0010_life_stages`):
+  - `householdSettings.state` and `regional`. The app's questionnaire now saves where you live; before, it dropped it.
+  - `projectionSettings.lifeStagesOn` (default **on**) and `childLeavesHomeAge` (default 18, up to 25).
+  - The NAS gets a `Child` table (a twin of core's), with `/api/children` routes and an export mapping.
+- **Screens:**
+  - NAS Future → What if? → **Family** (new tab): life stages on or off, capital city or regional, children and planned babies (birth year, optional name), a "stay at home past 18" switch with the age, and a "typical costs used" list with sources. The calendar life-phase panel is renamed "Extra costs by year".
+  - App: Assumptions has where you live, life stages, and stay past 18 with the age. What if? → Basics has life stages and the leave-home age. Future milestones add "Child N is born" and "… leaves home". A child's birth year can be up to 10 years ahead, for planning.
+- **Numbers change** (owner's OK needed before merge):
+  - On by default for households with a life course, NAS and app.
+  - Households with children see costs rise as they grow and fall when they leave.
+  - Childcare stops at school age, where before it ran forever.
+  - Commuting falls when someone goes part-time, takes leave or retires.
+  - Retirement spending eases from 85.
+  - The NAS changes only once children are added there, apart from work costs and the 85+ step, which apply to everyone.
+- **Verified:**
+  - 493 tests. `lifeStages.test.ts` is hand-worked: the figures, bands, leaving home, planned babies, childcare ending, work days, retirement, and inflation inside the projection. The app test covers milestones, staying longer, regional, and switching off.
+  - NAS Family tab at 390px and 1280px; the app's Future and Assumptions at 390px (headless Edge). Same household, same end figure on both.
 
 ### Phase 43 — Plan step C, part 1: a cash safety net, then invest or enjoy (2026-10-14)
 

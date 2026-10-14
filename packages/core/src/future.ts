@@ -18,13 +18,14 @@ import { computeBudgetSummary, type BudgetExpense, type BudgetAnnualExpense, typ
 import { computeCurrentNetWorth, type AssetRow, type DebtRow } from './netWorth'
 import { findHelpDebt } from './members'
 import { toMonthly } from './formatting'
-import type { ProjectionInputs, WorkPhase, OneOff } from './projections'
+import { workDaysForYear, type ProjectionInputs, type WorkPhase, type OneOff } from './projections'
 import { presetScheduleFor } from './educationCosts'
 import { SF_BASE, type FeeSchedule } from './schoolFees'
 import type { LifePhaseOverlay } from './lifephases'
 import type { HouseholdSuperInputs, ProjectionContext } from './super'
 import { asDrawdownStrategy, yearsToAge, DEFAULT_HORIZON_AGE } from './retirement'
 import { schoolStartsFromChildren, type ChildLike } from './people'
+import { DEFAULT_LEAVE_HOME_AGE } from './lifeStages'
 
 /** The budget's home-loan repayment line(s). */
 export const isMortgageLine = (e: { cat: string; name: string }) => e.cat === 'Home' && /mortgage/i.test(e.name)
@@ -63,6 +64,9 @@ export interface ProjectionBaseline {
   budgetMortgageMonthly: number
   /** School costs in the budget for the children the engine's school-fee model covers. */
   modelledSchoolMonthly: number
+  /** Childcare in the budget, after the subsidy, a month; and how many children it's for (0 when off). */
+  childcareMonthly:      number
+  childcareChildren:     number
   person1HELPBalance:    number
   person2HELPBalance:    number
   mortBalance:           number
@@ -92,6 +96,8 @@ export function projectionBaseline<E extends BudgetExpense>(s: BaselineSource<E>
     retirementMonthly:     spendingInRetirement(budget, s.expenses),
     budgetMortgageMonthly,
     modelledSchoolMonthly: monthly(s.expenses.filter(isModelledSchoolLine)),
+    childcareMonthly:      budget.childcareNet ?? 0,
+    childcareChildren:     s.childcare.enabled ? s.childcare.numChildren : 0,
     person1HELPBalance, person2HELPBalance,
     mortBalance: mortDebt, cashOnHand, propValue, cryptoValue,
     investmentsValue: otherAssets,
@@ -115,6 +121,10 @@ export interface ProjectionSettingsLike {
   cashBufferMonths?: number
   /** % of the surplus above the buffer spent on fun (schema v5). */
   funPct?: number
+  /** Costs that follow ages (schema v6); on unless switched off. */
+  lifeStagesOn?: boolean
+  /** Children leave home in the year they turn this (schema v6). */
+  childLeavesHomeAge?: number
 }
 
 export interface RentSettingsLike {
@@ -153,6 +163,8 @@ export interface ProjectionLive {
    * single child is charged as one.
    */
   children?:      ChildLike[]
+  /** Lives outside a capital city (schema v6): lower typical costs. */
+  regional?:      boolean
 }
 
 export interface LifeLive {
@@ -211,6 +223,18 @@ export function buildProjectionInputs(b: ProjectionBaseline, l: ProjectionLive):
     depositFromCash: l.rent.depositFromCash, depositFromInvestments: l.rent.depositFromInvestments,
     newMortgageRate: l.rent.newMortgageRate, newMortgageTermYrs: l.rent.newMortgageTermYrs,
     stampDutyPct: l.rent.stampDutyPct ?? 0,
+    // Costs that follow ages need the people's ages, so only with a life course.
+    lifeStages: life && sup && s.lifeStagesOn !== false ? {
+      childBirthYears: (l.children ?? []).map(c => c.birthYear),
+      leaveHomeAge: s.childLeavesHomeAge ?? DEFAULT_LEAVE_HOME_AGE,
+      regional: l.regional ?? false,
+      childcareMonthly: b.childcareMonthly ?? 0,
+      childcareChildren: b.childcareChildren ?? 0,
+      workDaysToday: [
+        life.person1Age >= sup.person1RetirementAge ? 0 : workDaysForYear(l.person1Phases, l.currentYear),
+        !life.partnerEnabled || life.person2Age >= sup.person2RetirementAge ? 0 : workDaysForYear(l.person2Phases, l.currentYear),
+      ],
+    } : undefined,
     lifeCourse: life && sup ? {
       partnerEnabled: life.partnerEnabled,
       person1Age: life.person1Age, person2Age: life.person2Age,

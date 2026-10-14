@@ -18,6 +18,7 @@ import SchoolFeeChart     from './SchoolFeeChart'
 import WorkPhaseTimeline, { type WorkPhaseRow } from './WorkPhaseTimeline'
 import OneOffPanel,       { type OneOffRow }      from './OneOffPanel'
 import LifePhasesPanel                            from './LifePhasesPanel'
+import LifeStagesPanel, { type ChildRow }         from './LifeStagesPanel'
 import NetWorthHistoryPanel, { type NetWorthSnapshotRow } from './NetWorthHistoryPanel'
 import type { LifePhase } from '@proviso/core/lifephases'
 
@@ -35,6 +36,8 @@ interface ProjSettings {
   horizonAge:    number
   cashBufferMonths: number
   funPct:        number
+  lifeStagesOn:  boolean
+  childLeavesHomeAge: number
   parentalLeaveEnabled: boolean
   schoolFeesOn:  boolean
   sfC1Start:     number
@@ -93,13 +96,16 @@ interface ProjectionsClientProps {
   /** Saved super settings, so Future can show retirement (and count super if asked). */
   superSettings:        SuperSettingsLike
   partnerEnabled:       boolean
+  initialChildren:      ChildRow[]
+  initialRegional:      boolean
 }
 
 type View  = 'networth' | 'inout' | 'home' | 'fees' | 'retirement'
-type Group = 'basics' | 'work' | 'home' | 'plans'
+type Group = 'basics' | 'work' | 'family' | 'home' | 'plans'
 const GROUPS: { key: Group; label: string }[] = [
   { key: 'basics', label: 'Basics' },
   { key: 'work',   label: 'Work' },
+  { key: 'family', label: 'Family' },
   { key: 'home',   label: 'Home' },
   { key: 'plans',  label: 'Plans' },
 ]
@@ -152,8 +158,10 @@ export default function ProjectionsClient({
   initialSettings, initialPerson1Phases, initialPerson2Phases, initialOneoffs, initialLifePhases, initialFeeSchedule,
   income, baseline, mortRate, mortPayment, mortEndDate, currentYear,
   person1Name, person2Name, initialRentSettings, initialSnapshots,
-  superSettings, partnerEnabled,
+  superSettings, partnerEnabled, initialChildren, initialRegional,
 }: ProjectionsClientProps) {
+  const [children,       setChildren]       = useState<ChildRow[]>(initialChildren)
+  const [regional,       setRegional]       = useState(initialRegional)
   const [settings,       setSettings]       = useState<ProjSettings>(initialSettings)
   const [person1Phases,  setPerson1Phases]  = useState<WorkPhaseRow[]>(initialPerson1Phases)
   const [person2Phases,  setPerson2Phases]  = useState<WorkPhaseRow[]>(initialPerson2Phases)
@@ -189,7 +197,8 @@ export default function ProjectionsClient({
     income, settings, person1Phases, person2Phases, oneoffs, lifePhases, sfSchedule,
     rent: rentSt, mortgage: { rate: mortRate, payment: mortPayment }, currentYear,
     life: { partnerEnabled, person1Age: income.person1Age, person2Age: income.person2Age, super: sup },
-  }), [baseline, income, settings, person1Phases, person2Phases, oneoffs, lifePhases, sfSchedule, rentSt, mortRate, mortPayment, currentYear, partnerEnabled, sup])
+    children, regional,
+  }), [baseline, income, settings, person1Phases, person2Phases, oneoffs, lifePhases, sfSchedule, rentSt, mortRate, mortPayment, currentYear, partnerEnabled, sup, children, regional])
   const { person1HELPBalance, person2HELPBalance, netWorthToday } = baseline
 
   const output = useMemo(() => runProjections(inputs), [inputs])
@@ -350,6 +359,24 @@ export default function ProjectionsClient({
   }, [])
 
   // ── Life phase toggle ──
+  // ── Children and where you live (life stages) ──
+  const saveRegional = useCallback(async (value: boolean) => {
+    setRegional(value)
+    await fetch('/api/household', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ regional: value }) })
+  }, [])
+  const addChild = useCallback(async () => {
+    const res = await fetch('/api/children', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ birthYear: currentYear + 1 }) })
+    if (res.ok) { const c = await res.json() as ChildRow; setChildren(prev => [...prev, c]) }
+  }, [currentYear])
+  const updateChild = useCallback(async (id: number, patch: Partial<Omit<ChildRow, 'id'>>) => {
+    setChildren(prev => prev.map(c => c.id === id ? { ...c, ...patch } : c))
+    await fetch(`/api/children/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch) })
+  }, [])
+  const deleteChild = useCallback(async (id: number) => {
+    setChildren(prev => prev.filter(c => c.id !== id))
+    await fetch(`/api/children/${id}`, { method: 'DELETE' })
+  }, [])
+
   const toggleLifePhase = useCallback(async (id: number, enabled: boolean) => {
     setLifePhases(prev => prev.map(p => p.id === id ? { ...p, enabled } : p))
     await fetch(`/api/life-phases/${id}`, {
@@ -656,6 +683,17 @@ export default function ProjectionsClient({
                 fte={income.person2FTE}
                 showLeave={settings.parentalLeaveEnabled}
                 onUpdate={updatePerson2Phase} onDelete={deletePerson2Phase} onAdd={addPerson2Phase}
+              />
+            </Panel>
+          </div>
+
+          <div className="wi-group" data-group="family">
+            <Panel title="Costs that change with age" dotColor="var(--pink)">
+              <LifeStagesPanel
+                on={settings.lifeStagesOn ?? true} leaveHomeAge={settings.childLeavesHomeAge ?? 18}
+                regional={regional} kids={children} currentYear={currentYear}
+                onSettings={patchSettings} onRegional={saveRegional}
+                onAddChild={addChild} onUpdateChild={updateChild} onDeleteChild={deleteChild}
               />
             </Panel>
           </div>
@@ -982,7 +1020,7 @@ export default function ProjectionsClient({
               )}
             </Panel>
             <Panel
-              title="Life stage costs"
+              title="Extra costs by year"
               dotColor="var(--teal)"
               right={
                 lifePhases.filter(p => p.enabled).length > 0

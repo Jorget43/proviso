@@ -253,7 +253,7 @@ function homeEquity(a: StarterAnswers): number {
 }
 
 export interface StarterHousehold {
-  household:  { person1Name: string; person2Name: string; partnerEnabled: boolean; onboardingDone: true }
+  household:  { person1Name: string; person2Name: string; partnerEnabled: boolean; onboardingDone: true; state: StateKey; regional: boolean }
   income:     { taxMode: true; person1FTE: number; person2FTE: number; person1HasHELP: boolean; person2HasHELP: boolean; person1Age: number; person2Age: number; person1BirthYear: number; person2BirthYear: number }
   /** Eldest first, birth year from the age given (the month isn't asked). */
   children:   { name: null; birthYear: number; birthMonth: null }[]
@@ -292,7 +292,9 @@ export function buildStarterHousehold(a: StarterAnswers, lines: StarterLine[], n
   const loc = locationKey(a.state, a.regional)
 
   return {
-    household: { person1Name: a.you.name.trim() || 'You', person2Name: p?.name.trim() || 'Partner', partnerEnabled: p !== null, onboardingDone: true },
+    household: { person1Name: a.you.name.trim() || 'You', person2Name: p?.name.trim() || 'Partner', partnerEnabled: p !== null, onboardingDone: true,
+      // Only states with a capital/regional split can be regional (locationKey).
+      state: a.state, regional: a.regional && (STATES.find(s => s.key === a.state)?.split ?? false) },
     income: {
       taxMode: true,
       person1FTE: a.you.salary, person2FTE: p?.salary ?? 0,

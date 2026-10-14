@@ -13,7 +13,7 @@ import { homeView, spendingView, wealthView, futureView, cashflowView } from '@/
 import { saveCost, removeCost, kindOf, type CostDraft } from '@/data/costs'
 import { startHousehold, savePay } from '@/data/setup'
 import { saveAsset, removeAsset, saveDebt, saveLoan, saveSuper } from '@/data/wealth'
-import { saveAssumptions, saveOneOff, removeOneOff } from '@/data/future'
+import { saveAssumptions, saveOneOff, removeOneOff, saveRegional } from '@/data/future'
 import { startWhatIf, applyWhatIf, hasChanges, addWorkChange, keepWhatIf } from '@/data/whatif'
 import { estimateLivingCosts, buildStarterHousehold, type StarterAnswers } from '@proviso/core/starter'
 
@@ -25,7 +25,7 @@ const NOW = new Date('2026-10-15T00:00:00Z')
 
 function sampleExport(): HouseholdExport {
   const h = emptyHouseholdTables()
-  h.householdSettings.push({ id: SETTINGS_ID.household, deletedAt: null, person1Name: 'Alex', person2Name: 'Sam', partnerEnabled: true, onboardingDone: true })
+  h.householdSettings.push({ id: SETTINGS_ID.household, deletedAt: null, person1Name: 'Alex', person2Name: 'Sam', partnerEnabled: true, onboardingDone: true, state: null, regional: false })
   h.incomeSettings.push({ id: SETTINGS_ID.income, deletedAt: null, taxMode: false, person1FTE: 0, person2FTE: 0, person1HasHELP: false, person2HasHELP: false,
     person1MonthlyNet: 5000, person2MonthlyNet: 3000, person1Age: 35, person2Age: 34, person1BirthYear: null, person2BirthYear: null })
   h.expense.push(
@@ -37,7 +37,7 @@ function sampleExport(): HouseholdExport {
   // A NAS household always has this row (seeded); parental leave is off here.
   h.projectionSettings.push({ id: SETTINGS_ID.projections, deletedAt: null, person1Growth: 3.5, person2Growth: 3, expInflNear: 4, expInfl: 2.5,
     childcareInfl: 6, propGrowth: 3.5, savingsRate: 10, investReturn: 3.5, projYears: 20, schoolFeesOn: false, sfC1Start: 2032, sfC1ExitIdx: 13,
-    sfC2Start: 2035, sfC2ExitIdx: 13, sfInfl: 5, sfPresetKey: null, parentalLeaveEnabled: false, horizonAge: 95, cashBufferMonths: 0, funPct: 0 })
+    sfC2Start: 2035, sfC2ExitIdx: 13, sfInfl: 5, sfPresetKey: null, parentalLeaveEnabled: false, horizonAge: 95, cashBufferMonths: 0, funPct: 0, lifeStagesOn: true, childLeavesHomeAge: 18 })
   h.rentSettings.push({ id: SETTINGS_ID.rent, deletedAt: null, enabled: true, monthlyRent: 2400, annualIncreaseRate: 5, purchasePlanEnabled: false,
     targetPurchaseYear: 2031, targetPropertyValue: 800000, depositPct: 20, depositFromCash: 0, depositFromInvestments: 0, newMortgageRate: 6, newMortgageTermYrs: 30, stampDutyPct: 4 })
   return {
@@ -182,7 +182,7 @@ describe('setting up a new household', () => {
     await startHousehold(db, buildStarterHousehold(answers, lines, NOW))
     const h = await loadHousehold(db)
     expect(h.exists).toBe(true)
-    expect(h.settings).toMatchObject({ person1Name: 'Alex', person2Name: 'Sam', partnerEnabled: true, onboardingDone: true })
+    expect(h.settings).toMatchObject({ person1Name: 'Alex', person2Name: 'Sam', partnerEnabled: true, onboardingDone: true, state: 'qld', regional: false })
     expect(h.expenses).toHaveLength(lines.length + 1)   // + the managed childcare line
     expect(h.debts.map(d => d.name)).toEqual(['Alex HELP debt'])
     expect(h.mortgage?.balance).toBe(550_000)
@@ -551,6 +551,38 @@ describe('settings and backups', () => {
     expect(futureView(h, NOW).schoolFees.total).toBeCloseTo(one)
     expect(await saveChild(db, null, { name: '', birthYear: 1950, birthMonth: null }, 2026)).toMatch(/year they were born/)
     expect(await saveChild(db, null, { name: '', birthYear: 2020, birthMonth: 13 }, 2026)).toMatch(/month/)
+  })
+
+  it('costs follow the children’s ages: leaving home, a planned baby, regional (Phase 44)', async () => {
+    const db = await setUp()
+    const end = async () => futureView(await loadHousehold(db), NOW).endNetWorth
+    const noKids = await end()
+    // A 16-year-old today: leaves home in 2028 (18).
+    expect(await saveChild(db, null, { name: 'Teen', birthYear: 2010, birthMonth: null }, 2026)).toBeNull()
+    let v = futureView(await loadHousehold(db), NOW)
+    expect(v.milestones).toContainEqual({ year: 2028, text: 'Teen leaves home', tone: 'neutral' })
+    // Today's budget already holds the teenager, so their leaving lifts net worth.
+    expect(v.endNetWorth).toBeGreaterThan(noKids)
+    // Staying home to 22 costs more than leaving at 18.
+    const leaves18 = v.endNetWorth
+    await saveSettings(db, 'projectionSettings', { childLeavesHomeAge: 22 })
+    expect(await end()).toBeLessThan(leaves18)
+    // A baby planned for 2030 is a milestone, and costs money.
+    const before = await end()
+    expect(await saveChild(db, null, { name: '', birthYear: 2030, birthMonth: null }, 2026)).toBeNull()
+    v = futureView(await loadHousehold(db), NOW)
+    expect(v.milestones.map(m => m.text)).toContain('Child 2 is born')
+    expect(v.endNetWorth).toBeLessThan(before)
+    // This household is regional (the questionnaire's WA). In a capital city
+    // more of today's budget is the teenager's (2,165 a month, not 1,735), so
+    // more is freed when they leave: that outweighs the dearer baby here.
+    expect((await loadHousehold(db)).settings.regional).toBe(true)
+    const regional = v.endNetWorth
+    await saveRegional(db, false)
+    expect(await end()).toBeGreaterThan(regional)
+    // Switching life stages off goes back to prices only.
+    await saveSettings(db, 'projectionSettings', { lifeStagesOn: false })
+    expect(futureView(await loadHousehold(db), NOW).milestones.some(m => /leaves home|is born/.test(m.text))).toBe(false)
   })
 
   it('asks for the children while school fees are planned without them', async () => {

@@ -84,6 +84,8 @@ export const projectionSettingsSchema = z
     horizonAge:           int.min(50).max(110),
     cashBufferMonths:     num.min(0).max(60),
     funPct:               num.min(0).max(100),
+    lifeStagesOn:         z.boolean(),
+    childLeavesHomeAge:   int.min(18).max(25),
   })
   .partial()
 
@@ -92,6 +94,15 @@ export const phaseSchema = z
   .object({
     year: int,
     days: int,
+  })
+  .partial()
+
+// A child (schema v3): the birth year can be in the future for a planned baby.
+export const childSchema = z
+  .object({
+    name:       z.string().trim().max(40).nullable(),
+    birthYear:  int.min(1950).max(2100),
+    birthMonth: int.min(1).max(12).nullable(),
   })
   .partial()
 
@@ -159,6 +170,8 @@ export const householdNamesSchema = z
   .object({
     person1Name: memberName,
     person2Name: memberName,
+    state:       z.enum(['nsw', 'vic', 'qld', 'sa', 'wa', 'tas', 'act', 'nt']).nullable(),
+    regional:    z.boolean(),
   })
   .partial()
 

@@ -6,7 +6,7 @@ import { computeHomeOverview, type HomeOverview } from '@proviso/core/overview'
 import { computeBudgetSummary, isManagedChildcare } from '@proviso/core/budgetSummary'
 import { workDaysForYear, runProjections, type PurchasePaid } from '@proviso/core/projections'
 import { projectionBaseline, buildProjectionInputs, feeScheduleFor, retirementIncomeGoal } from '@proviso/core/future'
-import { currentAges } from '@proviso/core/people'
+import { currentAges, childLabel, sortChildren } from '@proviso/core/people'
 import { situationFrom, situationLabels } from '@proviso/core/situation'
 import { toMonthly, possessive } from '@proviso/core/formatting'
 import { netPositionOf, computeCashOnHand, isHomeEquity } from '@proviso/core/netWorth'
@@ -255,6 +255,7 @@ export function futureView(h: HouseholdData, now: Date): FutureView {
     currentYear: year,
     life: { partnerEnabled: h.settings.partnerEnabled, ...ages, super: h.superSettings },
     children: h.children,
+    regional: h.settings.regional,
   }))
   const run = out.withFees ?? out.base
   const end = run.nwArr[run.nwArr.length - 1] ?? baseline.netWorthToday
@@ -269,6 +270,14 @@ export function futureView(h: HouseholdData, now: Date): FutureView {
   if (s.schoolFeesOn) {
     const feeYears = out.labels.filter((_, i) => run.sfTotalArr[i] > 0)
     if (feeYears.length) milestones.push({ year: Number(feeYears[feeYears.length - 1]), text: 'Last year of school fees', tone: 'good' })
+  }
+  if (s.lifeStagesOn) {
+    const lastYear = Number(out.labels[out.labels.length - 1])
+    sortChildren(h.children).forEach((c, i) => {
+      const born = c.birthYear, leaves = c.birthYear + s.childLeavesHomeAge
+      if (born > year && born <= lastYear) milestones.push({ year: born, text: `${childLabel(c, i + 1)} is born`, tone: 'neutral' })
+      if (leaves > year && leaves <= lastYear) milestones.push({ year: leaves, text: `${childLabel(c, i + 1)} leaves home`, tone: 'neutral' })
+    })
   }
   milestones.sort((a, b) => a.year - b.year)
 

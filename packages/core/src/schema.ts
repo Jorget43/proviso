@@ -22,7 +22,7 @@
 import { sqliteTable, text, integer, real } from 'drizzle-orm/sqlite-core'
 
 /** Bumped by every migration. Travels with each sync message and export. */
-export const SCHEMA_VERSION = 5
+export const SCHEMA_VERSION = 6
 
 export type PersonKey = 'p1' | 'p2'
 export const PERSON_KEYS: readonly PersonKey[] = ['p1', 'p2']
@@ -51,6 +51,10 @@ export const householdSettings = sqliteTable('householdSettings', {
   person2Name:    text('person2Name').notNull().default('Partner'),
   partnerEnabled: bool('partnerEnabled').notNull().default(false),
   onboardingDone: bool('onboardingDone').notNull().default(false),
+  // v6: where the household lives, for typical costs (starter.ts, lifeStages.ts).
+  // state is a StateKey ('nsw', …), null until asked.
+  state:          text('state'),
+  regional:       bool('regional').notNull().default(false),
 })
 
 /** People who use the app. Credentials never live here — devices hold keys. */
@@ -169,6 +173,9 @@ export const projectionSettings = sqliteTable('projectionSettings', {
   // spent on lifestyle. Both 0 by default, which is the rule before v5.
   cashBufferMonths:     real('cashBufferMonths').notNull().default(0),
   funPct:               real('funPct').notNull().default(0),
+  // v6: costs that follow ages (lifeStages.ts), and the age children leave home.
+  lifeStagesOn:         bool('lifeStagesOn').notNull().default(true),
+  childLeavesHomeAge:   integer('childLeavesHomeAge').notNull().default(18),
 })
 
 export const lifePhase = sqliteTable('lifePhase', {

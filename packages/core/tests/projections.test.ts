@@ -24,7 +24,7 @@ function expectShape(r: ProjectionResult, years: number) {
     'investArr', 'leaveYrs', 'mortArr', 'mortStressArr', 'nwArr', 'owedArr', 'person1Arr',
     'person1HelpClearedYr', 'person1RetireYr', 'person2Arr', 'person2HelpClearedYr', 'person2RetireYr',
     'phaseArr', 'purchase', 'purchaseYr', 'rentArr', 'retiredArr', 'sfC1Arr', 'sfC2Arr',
-    'sfSibArr', 'sfTotalArr', 'shortfallYr', 'super1Arr', 'super2Arr', 'superArr', 'superDrawArr',
+    'sfSibArr', 'sfTotalArr', 'shortfallYr', 'stageArr', 'super1Arr', 'super2Arr', 'superArr', 'superDrawArr',
   ])
   for (const k of ['nwArr', 'incArr', 'expArr', 'mortArr', 'cashArr', 'investArr'] as const) {
     expect(r[k]).toHaveLength(years)

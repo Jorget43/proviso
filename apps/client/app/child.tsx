@@ -50,7 +50,7 @@ export default function Child() {
       <Field label="Name" hint="Optional. Without one, they’re called Child 1, Child 2… eldest first.">
         <TextField label="Name" value={name} onChange={setName} />
       </Field>
-      <Field label="Year they were born" hint="For a child on the way, the year they’re due.">
+      <Field label="Year they were born" hint="For a child on the way or one you’re planning, the year you expect them. Their costs start then.">
         <NumberField unit="" label="Year they were born" value={year} onChange={setYear} />
       </Field>
       <Field label="Month (optional)">

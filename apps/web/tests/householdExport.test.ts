@@ -14,7 +14,7 @@ const HOUSEHOLD_ID = '01990000-0000-7000-8000-000000000001'
 // A small made-up household covering every mapping rule.
 function legacy(): LegacyHousehold {
   return {
-    householdSettings: { id: 1, person1Name: 'Alex', person2Name: 'Sam', partnerEnabled: true, onboardingDone: true, householdId: HOUSEHOLD_ID },
+    householdSettings: { id: 1, person1Name: 'Alex', person2Name: 'Sam', partnerEnabled: true, onboardingDone: true, householdId: HOUSEHOLD_ID, state: 'vic', regional: true },
     users: [{ id: 1, name: 'Alex', role: 'CFO' }, { id: 2, name: 'Sam', role: 'PARTNER' }, { id: 3, name: 'Kid', role: 'CHILD' }],
     expenses: [{ id: 1, cat: 'Groceries', name: 'Weekly shop', freq: 'weekly', amt: 200, createdAt: at, updatedAt: at }],
     annualExpenses: [{ id: 1, name: 'Car rego', cat: 'Transport', amt: 900, month: 3, createdAt: at, updatedAt: at }],
@@ -57,6 +57,7 @@ function legacy(): LegacyHousehold {
     rent: null,
     allowances: [{ id: 1, userId: 3, amount: 10, dayOfWeek: 5, createdAt: at, updatedAt: at }],
     pocketMoney: [{ id: 1, userId: 3, amount: 10, description: 'Allowance', date: '2026-10-03', category: 'general', createdAt: at }],
+    children: [{ id: 1, name: 'Kid', birthYear: 2015, birthMonth: 4 }, { id: 2, name: null, birthYear: 2028, birthMonth: null }],
   }
 }
 
@@ -95,10 +96,11 @@ describe('mapLegacyHousehold', () => {
     expect((db.prepare('SELECT count(*) c FROM "transaction"').get() as { c: number }).c).toBe(2)
   })
 
-  it('carries birth years across; the NAS has no child records yet', () => {
+  it('carries birth years, children (a planned one too) and where the household lives', () => {
     const t = exportOf().household
     expect(t.incomeSettings[0]).toMatchObject({ person1Age: 35, person1BirthYear: 1991, person2BirthYear: null })
-    expect(t.child).toEqual([])
+    expect(t.child.map(c => [c.name, c.birthYear, c.birthMonth])).toEqual([['Kid', 2015, 4], [null, 2028, null]])
+    expect(t.householdSettings[0]).toMatchObject({ state: 'vic', regional: true })
   })
 
   it('gives the same ids every time it runs', () => {

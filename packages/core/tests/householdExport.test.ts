@@ -10,7 +10,7 @@ const ID = (n: number) => contentId('test', n)
 
 function sample(): HouseholdExport {
   const household = emptyHouseholdTables()
-  household.householdSettings.push({ id: SETTINGS_ID.household, deletedAt: null, person1Name: 'Alex', person2Name: 'Sam', partnerEnabled: true, onboardingDone: true })
+  household.householdSettings.push({ id: SETTINGS_ID.household, deletedAt: null, person1Name: 'Alex', person2Name: 'Sam', partnerEnabled: true, onboardingDone: true, state: null, regional: false })
   household.expense.push({ id: ID(1), deletedAt: null, cat: 'Groceries', name: 'Weekly shop', freq: 'weekly', amt: 200 })
   household.investmentParcel.push({ id: ID(2), deletedAt: null, person: 'p2', name: 'ETF', quantity: 10, purchasePrice: 100, purchaseDate: '2024-01-02', currentPrice: 110, sellYear: null })
   const member = ID(3)

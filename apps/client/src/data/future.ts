@@ -12,10 +12,15 @@ export interface Assumptions {
   savingsRate:   number
   cashBufferMonths?: number  // months of spending kept as cash before investing
   funPct?:       number      // % of what's above the safety net spent on fun
+  lifeStagesOn?: boolean     // costs follow ages (lifeStages.ts)
+  childLeavesHomeAge?: number
   propGrowth:    number
   horizonAge:    number   // look ahead until the younger adult is this age
   schoolFeesOn:  boolean
 }
+
+/** Where the household lives: typical costs differ outside the capital cities. */
+export const saveRegional = (db: Db, regional: boolean) => saveSettings(db, 'householdSettings', { regional })
 
 export async function saveAssumptions(db: Db, a: Assumptions, retirementIncome: number): Promise<void> {
   // One inflation figure in the app: the near-term rate follows the long-run one.

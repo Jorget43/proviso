@@ -84,7 +84,8 @@ export interface ChildForm { name: string; birthYear: number; birthMonth: number
 
 /** Checks a child's details; returns a problem in plain words, or null. */
 export function checkChild(c: ChildForm, year: number): string | null {
-  if (!Number.isInteger(c.birthYear) || c.birthYear < year - 40 || c.birthYear > year + 1) return `Enter the year they were born (${year - 40} to ${year + 1}).`
+  // Up to 10 years ahead, for a child being planned (their costs start then).
+  if (!Number.isInteger(c.birthYear) || c.birthYear < year - 40 || c.birthYear > year + 10) return `Enter the year they were born, or are due or planned (${year - 40} to ${year + 10}).`
   if (c.birthMonth !== null && !(Number.isInteger(c.birthMonth) && c.birthMonth >= 1 && c.birthMonth <= 12)) return 'Choose a month, or leave it blank.'
   if (c.name.trim().length > 40) return 'Keep the name to 40 characters.'
   return null

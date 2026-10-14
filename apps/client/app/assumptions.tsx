@@ -10,11 +10,13 @@ import { retirementIncomeGoal, spendingInRetirement } from '@proviso/core/future
 import { computeBudgetSummary } from '@proviso/core/budgetSummary'
 import { workDaysForYear } from '@proviso/core/projections'
 import { useHousehold } from '@/data/DataProvider'
-import { saveAssumptions } from '@/data/future'
+import { saveAssumptions, saveRegional } from '@/data/future'
+import { DEFAULT_LEAVE_HOME_AGE, MAX_LEAVE_HOME_AGE } from '@proviso/core/lifeStages'
 import { Button, Choice, Field, NumberField, Sheet, T, parseAmount } from '@/ui/kit'
 import { space } from '@/ui/theme'
 
 const YES_NO = [{ key: 'no', label: 'No' }, { key: 'yes', label: 'Yes' }]
+const WHERE = [{ key: 'metro', label: 'Capital city' }, { key: 'regional', label: 'Regional or rural' }]
 
 export default function AssumptionsSheet() {
   const { household: h, change } = useHousehold()
@@ -33,10 +35,12 @@ export default function AssumptionsSheet() {
     p1: String(s.person1Growth), p2: String(s.person2Growth), infl: String(s.expInfl), ret: String(s.investReturn),
     save: String(s.savingsRate), buffer: String(s.cashBufferMonths), fun: String(s.funPct), prop: String(s.propGrowth), age: String(s.horizonAge), monthly: String(Math.round(goal / 12)),
     fees: s.schoolFeesOn,
+    stages: s.lifeStagesOn, leave: String(s.childLeavesHomeAge), regional: h.settings.regional,
   })
   const [error, setError] = useState<string | null>(null)
   const set = (k: keyof typeof f) => (v: string) => setF(x => ({ ...x, [k]: v }))
   const hasKids = h.expenses.some(e => e.cat === 'Children') || s.sfPresetKey !== null
+  const n0 = (v: string) => parseAmount(v) || 0
 
   async function save() {
     const n = (v: string) => parseAmount(v)
@@ -48,9 +52,12 @@ export default function AssumptionsSheet() {
     const buffer = n(f.buffer), fun = n(f.fun)
     if (!(buffer >= 0 && buffer <= 60)) { setError('Keep a safety net of 0 to 60 months.'); return }
     if (!(fun >= 0 && fun + pct[4] <= 100)) { setError('Investing and fun together can’t be more than 100%.'); return }
+    const leave = n(f.leave)
+    if (!Number.isInteger(leave) || leave < DEFAULT_LEAVE_HOME_AGE || leave > MAX_LEAVE_HOME_AGE) { setError(`Children leave home between ${DEFAULT_LEAVE_HOME_AGE} and ${MAX_LEAVE_HOME_AGE}.`); return }
+    if (f.regional !== h.settings.regional) await change(db => saveRegional(db, f.regional))
     await change(db => saveAssumptions(db, {
       person1Growth: pct[0], person2Growth: pct[1], expInfl: pct[2], investReturn: pct[3], savingsRate: pct[4], propGrowth: pct[5],
-      cashBufferMonths: buffer, funPct: fun, horizonAge: age, schoolFeesOn: f.fees,
+      cashBufferMonths: buffer, funPct: fun, lifeStagesOn: f.stages, childLeavesHomeAge: leave, horizonAge: age, schoolFeesOn: f.fees,
     }, Math.round(n(f.monthly) * 12)))
     router.back()
   }
@@ -90,6 +97,25 @@ export default function AssumptionsSheet() {
       <Field label="Income you’d like in retirement" hint="A month, in today’s money, for the household. It starts as what you spend now, less the home loan and the children’s costs.">
         <NumberField label="Retirement income a month" value={f.monthly} onChange={set('monthly')} />
       </Field>
+      <Field label="Where you live" hint="Typical costs are lower outside the capital cities.">
+        <Choice label="Where you live" options={WHERE} value={f.regional ? 'regional' : 'metro'} onChange={k => setF(x => ({ ...x, regional: k === 'regional' }))} />
+      </Field>
+      <Field label="Costs change as everyone gets older?" hint="Children cost more as they grow and less once they leave home, childcare stops at school, work costs stop at retirement, and spending eases from 85.">
+        <Choice label="Costs change with age" options={YES_NO} value={f.stages ? 'yes' : 'no'} onChange={k => setF(x => ({ ...x, stages: k === 'yes' }))} />
+      </Field>
+      {f.stages && h.children.length > 0 && (
+        <>
+          <Field label="Children stay at home past 18?" hint="Many young adults live at home while they study or start work.">
+            <Choice label="Children stay at home past 18" options={YES_NO} value={n0(f.leave) > DEFAULT_LEAVE_HOME_AGE ? 'yes' : 'no'}
+              onChange={k => setF(x => ({ ...x, leave: String(k === 'yes' ? 21 : DEFAULT_LEAVE_HOME_AGE) }))} />
+          </Field>
+          {n0(f.leave) > DEFAULT_LEAVE_HOME_AGE && (
+            <Field label="They leave home at" hint={`Between ${DEFAULT_LEAVE_HOME_AGE + 1} and ${MAX_LEAVE_HOME_AGE}.`}>
+              <NumberField unit="" label="Age children leave home" value={f.leave} onChange={set('leave')} />
+            </Field>
+          )}
+        </>
+      )}
       {hasKids && (
         <Field label="Model school fees year by year?" hint="Fees rise each year and stop after Year 12, for the two eldest children. Their school costs in Spending are left out of the projection so they aren’t counted twice.">
           <Choice label="Model school fees" options={YES_NO} value={f.fees ? 'yes' : 'no'} onChange={k => setF(x => ({ ...x, fees: k === 'yes' }))} />

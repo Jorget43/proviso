@@ -63,7 +63,7 @@ export function missingBirthYears(f: AgeFacts, year: number): Record<string, num
 // ── Children ─────────────────────────────────────────────────────────────────
 
 export interface ChildLike {
-  id?:        string
+  id?:        string | number   // the app's are strings, the NAS's numbers
   name:       string | null
   birthYear:  number
   birthMonth: number | null
@@ -72,7 +72,7 @@ export interface ChildLike {
 /** Eldest first. A missing month counts as the middle of the year. */
 export function sortChildren<C extends ChildLike>(children: C[]): C[] {
   const key = (c: C) => c.birthYear * 12 + ((c.birthMonth ?? 6.5) - 1)
-  return [...children].sort((a, b) => key(a) - key(b) || (a.id ?? '').localeCompare(b.id ?? ''))
+  return [...children].sort((a, b) => key(a) - key(b) || String(a.id ?? '').localeCompare(String(b.id ?? '')))
 }
 
 /** "Child 2" when a child has no name; n counts from 1, eldest first. */

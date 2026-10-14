@@ -13,6 +13,7 @@ import { PPL_TOTAL, NEAR_TERM_INFLATION_HORIZON } from './constants';
 import { superAccumulationYear, superPensionGrowth } from './super';
 import { legislativeCap } from './superHistory';
 import { PRESERVATION_AGE, minimumDrawdownRate, superAccessible, type DrawdownStrategy } from './retirement';
+import { lifeStageYear, LATE_RETIREMENT_AGE, LATE_RETIREMENT_FACTOR, type LifeStageFacts } from './lifeStages';
 
 export interface WorkPhase {
   year: number;
@@ -150,6 +151,14 @@ export interface ProjectionInputs {
   // Without a life course, the engine runs as before: pay never stops and
   // super isn't modelled.
   lifeCourse?:           LifeCourse;
+
+  /**
+   * Costs that follow ages (lifeStages.ts): children's costs by age and
+   * leaving home, childcare ending at school, working costs following work
+   * days, and retirement spending easing from 85. Without it, spending only
+   * grows with prices, as before.
+   */
+  lifeStages?:           LifeStageFacts;
 }
 
 export interface ProjectionResult {
@@ -164,6 +173,8 @@ export interface ProjectionResult {
   phaseArr:       number[];
   deficitArr:     number[];
   cashRunningArr: number[];
+  /** Change in spending from today's budget because of life stages (in expArr): children growing up and leaving, childcare ending, work costs, late retirement. */
+  stageArr:       number[];
   /** Spent on fun / lifestyle out of the surplus above the cash buffer (not in expArr). */
   funArr:         number[];
   /** The cash buffer aimed for at the end of each year (0 without one). */
@@ -361,6 +372,9 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
     const deficitArr:     number[] = [];
     const cashRunningArr: number[] = [];
     const funArr:         number[] = [];
+    const stageArr:       number[] = [];
+    // Prices relative to today, for amounts given in today's dollars.
+    let priceIdx  = 1;
     const bufferArr:      number[] = [];
     const owedArr:        number[] = [];
     const mortStressArr:  number[] = [];
@@ -387,6 +401,7 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
       const yearInflRate = inflRateForYear(yr);
       expBase  *= (1 + yearInflRate);
       retSpend *= (1 + yearInflRate);
+      priceIdx *= (1 + yearInflRate);
       if (i > 0) pplIndex *= (1 + yearInflRate);
       const pplGross = (parentalLeaveEnabled ? PPL_TOTAL : 0) * pplIndex;
       if (!isRenting) pVal *= (1 + pG);  // only grow property value when owned
@@ -530,7 +545,20 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
       // at the actual (un-inflated) amount and stops once the loan is cleared,
       // for the current loan and for one started by a purchase plan alike.
       // Once everyone has retired, everyday spending becomes the retirement goal.
-      const nonMortExp  = (allRetired ? retSpend : expBase) + sf.total + phaseOverlay + rentAnnual;
+      let stageCost = 0;
+      const ls = inputs.lifeStages;
+      if (ls) {
+        const days1 = p1Retired ? 0 : p1Phase.days;
+        const days2 = p2Retired || isLeave ? 0 : phase.days;
+        const st = lifeStageYear(ls, { currentYear: cy, year: yr, workDays: [days1, days2], allRetired });
+        stageCost = (st.children + st.childcare + st.work) * priceIdx;
+        // From 85 (the younger adult), retirement spending eases (ASFA).
+        const younger = lc ? (lc.partnerEnabled ? Math.min(age1, age2) : age1) : 0;
+        if (allRetired && lc && younger >= LATE_RETIREMENT_AGE) {
+          stageCost += retSpend * ((lc.partnerEnabled ? LATE_RETIREMENT_FACTOR.couple : LATE_RETIREMENT_FACTOR.single) - 1);
+        }
+      }
+      const nonMortExp  = Math.max(0, (allRetired ? retSpend : expBase) + stageCost) + sf.total + phaseOverlay + rentAnnual;
       const oneoffTotal = oneoffs.filter(o => o.year === yr).reduce((s, o) => s + o.amt, 0);
 
       const monthlyNetFlow = (annualInc + superDraw - nonMortExp) / 12;
@@ -604,6 +632,7 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
       deficitArr.push(Math.round(moneyIn - annualExp));
       cashRunningArr.push(Math.round(cash));
       funArr.push(Math.round(fun));
+      stageArr.push(Math.round(stageCost));
       bufferArr.push(Math.round(buffer));
       owedArr.push(Math.round(owed));
 
@@ -629,7 +658,7 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
 
     return {
       nwArr, incArr, expArr, mortArr, cashArr, investArr,
-      person1Arr, person2Arr, phaseArr, deficitArr, cashRunningArr, funArr, bufferArr, owedArr, mortStressArr,
+      person1Arr, person2Arr, phaseArr, deficitArr, cashRunningArr, funArr, bufferArr, stageArr, owedArr, mortStressArr,
       sfC1Arr, sfC2Arr, sfSibArr, sfTotalArr, leaveYrs, person1HelpClearedYr, person2HelpClearedYr,
       rentArr, purchaseYr, purchase,
       super1Arr, super2Arr, superArr, superDrawArr, retiredArr,

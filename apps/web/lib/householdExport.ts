@@ -18,7 +18,7 @@
 import type {
   Expense, AnnualExpense, Debt, Asset, MortgageSettings, ChildcareSettings, IncomeSettings,
   Person1Phase, Person2Phase, ProjectionSettings, LifePhase, OneOff, Transaction,
-  CategoriationRule, SuggestionState, ActualsSettings, HouseholdSettings, SchoolFeeLevel,
+  CategoriationRule, SuggestionState, ActualsSettings, HouseholdSettings, SchoolFeeLevel, Child,
   HelpDebtDetail, SuperSettings, SuperHistory, InvestmentParcel, User, AllowanceSchedule,
   PocketMoneyTx, NetWorthSnapshot, Donation, WorkExpense, RentSettings,
 } from '@prisma/client'
@@ -43,6 +43,7 @@ export interface LegacyHousehold {
   person1Phases:      Person1Phase[]
   person2Phases:      Person2Phase[]
   projection:         ProjectionSettings | null
+  children:           Child[]
   lifePhases:         LifePhase[]
   oneOffs:            OneOff[]
   transactions:       Transaction[]
@@ -67,7 +68,7 @@ export async function readLegacyHousehold(): Promise<LegacyHousehold> {
     householdSettings, users, expenses, annualExpenses, debts, assets, mortgage, childcare, income,
     person1Phases, person2Phases, projection, lifePhases, oneOffs, transactions, rules, suggestions,
     actuals, schoolFeeLevels, helpDetails, superSettings, superHistory, parcels, netWorthSnapshots,
-    donations, workExpenses, rent, allowances, pocketMoney,
+    donations, workExpenses, rent, allowances, pocketMoney, children,
   ] = await Promise.all([
     prisma.householdSettings.findUnique({ where: { id: 1 } }),
     prisma.user.findMany({ select: { id: true, name: true, role: true }, orderBy: { id: 'asc' } }),
@@ -98,12 +99,13 @@ export async function readLegacyHousehold(): Promise<LegacyHousehold> {
     prisma.rentSettings.findUnique({ where: { id: 1 } }),
     prisma.allowanceSchedule.findMany({ orderBy: { id: 'asc' } }),
     prisma.pocketMoneyTx.findMany({ orderBy: { id: 'asc' } }),
+    prisma.child.findMany({ orderBy: { id: 'asc' } }),
   ])
   return {
     householdSettings, users, expenses, annualExpenses, debts, assets, mortgage, childcare, income,
     person1Phases, person2Phases, projection, lifePhases, oneOffs, transactions, rules, suggestions,
     actuals, schoolFeeLevels, helpDetails, superSettings, superHistory, parcels, netWorthSnapshots,
-    donations, workExpenses, rent, allowances, pocketMoney,
+    donations, workExpenses, rent, allowances, pocketMoney, children,
   }
 }
 
@@ -151,7 +153,7 @@ export function mapLegacyHousehold(
   if (hs) {
     t.householdSettings.push({ ...live, id: SETTINGS_ID.household,
       person1Name: hs.person1Name, person2Name: hs.person2Name,
-      partnerEnabled: hs.partnerEnabled, onboardingDone: hs.onboardingDone })
+      partnerEnabled: hs.partnerEnabled, onboardingDone: hs.onboardingDone, state: hs.state, regional: hs.regional })
   }
 
   const memberIds = new Map<number, string>()
@@ -192,6 +194,7 @@ export function mapLegacyHousehold(
     void _id
     t.projectionSettings.push({ ...live, ...rest, id: SETTINGS_ID.projections })
   }
+  for (const c of L.children) t.child.push({ ...live, id: legacyId('child', c.id), name: c.name, birthYear: c.birthYear, birthMonth: c.birthMonth })
   for (const p of L.lifePhases) {
     const type = p.type === 'recurring' || p.type === 'oneoff' || p.type === 'phaseout' ? p.type : 'recurring'
     if (type !== p.type) notes.push(`Life phase “${p.name}” had an unknown type “${p.type}”; brought across as recurring.`)

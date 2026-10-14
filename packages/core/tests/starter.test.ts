@@ -90,10 +90,15 @@ describe('estimateLivingCosts', () => {
 describe('buildStarterHousehold', () => {
   const now = new Date(2026, 9, 6)
 
+  it('keeps where the household lives; only split states can be regional', () => {
+    expect(buildStarterHousehold(base({ regional: true }), [], now).household).toMatchObject({ state: 'vic', regional: true })
+    expect(buildStarterHousehold(base({ state: 'act', regional: true }), [], now).household).toMatchObject({ state: 'act', regional: false })
+  })
+
   it('carries people, pay, super and HELP across', () => {
     const a = base({ you: person({ hasHelp: true, helpBalance: 20_000 }), partner: person({ name: 'Sam', salary: 80_000, days: 3, superBalance: 40_000 }) })
     const h = buildStarterHousehold(a, estimateLivingCosts(a), now)
-    expect(h.household).toEqual({ person1Name: 'Alex', person2Name: 'Sam', partnerEnabled: true, onboardingDone: true })
+    expect(h.household).toEqual({ person1Name: 'Alex', person2Name: 'Sam', partnerEnabled: true, onboardingDone: true, state: 'vic', regional: false })
     expect(h.income).toMatchObject({ person1FTE: 100_000, person2FTE: 80_000, person1HasHELP: true, person2HasHELP: false })
     expect(h.workPhases).toEqual([{ person: 'p1', year: 2026, days: 5 }, { person: 'p2', year: 2026, days: 3 }])
     expect(h.super).toEqual({ person1Balance: 60_000, person2Balance: 40_000 })

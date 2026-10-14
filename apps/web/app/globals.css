@@ -577,6 +577,9 @@ input[type=range] { width: 100%; accent-color: var(--t3); }
 .wp-field { display: flex; flex-direction: column; gap: 4px; font-size: 0.8rem; color: var(--t2); }
 .wp-field input, .wp-field select { font: inherit; font-size: 1rem; min-height: 42px; padding: 0 10px; border: 1px solid var(--border-md); border-radius: 8px; background: var(--surface); color: var(--t1); }
 .wp-pay { font-size: 0.82rem; color: var(--t2); }
+.ls-costs { list-style: none; margin: 0.5rem 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 0.85rem; }
+.ls-costs li { display: flex; justify-content: space-between; gap: 12px; padding: 4px 0; border-bottom: 1px solid var(--border); color: var(--t2); }
+.ls-costs strong { color: var(--t1); font-weight: 500; }
 .tl-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
 .tl-table th { font-size: 0.64rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--t3); padding: 4px 7px; border-bottom: 1px solid var(--border); text-align: left; background: var(--surface2); }
 .tl-table td { padding: 4px 7px; border-bottom: 1px solid var(--border); vertical-align: middle; }
@@ -1201,6 +1204,7 @@ input[type=range] { width: 100%; accent-color: var(--t3); }
   .whatif-body { flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 12px 1rem 1rem; }
   .whatif[data-group="basics"] .wi-group:not([data-group="basics"]),
   .whatif[data-group="work"]   .wi-group:not([data-group="work"]),
+  .whatif[data-group="family"] .wi-group:not([data-group="family"]),
   .whatif[data-group="home"]   .wi-group:not([data-group="home"]),
   .whatif[data-group="plans"]  .wi-group:not([data-group="plans"]) { display: none; }
   /* While the drawer is open: room to scroll the chart to the top, and a

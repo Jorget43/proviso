@@ -13,7 +13,7 @@ const ZERO_PHRASE = Array(23).fill('abandon').join(' ') + ' art'
 
 function sample(): HouseholdExport {
   const household = emptyHouseholdTables()
-  household.householdSettings.push({ id: SETTINGS_ID.household, deletedAt: null, person1Name: 'Alex', person2Name: 'Sam', partnerEnabled: true, onboardingDone: true })
+  household.householdSettings.push({ id: SETTINGS_ID.household, deletedAt: null, person1Name: 'Alex', person2Name: 'Sam', partnerEnabled: true, onboardingDone: true, state: null, regional: false })
   return {
     format: EXPORT_FORMAT, version: EXPORT_VERSION, schemaVersion: SCHEMA_VERSION, exportedAt: '2026-10-06T00:00:00.000Z',
     householdId: '0192a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b', source: { app: 'test', version: '0' }, household, pocketMoney: [], notes: [],
