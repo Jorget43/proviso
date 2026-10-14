@@ -435,7 +435,7 @@ In [`docs/architecture.md`](docs/architecture.md) order. Phase 3 there (the sing
 4. **Step B of [`docs/plan-modelling-and-ux.md`](docs/plan-modelling-and-ux.md)**:
    - The life-course engine shipped as Phase 40 (merged to master 2026-10-09 with the owner's OK).
    - Phase 41 (birth years, the `child` table) merged to master 2026-10-12 with the owner's OK.
-5. **Step C**: the cash-buffer rule is Phase 43 (2026-10-14, branch `phase-43-cash-buffer`). Next is Phase 44: life-stage modifiers (plan item 10), tied to the children's and adults' ages. Ask the owner first: the starter amounts, the leaving-home age, and what happens to the existing calendar life phases.
+5. **Step C**: the cash-buffer rule is Phase 43 (merged to master 2026-10-14). Next is Phase 44: life-stage modifiers (plan item 10), tied to the children's and adults' ages. Ask the owner first: the starter amounts, the leaving-home age, and what happens to the existing calendar life phases.
    - Step A (dark mode, editing, chart trim) shipped as Phases 37–39.
    - Also open: the relay enforcing roles, and the iOS build once the Apple account is ready.
 
@@ -561,7 +561,7 @@ Ideas that have been evaluated but aren't on the roadmap. Each links to its writ
 
 ### Phase 43 — Plan step C, part 1: a cash safety net, then invest or enjoy (2026-10-14)
 
-Plan item 9. The defaults reproduce the old rule exactly, so no numbers move until someone changes a setting.
+Plan item 9. Merged and pushed 2026-10-14. The defaults reproduce the old rule exactly, so no numbers move until someone changes a setting.
 
 - **Engine** (`projections.ts`, inputs `cashBufferMonths`, `funPct`; outputs `funArr`, `bufferArr`):
   - The safety net is N months of the year's money out (spending, rent, loan repayments), so it grows with prices.
