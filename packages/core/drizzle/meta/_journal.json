@@ -57,6 +57,13 @@
       "when": 1792317089125,
       "tag": "0007_school_fees_v2",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1792326562772,
+      "tag": "0008_return_ranges",
+      "breakpoints": true
     }
   ]
 }

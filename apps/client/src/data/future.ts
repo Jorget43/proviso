@@ -23,6 +23,8 @@ export interface Assumptions {
   sfSib4Pct?:    number
   sfFamilyFee?:  number
   sfEntryFee?:   number
+  /** Points either side of expected returns for the range shown (schema v9); 0 = off. */
+  returnSpread?: number
 }
 
 /** Where the household lives: typical costs differ outside the capital cities. */

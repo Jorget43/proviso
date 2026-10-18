@@ -1,0 +1,1 @@
+ALTER TABLE `projectionSettings` ADD `returnSpread` real DEFAULT 2 NOT NULL;

@@ -412,6 +412,7 @@ The assumptions watchdog (`/admin/watchdog` for the CFO when `WATCHDOG_ENABLED=t
   - Retirement before 60 leaves super in accumulation (taxed at 15%) until 60.
   - Excess minimum drawdowns pile up in cash, like any surplus. Since Phase 43, a safety net with invest + fun at 100% stops that; the share not invested or spent still stays as cash, by design.
   - Cash above the safety net from earlier years isn't swept into investments; only each year's surplus is split (Phase 43).
+- Ranges of returns (Phase 48) move every year's return by the same amount, so they treat bad years as spread evenly and understate the risk of a crash just before or after retiring (sequence risk). Monte Carlo (plan item 8b) is the step that captures it. The range doesn't move property growth, wages or inflation.
 - Scenarios (Phase 45) can't change renting vs owning, today's budget, balances, where you live, the custom fee table or the "extra costs by year" overlays: those are shared with the plan. A scenario's work pattern, one-offs and children are whole lists, so a later change to the plan's list doesn't reach a scenario that has its own.
 
 ### Security hardening still open
@@ -433,14 +434,14 @@ In [`docs/architecture.md`](docs/architecture.md) order. Phase 3 there (the sing
 **Start here next session**, in this order:
 1. **⏰ Remind the owner first — phone test still to do** (deferred 2026-10-08, "soon"). **The Android development build with Phases 34–35** (sync, camera, key backup): it built successfully on EAS on 2026-10-08 (so the key-backup Kotlin module and expo-camera compile); `npm run eas -w @proviso/client -- build:list --limit 1` shows the APK link. Install it and check on the phone: Settings → Recovery phrase → Save to Google Password Manager; Settings → Sync; Join a household (camera scan).
 2. **Run the relay on the NAS** with the owner: `docker compose --profile sync up -d` (image `ghcr.io/jorget43/proviso-relay`, published by CI from master since 2026-10-08), then `tailscale serve --bg --https=8443 http://localhost:8787` (README "Sync relay for the app"). Turn sync on in the app with the `https://<machine>.<tailnet>.ts.net:8443` address, then join from a second phone. Phones need Tailscale running to reach it.
-3. **Owner decisions pending**: none. (Phase 47 app charts: owner OK 2026-10-18, merged and pushed 0170ac8.)
+3. **Owner decisions pending**: **Phase 48 ranges of returns** is on branch `phase-48-return-ranges`, committed but not merged or pushed. No figure changes (the plan is the middle case); it adds a shaded range. Schema v9, so pushing publishes a NAS image that runs Prisma `0013_return_ranges`. Ask the owner to merge and push. (Phase 47 app charts: merged and pushed 0170ac8.)
 4. **Step B of [`docs/plan-modelling-and-ux.md`](docs/plan-modelling-and-ux.md)**:
    - The life-course engine shipped as Phase 40 (merged to master 2026-10-09 with the owner's OK).
    - Phase 41 (birth years, the `child` table) merged to master 2026-10-12 with the owner's OK.
 5. **Step C**: the cash-buffer rule is Phase 43 (merged to master 2026-10-14). Life stages are Phase 44 (merged to master 2026-10-14 with the owner's OK).
 6. **Step D**: scenarios are Phase 45 (merged and pushed 2026-10-18). Next:
    - School fees v2 (plan item 7) is Phase 46 (merged and pushed 2026-10-18).
-   - Then step E of the plan (uncertainty): item 8a, investment returns as ranges and a glide path; then 8b, Monte Carlo.
+   - Step E (uncertainty): 8a, ranges of returns, is Phase 48. The owner chose bands first, covering super too; Monte Carlo (8b) and the glide path come together next.
    - The app's chart component is Phase 47 (merged and pushed 2026-10-18). Still open for the app: editing a saved scenario, the Money in & out and Home charts, and the drawdown strategy choice.
    - Step A (dark mode, editing, chart trim) shipped as Phases 37–39.
    - Also open: the relay enforcing roles, and the iOS build once the Apple account is ready.
@@ -454,7 +455,7 @@ The full list:
 - **Dependency advisories**: GitHub lists some on master, believed to be all in Expo's build and dev-server tools (`braces`, `node-forge`, `uuid` via `xcode`, `decode-uri-component`), several with no fixed version yet. They don't reach the NAS image (CI audits exactly what it ships). Dependabot was preparing a security update for them on 2026-10-06: review it carefully, because Expo pins some of them, and React / React Native / `expo*` move only with the Expo SDK (`proviso-release` skill).
 - **Starter estimates** (`packages/core/src/starter.ts`): re-check the figures yearly with the July recalibration; electricity still uses the AER's 2020 usage benchmarks (no longer updated).
 
-### Where each feature lives (NAS ↔ app), as of Phase 47
+### Where each feature lives (NAS ↔ app), as of Phase 48
 
 | Feature | NAS web app | The app | Notes |
 |---|---|---|---|
@@ -475,6 +476,7 @@ The full list:
 | Birth years (ages move on each year) | Set at onboarding; kept in step | ✓ edit (Settings → People) | `core/people.ts` |
 | Children (birth year, month, name; planned babies) | ✓ (What if? → Family) | ✓ edit (Settings); drive school-fee years | NAS `Child` table since Phase 44; with children recorded, school-fee years follow them on both |
 | Costs that change with age (life stages), where you live | ✓ (What if? → Family) | ✓ (Assumptions; What if? leave-home age); milestones | `core/lifeStages.ts`, Phase 44 |
+| Ranges of returns (shaded band) | ✓ Net worth and Retirement charts, headline, takeaways; What if? → Basics slider | ✓ Future headline, net worth and super charts, retirement line; Assumptions | `core/ranges.ts`, Phase 48 |
 | Scenarios (save and compare) | ✓ make, edit, rename, delete in What if?; dashed lines on every Future chart; Compare card | Save a What if? draft as one; dashed lines on the net worth chart; show / hide; Compare card; delete | `core/scenarios.ts`, Phase 45; app lines Phase 47. Editing a saved scenario is NAS-only so far |
 | Life phases (calendar rows) | ✓ toggle ("Extra costs by year") | Read only | Kept as custom extras; life stages do the automatic part |
 | Next 2 years | ✓ | ✓ | `core/cashflow.ts` |
@@ -566,6 +568,27 @@ Ideas that have been evaluated but aren't on the roadmap. Each links to its writ
 - **School fees decided**: the questionnaire's school-cost lines stay in today's budget; the projection models the two eldest children's fees year by year (ending after Year 12) and leaves those lines out (`isModelledSchoolLine`), so nothing is counted twice. The questionnaire switches `schoolFeesOn` on when there are children.
 - Typed routes are off in `apps/client` (the generated file only existed where a dev server ran, never in CI, and misread the monorepo).
 - Verified: 356 tests; the app at 390px (a Melbourne family of four: $2.32M in today's money in 20 years, HELP cleared 2028, school fees end 2039, loan paid off 2042; a $45k car in 2029 gives $2.28M); the NAS Projections and Super pages rendered against a scratch household. The NAS Super "consider a lower target" hint was fixed on the way (it would have subtracted the mortgage twice and suggested $0).
+
+### Phase 48 — Plan step E, part 1: ranges of returns (2026-10-18)
+
+Plan item 8a. Owner's decisions (2026-10-18): bands first, with Monte Carlo later; the range covers super as well as investments outside it; the glide path waits for Monte Carlo. On branch `phase-48-return-ranges`, not merged.
+
+- **Core** (`ranges.ts`): `runRange(inputs, spread)` runs the projection three times: as expected, and with every year's investment return and super return `spread` percentage points lower and higher (`shiftReturns`; super's rates are decimals). A spread of 0 runs once. `summariseRange` gives the end net worth and the age money runs short in each case.
+- **Schema v9** (Drizzle `0008_return_ranges`, Prisma `0013_return_ranges`): `projectionSettings.returnSpread`, default 2, from 0 (off) to 5. Scenarios can change it.
+- **NAS** (Future → Long term):
+  - The headline adds "Somewhere between $A and $B, depending on how investments do".
+  - Net worth shades the band (counting super when that's switched on), and its takeaway gives the range.
+  - Retirement shades total super, and its takeaway says whether money still lasts with weaker returns, or the year it runs short.
+  - What if? → Basics: "Range shown either side" (Off to ±4 points).
+  - The readout lists both edges.
+- **App**: the chart takes a `band` on a series (`chartGeometry.bandPath`, tested), and the readout shows both ends.
+  - Future: the range in today's money under the headline, the band on net worth and on super, and a retirement line for the weaker case.
+  - Assumptions: the spread.
+- **Numbers**: none move; the plan is the middle case.
+- **Verified:**
+  - 534 tests: hand-worked growth at −2 / 0 / +2 points, super's shift, off at 0, summaries ordered and matching each run, the band's shape, and the app's range (and off).
+  - Headless Edge against the scratch NAS (migrated to v9): 1280px light and 390px dark (no sideways scroll); the slider saved 2.5 and moved the range from $18.19M–$69.46M to $16.00M–$84.09M.
+  - The app's web build after importing that export showed the same $16.00M–$84.09M, with bands on both charts.
 
 ### Phase 47 — The app's charts (2026-10-18)
 

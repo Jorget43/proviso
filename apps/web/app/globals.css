@@ -1148,6 +1148,7 @@ input[type=range] { width: 100%; accent-color: var(--t3); }
 .drawdown-option { min-height: 44px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface2); color: var(--t2); font-size: 0.9rem; cursor: pointer; }
 .drawdown-option.active { background: var(--blue); color: var(--on-accent); border-color: var(--blue); }
 .proj-lede-sub { font-size: 0.95rem; color: var(--t2); margin-top: 6px; line-height: 1.45; }
+.proj-lede-range { font-size: 0.95rem; color: var(--t2); margin-top: 2px; }
 .explorer { scroll-margin-top: 64px; }
 .explorer-tabs {
   display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none;

@@ -23,9 +23,11 @@ interface RetirementChartProps {
   marks:        number[]
   /** Scenarios' total super, shown over the plan's. */
   overlays?:    Overlay[]
+  /** Total super with weaker and stronger returns, shaded between. */
+  band?:        { low: number[]; high: number[] } | null
 }
 
-export default function RetirementChart({ labels, super1, super2, outside, drawn, person1Name, person2Name, marks, overlays }: RetirementChartProps) {
+export default function RetirementChart({ labels, super1, super2, outside, drawn, person1Name, person2Name, marks, overlays, band = null }: RetirementChartProps) {
   const c = useChartColors()
   const datasets: (ScrubSeries & Record<string, unknown>)[] = [
     { label: super2 ? `${possessive(person1Name)} super` : 'Super', data: super1, borderColor: c.teal, backgroundColor: c.a(c.teal, 0.08), fill: true, tension: 0.3, borderWidth: 2.2, pointRadius: 0 },
@@ -34,6 +36,12 @@ export default function RetirementChart({ labels, super1, super2, outside, drawn
     { label: 'Taken from super that year', data: drawn, borderColor: c.amber, borderDash: [2, 3], tension: 0.2, borderWidth: 1.4, pointRadius: 0, fill: false },
   ]
   datasets.splice(super2 ? 2 : 1, 0, ...overlayDatasets(overlays, c, labels.length, super1.map((v, i) => v + (super2?.[i] ?? 0))))
+  if (band) {
+    datasets.push(
+      { label: 'Super, weaker returns', data: band.low, borderColor: c.a(c.teal, 0.4), borderWidth: 1, pointRadius: 0, fill: false, tension: 0.3 },
+      { label: 'Super, stronger returns', data: band.high, borderColor: c.a(c.teal, 0.4), backgroundColor: c.a(c.teal, 0.1), borderWidth: 1, pointRadius: 0, fill: '-1', tension: 0.3 },
+    )
+  }
   const first = labels.findIndex(l => marks.includes(Number(l)))
 
   return (

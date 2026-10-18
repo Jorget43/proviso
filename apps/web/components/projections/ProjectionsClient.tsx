@@ -1,7 +1,8 @@
 'use client'
 import { useState, useMemo, useCallback } from 'react'
 import { fmt, fmtK, possessive } from '@proviso/core/formatting'
-import { runProjections, type ProjectionResult } from '@proviso/core/projections'
+import { type ProjectionResult } from '@proviso/core/projections'
+import { runRange, mainOf, DEFAULT_RETURN_SPREAD } from '@proviso/core/ranges'
 import { runScenarios, summariseRun, readOverrides, validOverrides, patchOverrides, writeOverrides, countChanges, scenarioColour, type ScenarioOverrides, type OverrideSection, type ScenarioSummary } from '@proviso/core/scenarios'
 import { buildProjectionInputs, type ProjectionBaseline, type SuperSettingsLike } from '@proviso/core/future'
 import { asDrawdownStrategy, PRESERVATION_AGE, DEFAULT_HORIZON_AGE, type DrawdownStrategy } from '@proviso/core/retirement'
@@ -46,6 +47,7 @@ interface ProjSettings {
   sfSib4Pct:     number
   sfFamilyFee:   number
   sfEntryFee:    number
+  returnSpread:  number
   childLeavesHomeAge: number
   parentalLeaveEnabled: boolean
   schoolFeesOn:  boolean
@@ -226,7 +228,10 @@ export default function ProjectionsClient({
   const runs = useMemo(() => runScenarios(baseline, live, scenarios, ownSchedule), [baseline, live, scenarios, ownSchedule])
   const { person1HELPBalance, person2HELPBalance, netWorthToday } = baseline
 
-  const output = useMemo(() => runProjections(inputs), [inputs])
+  // The plan, and the same plan with returns lower and higher by the spread (@proviso/core/ranges).
+  const spread = settings.returnSpread ?? DEFAULT_RETURN_SPREAD
+  const range  = useMemo(() => runRange(inputs, spread), [inputs, spread])
+  const output = range.mid
   const main   = output.withFees ?? output.base
   const sfOn   = settings.schoolFeesOn
 
@@ -516,6 +521,15 @@ export default function ProjectionsClient({
   const p2RetireYear = main.person2RetireYr
   const lastRetireYr = Math.max(p1RetireYear, p2RetireYear ?? 0)
   const strategy     = asDrawdownStrategy(sup.drawdownStrategy)
+  // The range's edges, on the same basis as what each chart shows.
+  const lowRun  = mainOf(range.low)
+  const highRun = mainOf(range.high)
+  const endLow  = lowRun.nwArr[lowRun.nwArr.length - 1] ?? 0
+  const endHigh = highRun.nwArr[highRun.nwArr.length - 1] ?? 0
+  const nwBand  = range.spread > 0 ? {
+    low:  lowRun.nwArr.map((v, i) => v + (includeSuper && hasSuper ? lowRun.superArr[i] ?? 0 : 0)),
+    high: highRun.nwArr.map((v, i) => v + (includeSuper && hasSuper ? highRun.superArr[i] ?? 0 : 0)),
+  } : null
   const retirementTakeaway = (() => {
     const lasts = main.shortfallYr
       ? `Money runs short from ${main.shortfallYr}, when ${partnerEnabled ? `${person1Name} is` : 'you are'} ${ageIn(income.person1Age, main.shortfallYr)}.`
@@ -526,7 +540,12 @@ export default function ProjectionsClient({
     const when = lastRetireYr > currentYear
       ? ` Retiring in ${p1RetireYear}${p2RetireYear ? ` and ${p2RetireYear}` : ''}.`
       : ''
-    return `${lasts}${bridge}${when} Doesn't count the Age Pension.`
+    const weaker = range.spread > 0
+      ? (lowRun.shortfallYr
+          ? ` With returns ${range.spread} points lower, it runs short in ${lowRun.shortfallYr}.`
+          : ` It still lasts with returns ${range.spread} points lower.`)
+      : ''
+    return `${lasts}${weaker}${bridge}${when} Doesn't count the Age Pension.`
   })()
 
   // ── Scenarios on the charts: the ones switched on, plus the one being edited ──
@@ -555,7 +574,8 @@ export default function ProjectionsClient({
       key: 'networth', label: 'Net worth',
       takeaway: `By ${lastLabel} you're on track to be worth ${fmtK(finalNW)} — ${growth >= 0 ? 'up' : 'down'} ${fmtK(Math.abs(growth))} on today.`
         + (hasSuper ? (includeSuper ? ` With super counted, ${fmtK(finalNW + superAtEnd)}.` : ` Plus ${fmtK(superAtEnd)} in super, which you can't touch until about 60.`) : '')
-        + (sfOn && nwFeeCost > 0 ? ` Without school fees it would be about ${fmtK(nwFeeCost)} more.` : ''),
+        + (sfOn && nwFeeCost > 0 ? ` Without school fees it would be about ${fmtK(nwFeeCost)} more.` : '')
+        + (range.spread > 0 ? ` If returns were ${range.spread} points lower or higher every year: ${fmtK(endLow)} to ${fmtK(endHigh)}.` : ''),
     },
     {
       key: 'inout', label: 'Money in & out',
@@ -606,6 +626,9 @@ export default function ProjectionsClient({
         <p className="proj-lede">
           In {lastLabel}, you&rsquo;re on track to be worth <strong className={finalNW < 0 ? 'neg' : undefined}>{fmtK(finalNW)}</strong>.
         </p>
+        {range.spread > 0 && (
+          <p className="proj-lede-range">Somewhere between {fmtK(endLow)} and {fmtK(endHigh)}, depending on how investments do.</p>
+        )}
         <p className="proj-lede-sub">
           {hasLoan && (clearedIdx >= 0 ? `Home loan paid off in ${mortCleared}. ` : 'Home loan still being paid off. ')}
           {rentSt.enabled && `${fmtK(totalRentPaid)} paid in rent along the way. `}
@@ -659,6 +682,7 @@ export default function ProjectionsClient({
                     historyLabels={historyLabels} historyData={historyData}
                     superData={hasSuper ? superData : null} includeSuper={includeSuper}
                     overlays={overlays(x => (includeSuper && hasSuper ? x.nwArr.map((v, i) => v + (x.superArr[i] ?? 0)) : x.nwArr))}
+                    band={nwBand}
                   />
                 </>
               )}
@@ -684,6 +708,7 @@ export default function ProjectionsClient({
                     person1Name={person1Name} person2Name={person2Name}
                     marks={[p1RetireYear, ...(p2RetireYear ? [p2RetireYear] : [])]}
                     overlays={overlays(x => x.superArr)}
+                    band={range.spread > 0 ? { low: lowRun.superArr, high: highRun.superArr } : null}
                   />
                   <ReadOnlyFence canEdit={canEdit}>
                     <fieldset className="drawdown-choice">
@@ -850,6 +875,9 @@ export default function ProjectionsClient({
                 min={0} max={100 - ed.settings.savingsRate} step={5} value={Math.min(ed.settings.funPct ?? 0, 100 - ed.settings.savingsRate)} cls="purple-t"
                 onChange={v => editSettings({ funPct: v })} />
               <Slider label="Investment growth each year" min={0} max={15} step={0.5} value={ed.settings.investReturn} cls="purple-t" onChange={v => editSettings({ investReturn: v })} />
+              <Slider label="Range shown either side" hint="A shaded band on Net worth and Retirement: every year’s investment and super returns this much lower, and higher."
+                min={0} max={4} step={0.5} value={ed.settings.returnSpread ?? DEFAULT_RETURN_SPREAD} cls="purple-t"
+                fmt={v => (v === 0 ? 'Off' : `± ${v} points`)} onChange={v => editSettings({ returnSpread: v })} />
               <details className="wi-more">
                 <summary>More assumptions</summary>
                 <Slider label={`Price rises, ${currentYear}–${String(currentYear + 2).slice(2)}`} min={0} max={10} step={0.5} value={ed.settings.expInflNear} cls="red-t" onChange={v => editSettings({ expInflNear: v })} />

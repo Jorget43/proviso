@@ -22,9 +22,11 @@ interface NetWorthChartProps {
   includeSuper?:  boolean
   /** Scenarios shown over the plan (net worth on the same basis as the plan's line). */
   overlays?:      Overlay[]
+  /** The range: net worth with weaker and stronger returns (same basis as the plan's line), shaded between. */
+  band?:          { low: number[]; high: number[] } | null
 }
 
-export default function NetWorthChart({ labels, nwData, nwNoFees, investData, cashData, sfOn, historyLabels = [], historyData = [], superData = null, includeSuper = false, overlays }: NetWorthChartProps) {
+export default function NetWorthChart({ labels, nwData, nwNoFees, investData, cashData, sfOn, historyLabels = [], historyData = [], superData = null, includeSuper = false, overlays, band = null }: NetWorthChartProps) {
   const c = useChartColors()
   // Pad the projected series with leading nulls so they still start exactly
   // where they always did; the "Actual" series only has points in the
@@ -49,6 +51,13 @@ export default function NetWorthChart({ labels, nwData, nwNoFees, investData, ca
   }
 
   datasets.splice(1, 0, ...overlayDatasets(overlays, c, labels.length, pad(withSuper), historyLabels.length))
+  if (band) {
+    // Two edges, the second filled down to the first: the shaded range.
+    datasets.push(
+      { label: 'Weaker returns', data: pad(band.low), borderColor: c.a(c.green, 0.35), borderWidth: 1, pointRadius: 0, fill: false, tension: 0.4 },
+      { label: 'Stronger returns', data: pad(band.high), borderColor: c.a(c.green, 0.35), backgroundColor: c.a(c.green, 0.1), borderWidth: 1, pointRadius: 0, fill: '-1', tension: 0.4 },
+    )
+  }
 
   return (
     <ScrubChart labels={allLabels} datasets={datasets} height={240}>

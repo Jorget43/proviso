@@ -132,6 +132,8 @@ export interface ProjectionSettingsLike {
   sfSib4Pct?:   number
   sfFamilyFee?: number
   sfEntryFee?:  number
+  /** Points either side of the expected returns for the range shown (schema v9; ranges.ts). */
+  returnSpread?: number
 }
 
 export interface RentSettingsLike {

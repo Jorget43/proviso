@@ -130,6 +130,7 @@ model ProjectionSettings {
   sfSib4Pct            Float   @default(15)   // … 4th or later
   sfFamilyFee          Float   @default(350)  // yearly family fee while any child is at school
   sfEntryFee           Float   @default(0)    // one-off when a child starts at a school
+  returnSpread         Float   @default(2)    // points either side of expected returns for the range shown (schema v9)
 }
 
 model LifePhase {

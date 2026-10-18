@@ -30,14 +30,18 @@ export default function Future() {
         <T tone="t2">
           In today’s money ({fmtK(v.endNetWorth)} in {v.labels[v.labels.length - 1]} dollars). You’re at {fmtK(v.netWorthToday)} now.
         </T>
+        {v.range.spread > 0 && (
+          <T tone="t2">Somewhere between {fmtK(v.range.endLowReal)} and {fmtK(v.range.endHighReal)} in today’s money, depending on how investments do.</T>
+        )}
         <View style={{ marginTop: space.md }}>
           <ScrubChart title="Net worth by year" labels={v.labels} series={[
-            { key: 'plan', label: compare.length ? 'Your plan' : 'Net worth', data: v.netWorth, color: p.green, area: true },
+            { key: 'plan', label: compare.length ? 'Your plan' : 'Net worth', data: v.netWorth, color: p.green, area: true,
+              band: v.range.spread > 0 ? { low: v.range.netWorthLow, high: v.range.netWorthHigh } : undefined },
             ...compare.filter(r => r.id !== null && r.shown && r.colour).map((r): ChartSeries => ({
               key: r.id!, label: r.name, data: fit(r.netWorth, v.labels.length), color: p[r.colour!], dashed: true, compareTo: v.netWorth,
             })),
           ]} />
-          <T size="caption" tone="t3">In each year’s dollars, without super.</T>
+          <T size="caption" tone="t3">In each year’s dollars, without super.{v.range.spread > 0 ? ` Shaded: every year’s returns ${v.range.spread} points lower or higher.` : ''}</T>
         </View>
         <T size="small" tone="t2" style={{ marginTop: space.sm }}>Try a pay rise, fewer days at work or buying a home, and see what changes.</T>
         <View style={{ alignItems: 'flex-start' }}>
@@ -120,6 +124,13 @@ export default function Future() {
               ? `Enough for ${fmt(v.retirement.goalMonthly)} a month in retirement, to age ${v.retirement.lastAge}.`
               : `${fmt(v.retirement.goalMonthly)} a month in retirement would run your money out around age ${v.retirement.runsOutAt}.`}
           </T>
+          {v.range.spread > 0 && (
+            <T tone={v.range.runsOutLow === null ? 't2' : 'amber'}>
+              {v.range.runsOutLow === null
+                ? `It still lasts if returns are ${v.range.spread} points lower every year.`
+                : `If returns are ${v.range.spread} points lower every year, money runs short around age ${v.range.runsOutLow}.`}
+            </T>
+          )}
           {v.retirement.bridgeShortYear !== null && (
             <T tone="amber">Savings outside super run out in {v.retirement.bridgeShortYear}, before super can be reached at 60.</T>
           )}
@@ -129,7 +140,8 @@ export default function Future() {
               <ScrubChart title="Super and savings by year" labels={v.labels} height={160}
                 defaultIndex={v.retirement.firstRetireYear ? v.labels.indexOf(String(v.retirement.firstRetireYear)) : undefined}
                 series={[
-                  { key: 'super', label: 'Super', data: v.retirement.superByYear, color: p.teal, area: true },
+                  { key: 'super', label: 'Super', data: v.retirement.superByYear, color: p.teal, area: true,
+                    band: v.range.spread > 0 ? { low: v.range.superLow, high: v.range.superHigh } : undefined },
                   { key: 'outside', label: 'Savings outside super', data: v.retirement.outsideByYear, color: p.blue, dashed: true },
                 ]} />
               <T size="caption" tone="t3">In each year’s dollars. Opens at the year you first stop work.</T>

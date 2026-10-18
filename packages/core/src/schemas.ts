@@ -91,6 +91,7 @@ export const projectionSettingsSchema = z
     sfSib4Pct:            num.min(0).max(100),
     sfFamilyFee:          num.min(0).max(100_000),
     sfEntryFee:           num.min(0).max(100_000),
+    returnSpread:         num.min(0).max(5),
   })
   .partial()
 

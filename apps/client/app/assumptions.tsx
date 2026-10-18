@@ -36,6 +36,7 @@ export default function AssumptionsSheet() {
     save: String(s.savingsRate), buffer: String(s.cashBufferMonths), fun: String(s.funPct), prop: String(s.propGrowth), age: String(s.horizonAge), monthly: String(Math.round(goal / 12)),
     fees: s.schoolFeesOn,
     stages: s.lifeStagesOn, leave: String(s.childLeavesHomeAge), regional: h.settings.regional,
+    spread: String(s.returnSpread),
     sib2: String(s.sfSib2Pct), sib3: String(s.sfSib3Pct), sib4: String(s.sfSib4Pct), family: String(s.sfFamilyFee), entry: String(s.sfEntryFee),
   })
   const [error, setError] = useState<string | null>(null)
@@ -55,6 +56,8 @@ export default function AssumptionsSheet() {
     if (!(fun >= 0 && fun + pct[4] <= 100)) { setError('Investing and fun together can’t be more than 100%.'); return }
     const leave = n(f.leave)
     if (!Number.isInteger(leave) || leave < DEFAULT_LEAVE_HOME_AGE || leave > MAX_LEAVE_HOME_AGE) { setError(`Children leave home between ${DEFAULT_LEAVE_HOME_AGE} and ${MAX_LEAVE_HOME_AGE}.`); return }
+    const spread = n(f.spread)
+    if (!(spread >= 0 && spread <= 5)) { setError('Show a range of 0 to 5 points.'); return }
     const rules = [n(f.sib2), n(f.sib3), n(f.sib4)]
     if (rules.some(x => !(x >= 0 && x <= 100))) { setError('Sibling discounts are 0 to 100%.'); return }
     if (!(n(f.family) >= 0 && n(f.entry) >= 0)) { setError('Check the school fees.'); return }
@@ -62,6 +65,7 @@ export default function AssumptionsSheet() {
     await change(db => saveAssumptions(db, {
       person1Growth: pct[0], person2Growth: pct[1], expInfl: pct[2], investReturn: pct[3], savingsRate: pct[4], propGrowth: pct[5],
       cashBufferMonths: buffer, funPct: fun, lifeStagesOn: f.stages, childLeavesHomeAge: leave, horizonAge: age, schoolFeesOn: f.fees,
+      returnSpread: spread,
       sfSib2Pct: rules[0], sfSib3Pct: rules[1], sfSib4Pct: rules[2], sfFamilyFee: n(f.family), sfEntryFee: n(f.entry),
     }, Math.round(n(f.monthly) * 12)))
     router.back()
@@ -83,6 +87,9 @@ export default function AssumptionsSheet() {
       </Field>
       <Field label="Investments return" hint="After fees, before tax.">
         <NumberField unit="%" label="Investment return, percent a year" value={f.ret} onChange={set('ret')} />
+      </Field>
+      <Field label="Range shown either side" hint="Percentage points. Future shades a band: every year’s investment and super returns this much lower, and higher. 0 turns it off.">
+        <NumberField unit="" label="Range of returns shown, percentage points either side" value={f.spread} onChange={set('spread')} />
       </Field>
       <Field label="Safety net kept as cash" hint="Months of spending. What’s left over each year tops it up first; 0 for none.">
         <NumberField unit="" label="Safety net, months of spending" value={f.buffer} onChange={set('buffer')} />

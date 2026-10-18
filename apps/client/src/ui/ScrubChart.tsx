@@ -10,7 +10,7 @@ import Svg, { Circle, Line, Path, Text as SvgText } from 'react-native-svg'
 import { fmtK } from '@proviso/core/formatting'
 import { T } from './kit'
 import { usePalette, space, radius } from './theme'
-import { areaPath, axisLabels, indexAt, linePath, scaleFor, tickLabel, xAt, yAt, type Plot } from './chartGeometry'
+import { areaPath, axisLabels, bandPath, indexAt, linePath, scaleFor, tickLabel, xAt, yAt, type Plot } from './chartGeometry'
 
 export interface ChartSeries {
   key:    string
@@ -25,6 +25,8 @@ export interface ChartSeries {
   compareTo?: (number | null)[]
   /** How the value reads (default $12k). */
   format?: (v: number) => string
+  /** A shaded range around the line (weaker and stronger returns); the readout gives both ends. */
+  band?:   { low: (number | null)[]; high: (number | null)[] }
 }
 
 interface Props {
@@ -53,7 +55,7 @@ export function ScrubChart({ labels, series, height = 180, defaultIndex, title, 
 
   const plot: Plot = { width, height, ...MARGIN }
   const shown = series.filter(s => !hidden.has(s.key))
-  const scale = useMemo(() => scaleFor((shown.length ? shown : series).map(s => s.data)), [shown, series])
+  const scale = useMemo(() => scaleFor((shown.length ? shown : series).flatMap(s => [s.data, ...(s.band ? [s.band.low, s.band.high] : [])])), [shown, series])
 
   // Where a touch started, to tell a sideways scrub from an up-and-down scroll.
   const start = useRef({ x: 0, y: 0 })
@@ -104,6 +106,9 @@ export function ScrubChart({ labels, series, height = 180, defaultIndex, title, 
                 <View style={{ width: 14, borderTopWidth: 2.5, borderStyle: s.dashed ? 'dashed' : 'solid', borderColor: s.color }} />
                 <T size="small" tone="t2" style={{ textDecorationLine: off ? 'line-through' : 'none' }}>{s.label}</T>
                 <T size="small" weight="600">{v == null ? '—' : fmt(s, v)}</T>
+                {s.band && s.band.low[idx] != null && s.band.high[idx] != null && (
+                  <T size="caption" tone="t3">{`${fmt(s, s.band.low[idx]!)} to ${fmt(s, s.band.high[idx]!)}`}</T>
+                )}
                 {diff !== null && (
                   <T size="caption" tone="t3">{Math.abs(diff) < 1 ? 'same as plan' : `${diff > 0 ? '+' : '−'}${fmt(s, Math.abs(diff)).replace(/^[+−-]/, '')} vs plan`}</T>
                 )}
@@ -130,7 +135,10 @@ export function ScrubChart({ labels, series, height = 180, defaultIndex, title, 
               <SvgText key={`x${i}`} x={xAt(i, n, plot)} y={height - 4} fontSize={10} fontFamily={AXIS_FONT} fill={p.t3}
                 textAnchor={i === 0 ? 'start' : i === n - 1 ? 'end' : 'middle'}>{label}</SvgText>
             ))}
-            {shown.filter(s => s.area).map(s => (
+            {shown.filter(s => s.band).map(s => (
+              <Path key={`b${s.key}`} d={bandPath(s.band!.low, s.band!.high, scale, plot)} fill={s.color} fillOpacity={0.14} />
+            ))}
+            {shown.filter(s => s.area && !s.band).map(s => (
               <Path key={`a${s.key}`} d={areaPath(s.data, scale, plot)} fill={s.color} fillOpacity={0.08} />
             ))}
             {shown.map(s => (

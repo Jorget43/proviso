@@ -22,7 +22,7 @@
 import { sqliteTable, text, integer, real } from 'drizzle-orm/sqlite-core'
 
 /** Bumped by every migration. Travels with each sync message and export. */
-export const SCHEMA_VERSION = 8
+export const SCHEMA_VERSION = 9
 
 export type PersonKey = 'p1' | 'p2'
 export const PERSON_KEYS: readonly PersonKey[] = ['p1', 'p2']
@@ -189,6 +189,9 @@ export const projectionSettings = sqliteTable('projectionSettings', {
   sfSib4Pct:            real('sfSib4Pct').notNull().default(15),
   sfFamilyFee:          real('sfFamilyFee').notNull().default(350),
   sfEntryFee:           real('sfEntryFee').notNull().default(0),
+  // v9: the range of returns shown either side of the plan (ranges.ts), in
+  // percentage points; 0 turns the range off.
+  returnSpread:         real('returnSpread').notNull().default(2),
 })
 
 export const lifePhase = sqliteTable('lifePhase', {

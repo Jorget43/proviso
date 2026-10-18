@@ -91,3 +91,14 @@ export function tickLabel(v: number): string {
   if (a >= 1_000) return `${sign}$${trim(a / 1_000)}k`
   return `${sign}$${Math.round(a)}`
 }
+
+/** A shaded range between two lines: along the top edge, then back along the bottom (years where both have values). */
+export function bandPath(low: (number | null)[], high: (number | null)[], scale: Scale, plot: Plot): string {
+  const n = Math.max(low.length, high.length)
+  const idx = Array.from({ length: n }, (_, i) => i).filter(i => low[i] != null && high[i] != null && Number.isFinite(low[i]!) && Number.isFinite(high[i]!))
+  if (idx.length < 2) return ''
+  const pt = (i: number, v: number) => `${xAt(i, n, plot).toFixed(1)} ${yAt(v, scale, plot).toFixed(1)}`
+  const top = idx.map((i, k) => `${k ? 'L' : 'M'}${pt(i, high[i]!)}`)
+  const bottom = [...idx].reverse().map(i => `L${pt(i, low[i]!)}`)
+  return [...top, ...bottom, 'Z'].join(' ')
+}

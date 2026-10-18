@@ -6,6 +6,7 @@ import { computeHomeOverview, type HomeOverview } from '@proviso/core/overview'
 import { computeBudgetSummary, isManagedChildcare } from '@proviso/core/budgetSummary'
 import { workDaysForYear, runProjections, type PurchasePaid } from '@proviso/core/projections'
 import { projectionBaseline, buildProjectionInputs, feeScheduleFor, retirementIncomeGoal, type ProjectionLive } from '@proviso/core/future'
+import { runRange, mainOf, DEFAULT_RETURN_SPREAD } from '@proviso/core/ranges'
 import { runScenarios, summariseRun, countChanges, validOverrides, readOverrides, type ScenarioColour, type ScenarioSummary } from '@proviso/core/scenarios'
 import { currentAges, childLabel, sortChildren } from '@proviso/core/people'
 import { situationFrom, situationLabels } from '@proviso/core/situation'
@@ -236,6 +237,21 @@ export interface FutureView {
   }
   /** Spent on fun out of what's left over, over the whole projection. */
   funTotal:       number
+  /**
+   * The range (core/ranges.ts): the same plan with every year's investment and
+   * super returns `spread` points lower and higher. spread 0 = off.
+   */
+  range: {
+    spread:       number
+    endLowReal:   number
+    endHighReal:  number
+    netWorthLow:  number[]
+    netWorthHigh: number[]
+    superLow:     number[]
+    superHigh:    number[]
+    /** Person 1's age when money runs short with weaker returns; null = it lasts. */
+    runsOutLow:   number | null
+  }
   assumptions: { salaryGrowth: number; inflation: number; investReturn: number; savingsRate: number; propGrowth: number; cashBufferMonths: number; funPct: number }
 }
 
@@ -272,7 +288,9 @@ export function futureView(h: HouseholdData, now: Date): FutureView {
   const year = now.getFullYear()
   const s = h.projection
   const { baseline, live, ages } = planOf(h, year)
-  const out = runProjections(buildProjectionInputs(baseline, live))
+  const range = runRange(buildProjectionInputs(baseline, live), s.returnSpread ?? DEFAULT_RETURN_SPREAD)
+  const out = range.mid
+  const low = mainOf(range.low), high = mainOf(range.high)
   const run = out.withFees ?? out.base
   const end = run.nwArr[run.nwArr.length - 1] ?? baseline.netWorthToday
   const deflate = Math.pow(1 + s.expInfl / 100, run.nwArr.length)
@@ -334,6 +352,14 @@ export function futureView(h: HouseholdData, now: Date): FutureView {
       firstRetireYear: [run.person1RetireYr, run.person2RetireYr].filter((y): y is number => y !== null && y > year).sort()[0] ?? null,
     },
     funTotal: run.funArr.reduce((t, v) => t + v, 0),
+    range: {
+      spread: range.spread,
+      endLowReal: (low.nwArr[low.nwArr.length - 1] ?? 0) / deflate,
+      endHighReal: (high.nwArr[high.nwArr.length - 1] ?? 0) / deflate,
+      netWorthLow: low.nwArr, netWorthHigh: high.nwArr,
+      superLow: low.superArr, superHigh: high.superArr,
+      runsOutLow: low.shortfallYr ? ages.person1Age + (low.shortfallYr - year) : null,
+    },
     assumptions: { salaryGrowth: s.person1Growth, inflation: s.expInfl, investReturn: s.investReturn, savingsRate: s.savingsRate, propGrowth: s.propGrowth,
       cashBufferMonths: s.cashBufferMonths, funPct: Math.min(s.funPct, 100 - s.savingsRate) },
   }

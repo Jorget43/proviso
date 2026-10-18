@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { niceCeil, scaleFor, xAt, yAt, indexAt, linePath, areaPath, axisLabels, tickLabel, type Plot } from '@/ui/chartGeometry'
+import { niceCeil, scaleFor, xAt, yAt, indexAt, linePath, areaPath, axisLabels, tickLabel, bandPath, type Plot } from '@/ui/chartGeometry'
 
 // A 240 × 120 chart with no margins on the right or top, 40 on the left and 20 at the bottom:
 // the plotting area is 200 wide and 100 tall.
@@ -39,5 +39,12 @@ describe('the chart’s maths', () => {
 
   it('writes short axis labels', () => {
     expect([0, 250_000, 1_500_000, 50_000_000, -25_000, 999].map(tickLabel)).toEqual(['$0', '$250k', '$1.5M', '$50M', '−$25k', '$999'])
+  })
+
+  it('shades a range between two lines', () => {
+    const s = { min: 0, max: 100, ticks: [] }
+    // Top edge 50 → 100, back along the bottom 50 → 0.
+    expect(bandPath([0, 50], [50, 100], s, plot)).toBe('M40.0 50.0 L240.0 0.0 L240.0 50.0 L40.0 100.0 Z')
+    expect(bandPath([0], [1], s, plot)).toBe('')
   })
 })
