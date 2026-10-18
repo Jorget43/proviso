@@ -433,13 +433,13 @@ In [`docs/architecture.md`](docs/architecture.md) order. Phase 3 there (the sing
 **Start here next session**, in this order:
 1. **⏰ Remind the owner first — phone test still to do** (deferred 2026-10-08, "soon"). **The Android development build with Phases 34–35** (sync, camera, key backup): it built successfully on EAS on 2026-10-08 (so the key-backup Kotlin module and expo-camera compile); `npm run eas -w @proviso/client -- build:list --limit 1` shows the APK link. Install it and check on the phone: Settings → Recovery phrase → Save to Google Password Manager; Settings → Sync; Join a household (camera scan).
 2. **Run the relay on the NAS** with the owner: `docker compose --profile sync up -d` (image `ghcr.io/jorget43/proviso-relay`, published by CI from master since 2026-10-08), then `tailscale serve --bg --https=8443 http://localhost:8787` (README "Sync relay for the app"). Turn sync on in the app with the `https://<machine>.<tailnet>.ts.net:8443` address, then join from a second phone. Phones need Tailscale running to reach it.
-3. **Owner decisions pending**: **Phase 46 school fees v2** is on branch `phase-46-school-fees`, committed but not merged or pushed. Numbers move for some households (below); schema v8, so pushing publishes a NAS image that runs Prisma `0012_school_fees_v2`. Ask the owner to merge and push. (Phase 45 scenarios: merged and pushed f413a67.)
+3. **Owner decisions pending**: none. (Phase 46 school fees v2: owner OK 2026-10-18, merged and pushed ca152c6; the NAS image runs Prisma `0012_school_fees_v2` on its next start.)
 4. **Step B of [`docs/plan-modelling-and-ux.md`](docs/plan-modelling-and-ux.md)**:
    - The life-course engine shipped as Phase 40 (merged to master 2026-10-09 with the owner's OK).
    - Phase 41 (birth years, the `child` table) merged to master 2026-10-12 with the owner's OK.
 5. **Step C**: the cash-buffer rule is Phase 43 (merged to master 2026-10-14). Life stages are Phase 44 (merged to master 2026-10-14 with the owner's OK).
 6. **Step D**: scenarios are Phase 45 (merged and pushed 2026-10-18). Next:
-   - School fees v2 (plan item 7) is Phase 46 (above).
+   - School fees v2 (plan item 7) is Phase 46 (merged and pushed 2026-10-18).
    - Then step E of the plan (uncertainty): item 8a, investment returns as ranges and a glide path; then 8b, Monte Carlo.
    - **The app's chart component** (`react-native-svg`, a native module, so it rides on the next development build). Then the app can show scenario lines and edit a saved scenario; today it saves What if? drafts as scenarios and compares them in a card.
    - Step A (dark mode, editing, chart trim) shipped as Phases 37–39.
@@ -569,7 +569,7 @@ Ideas that have been evaluated but aren't on the roadmap. Each links to its writ
 
 ### Phase 46 — Plan step D, part 2: school fees, properly (2026-10-18)
 
-Plan item 7. Owner's decisions (2026-10-18): a primary and a secondary school per child (not any number of stages); households that already exist keep today's 15% sibling discount and $350 levy, new households start with none; every child's fees are modelled, not just the two eldest. On branch `phase-46-school-fees`, not merged.
+Plan item 7. Owner's decisions (2026-10-18): a primary and a secondary school per child (not any number of stages); households that already exist keep today's 15% sibling discount and $350 levy, new households start with none; every child's fees are modelled, not just the two eldest. Merged and pushed with the owner's OK the same day (ca152c6).
 
 - **Core** (`schoolFees.ts` v2, `future.ts`):
   - `schoolFeesYear(yr, kids, rules, inflation)`: any number of children, eldest first. Each child has a fee table per stage (Kinder–Year 6, Years 7–12; `SECONDARY_FROM_IDX` = Year 7) or none. Rules: % off tuition for the 2nd, 3rd and 4th-or-later child at school that year; a yearly family fee while any child is at school; an entry fee when a child starts school, and again at Year 7 if secondary is a different kind of school. With the old rules it gives exactly the old figures (tested year by year).
