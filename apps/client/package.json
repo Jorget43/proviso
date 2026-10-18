@@ -19,7 +19,7 @@
     "@proviso/core": "*",
     "@proviso/sync": "*",
     "@proviso/tokens": "*",
-    "drizzle-orm": "^0.45.3",
+    "drizzle-orm": "^0.45.4",
     "expo": "~57.0.27",
     "expo-camera": "~57.0.6",
     "expo-constants": "~57.0.20",
