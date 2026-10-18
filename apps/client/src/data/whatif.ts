@@ -99,6 +99,9 @@ export async function saveAsScenario(db: Db, h: HouseholdData, w: WhatIf, name: 
 
 export const removeScenario = (db: Db, id: string) => deleteRow(db, 'scenario', id)
 
+/** Shows or hides a scenario on Future's chart (stored, so the NAS's chips match). */
+export const showScenario = (db: Db, id: string, shown: boolean) => updateRow(db, 'scenario', id, { enabled: shown })
+
 /** Writes what the draft changed, and nothing else. */
 export async function keepWhatIf(db: Db, h: HouseholdData, w: WhatIf): Promise<void> {
   const { id: _p, deletedAt: _pd, ...proj } = changed(h.projection, w.projection)

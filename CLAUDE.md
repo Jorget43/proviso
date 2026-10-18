@@ -433,7 +433,7 @@ In [`docs/architecture.md`](docs/architecture.md) order. Phase 3 there (the sing
 **Start here next session**, in this order:
 1. **⏰ Remind the owner first — phone test still to do** (deferred 2026-10-08, "soon"). **The Android development build with Phases 34–35** (sync, camera, key backup): it built successfully on EAS on 2026-10-08 (so the key-backup Kotlin module and expo-camera compile); `npm run eas -w @proviso/client -- build:list --limit 1` shows the APK link. Install it and check on the phone: Settings → Recovery phrase → Save to Google Password Manager; Settings → Sync; Join a household (camera scan).
 2. **Run the relay on the NAS** with the owner: `docker compose --profile sync up -d` (image `ghcr.io/jorget43/proviso-relay`, published by CI from master since 2026-10-08), then `tailscale serve --bg --https=8443 http://localhost:8787` (README "Sync relay for the app"). Turn sync on in the app with the `https://<machine>.<tailnet>.ts.net:8443` address, then join from a second phone. Phones need Tailscale running to reach it.
-3. **Owner decisions pending**: none. (Phase 46 school fees v2: owner OK 2026-10-18, merged and pushed ca152c6; the NAS image runs Prisma `0012_school_fees_v2` on its next start.)
+3. **Owner decisions pending**: **Phase 47 app charts** is on branch `phase-47-app-charts`, committed but not merged or pushed. App only: no numbers move, no schema change, and the NAS image doesn't change (CI drops the app's workspaces). It adds `react-native-svg`, which Expo Go already includes, so the phone test can also use Expo Go. Ask the owner to merge and push. (Phase 46 school fees v2: merged and pushed ca152c6.)
 4. **Step B of [`docs/plan-modelling-and-ux.md`](docs/plan-modelling-and-ux.md)**:
    - The life-course engine shipped as Phase 40 (merged to master 2026-10-09 with the owner's OK).
    - Phase 41 (birth years, the `child` table) merged to master 2026-10-12 with the owner's OK.
@@ -441,7 +441,7 @@ In [`docs/architecture.md`](docs/architecture.md) order. Phase 3 there (the sing
 6. **Step D**: scenarios are Phase 45 (merged and pushed 2026-10-18). Next:
    - School fees v2 (plan item 7) is Phase 46 (merged and pushed 2026-10-18).
    - Then step E of the plan (uncertainty): item 8a, investment returns as ranges and a glide path; then 8b, Monte Carlo.
-   - **The app's chart component** (`react-native-svg`, a native module, so it rides on the next development build). Then the app can show scenario lines and edit a saved scenario; today it saves What if? drafts as scenarios and compares them in a card.
+   - The app's chart component is Phase 47 (on branch `phase-47-app-charts`, not merged; see "Owner decisions pending"). Still open for the app: editing a saved scenario, the Money in & out and Home charts, and the drawdown strategy choice.
    - Step A (dark mode, editing, chart trim) shipped as Phases 37–39.
    - Also open: the relay enforcing roles, and the iOS build once the Apple account is ready.
 
@@ -454,7 +454,7 @@ The full list:
 - **Dependency advisories**: GitHub lists some on master, believed to be all in Expo's build and dev-server tools (`braces`, `node-forge`, `uuid` via `xcode`, `decode-uri-component`), several with no fixed version yet. They don't reach the NAS image (CI audits exactly what it ships). Dependabot was preparing a security update for them on 2026-10-06: review it carefully, because Expo pins some of them, and React / React Native / `expo*` move only with the Expo SDK (`proviso-release` skill).
 - **Starter estimates** (`packages/core/src/starter.ts`): re-check the figures yearly with the July recalibration; electricity still uses the AER's 2020 usage benchmarks (no longer updated).
 
-### Where each feature lives (NAS ↔ app), as of Phase 46
+### Where each feature lives (NAS ↔ app), as of Phase 47
 
 | Feature | NAS web app | The app | Notes |
 |---|---|---|---|
@@ -467,15 +467,15 @@ The full list:
 | Super: balances, retirement ages | ✓ | ✓ | |
 | Super: extra contributions, carry-forward | ✓ | — | Extra contributions feed the projection as salary sacrifice since Phase 40 |
 | Investments (parcels, CGT) | ✓ | — | |
-| Future: net worth, money in & out | ✓ charts | Net worth bars, short years, milestones | Same engine; app charts wait on plan item 2 |
-| Future: Retirement (chart, drawdown strategy) | ✓ | Summary text only | App needs the chart component (plan item 2) and the strategy choice |
+| Future: net worth, money in & out | ✓ charts | Net worth chart (scrubbed), short years, milestones | Same engine. The app has no Money in & out or Home chart yet; the component is there (Phase 47) |
+| Future: Retirement (chart, drawdown strategy) | ✓ | Summary and a super / savings chart | Phase 47; the app still lacks the drawdown strategy choice |
 | Future: look-ahead age, work changes, rent-then-buy | ✓ | ✓ (What if?) | Buying: deposit + stamp duty, paid from savings then investments, any rest on the loan (`buyHome`) |
 | Future: safety net, invest share, fun share | ✓ (What if? → Basics) | ✓ (What if?, Assumptions) | Phase 43; both off by default |
 | Future: school fees | ✓ chart stacked by child; each child's primary and secondary school; fee rules (What if? → Plans) | Total; each child's schools (Settings → People → child); fee rules (Assumptions) | `core/schoolFees.ts` v2, Phase 46. The custom fee table is NAS-only (the app keeps a NAS choice of it) |
 | Birth years (ages move on each year) | Set at onboarding; kept in step | ✓ edit (Settings → People) | `core/people.ts` |
 | Children (birth year, month, name; planned babies) | ✓ (What if? → Family) | ✓ edit (Settings); drive school-fee years | NAS `Child` table since Phase 44; with children recorded, school-fee years follow them on both |
 | Costs that change with age (life stages), where you live | ✓ (What if? → Family) | ✓ (Assumptions; What if? leave-home age); milestones | `core/lifeStages.ts`, Phase 44 |
-| Scenarios (save and compare) | ✓ make, edit, rename, delete in What if?; dashed lines on every Future chart; Compare card | Save a What if? draft as one; Compare card on Future; delete | `core/scenarios.ts`, Phase 45. App lines and editing wait on the chart component |
+| Scenarios (save and compare) | ✓ make, edit, rename, delete in What if?; dashed lines on every Future chart; Compare card | Save a What if? draft as one; dashed lines on the net worth chart; show / hide; Compare card; delete | `core/scenarios.ts`, Phase 45; app lines Phase 47. Editing a saved scenario is NAS-only so far |
 | Life phases (calendar rows) | ✓ toggle ("Extra costs by year") | Read only | Kept as custom extras; life stages do the automatic part |
 | Next 2 years | ✓ | ✓ | `core/cashflow.ts` |
 | Parental-leave switch | ✓ | Read only | |
@@ -566,6 +566,28 @@ Ideas that have been evaluated but aren't on the roadmap. Each links to its writ
 - **School fees decided**: the questionnaire's school-cost lines stay in today's budget; the projection models the two eldest children's fees year by year (ending after Year 12) and leaves those lines out (`isModelledSchoolLine`), so nothing is counted twice. The questionnaire switches `schoolFeesOn` on when there are children.
 - Typed routes are off in `apps/client` (the generated file only existed where a dev server ran, never in CI, and misread the monorepo).
 - Verified: 356 tests; the app at 390px (a Melbourne family of four: $2.32M in today's money in 20 years, HELP cleared 2028, school fees end 2039, loan paid off 2042; a $45k car in 2029 gives $2.28M); the NAS Projections and Super pages rendered against a scratch household. The NAS Super "consider a lower target" hint was fixed on the way (it would have subtracted the mortgage twice and suggested $0).
+
+### Phase 47 — The app's charts (2026-10-18)
+
+Plan item 2's chart component. The owner picked it next (2026-10-18). On branch `phase-47-app-charts`, not merged.
+
+- **`apps/client/src/ui/ScrubChart.tsx`** on `react-native-svg` 15.15.4 (installed with `expo install`; Expo Go includes it). It behaves like the NAS charts:
+  - Drag sideways to move through the years, or move the mouse on the web. Up-and-down drags still scroll: the chart lets go when a drag is mostly vertical.
+  - A fixed readout above the chart is also the legend: tap an item to hide its line. A `compareTo` series adds "+$x vs plan".
+  - Lines (dashed for scenarios), a shaded main series, three value gridlines and first / middle / last years.
+  - Screen readers get an adjustable control: swipe up or down to change the year, and the value reads that year's figures.
+  - The maths (scale, positions, paths, the year under a finger, axis labels) is in `chartGeometry.ts` and tested in Node.
+- **Future**: the net worth bars became the chart, with each scenario shown as a dashed line. Compare rows gain "Show on chart" / "Hide from chart", which writes `scenario.enabled`, the same flag as the NAS chips. Retirement gains a super and savings-outside-super chart that opens at the first year someone stops work.
+- **What if?**: the header chart shows the draft against a dashed "Your plan" line, in a compact mode with no hint line. The cash month bars (Next 2 years) are unchanged.
+- **Gotchas:**
+  - Width comes from `onLayout` on the chart's wrapper.
+  - In headless Edge the page reports itself hidden, so ResizeObserver (which `onLayout` uses on the web) never fires and charts stay unmeasured. The test harness now calls `Page.bringToFront` and `Emulation.setFocusEmulationEnabled`. Real browsers and phones aren't affected.
+  - SVG text on the web needs an explicit system font, or it falls back to serif.
+  - The react-hooks lint rule refuses refs read inside `useMemo` during render, so the gestures use plain responder props.
+- **Verified:**
+  - 528 tests (7 new on the chart maths).
+  - The app's web build in headless Edge with the scratch household and its scenarios: 390px light and dark, and 1280px; mouse scrubbing moved the readout to 2028; hiding a scenario wrote the flag; no sideways scroll.
+  - Not yet on a phone: touch scrubbing and VoiceOver / TalkBack need the phone test (Expo Go works for this one).
 
 ### Phase 46 — Plan step D, part 2: school fees, properly (2026-10-18)
 

@@ -12,7 +12,7 @@ import { useHousehold } from '@/data/DataProvider'
 import { futureView } from '@/data/views'
 import { addWorkChange, applyWhatIf, hasChanges, keepWhatIf, saveAsScenario, startWhatIf, type WhatIf } from '@/data/whatif'
 import { Button, Card, Choice, Field, H2, NumberField, Sheet, Stepper, T, TextField, parseAmount } from '@/ui/kit'
-import { NetWorthBars } from '@/ui/NetWorthBars'
+import { ScrubChart } from '@/ui/ScrubChart'
 import { DEFAULT_LEAVE_HOME_AGE, MAX_LEAVE_HOME_AGE } from '@proviso/core/lifeStages'
 import { usePalette, space } from '@/ui/theme'
 
@@ -81,7 +81,11 @@ export default function WhatIfSheet() {
               </T>
             )}
           </View>
-          <NetWorthBars labels={tried.labels} values={tried.netWorth} height={48} />
+          <ScrubChart title="Net worth by year, with these changes and in your plan" labels={tried.labels} height={96} compact series={[
+            { key: 'tried', label: 'With these changes', data: tried.netWorth, color: p.green, area: true,
+              compareTo: dirty ? tried.labels.map((_, i) => plan.netWorth[i] ?? null) : undefined },
+            ...(dirty ? [{ key: 'plan', label: 'Your plan', data: tried.labels.map((_, i) => plan.netWorth[i] ?? null), color: p.t3, dashed: true }] : []),
+          ]} />
           <T size="small" tone={tried.retirement.runsOutAt === null ? 't2' : 'amber'}>
             {tried.retirement.runsOutAt === null
               ? `Retirement: ${fmt(tried.retirement.goalMonthly)} a month lasts to age ${tried.retirement.lastAge}.`

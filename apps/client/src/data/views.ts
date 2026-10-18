@@ -228,6 +228,11 @@ export interface FutureView {
     lastAge:      number
     /** Year savings outside super run out before super can be reached (retiring before 60); null = they don't. */
     bridgeShortYear: number | null
+    /** Super (everyone's) and savings outside it at the end of each year, that year's dollars; for the chart. */
+    superByYear:   number[]
+    outsideByYear: number[]
+    /** The first year someone stops work (the chart opens there); null if already retired. */
+    firstRetireYear: number | null
   }
   /** Spent on fun out of what's left over, over the whole projection. */
   funTotal:       number
@@ -324,6 +329,9 @@ export function futureView(h: HouseholdData, now: Date): FutureView {
       runsOutAt: run.shortfallYr ? ages.person1Age + (run.shortfallYr - year) : null,
       lastAge: ages.person1Age + run.nwArr.length,
       bridgeShortYear: run.bridgeShortYr,
+      superByYear: run.superArr,
+      outsideByYear: run.investArr.map((v, i) => v + (run.cashArr[i] ?? 0)),
+      firstRetireYear: [run.person1RetireYr, run.person2RetireYr].filter((y): y is number => y !== null && y > year).sort()[0] ?? null,
     },
     funTotal: run.funArr.reduce((t, v) => t + v, 0),
     assumptions: { salaryGrowth: s.person1Growth, inflation: s.expInfl, investReturn: s.investReturn, savingsRate: s.savingsRate, propGrowth: s.propGrowth,
@@ -363,6 +371,10 @@ export interface CompareRow {
   endReal: number
   /** How many things the scenario changes. */
   changes: number
+  /** Shown on the Future chart (the plan always is). */
+  shown:   boolean
+  /** Net worth at the end of each year, that year's dollars, for the chart. */
+  netWorth: number[]
 }
 
 /** The plan and each saved scenario, side by side (empty when there are none). */
@@ -372,12 +384,12 @@ export function compareView(h: HouseholdData, now: Date): CompareRow[] {
   const { baseline, live, ownSchedule } = planOf(h, year)
   const row = (id: string | null, name: string, colour: ScenarioColour | null, l: ProjectionLive, output: ReturnType<typeof runProjections>, changes: number): CompareRow => {
     const summary = summariseRun(output, l)
-    const years = (output.withFees ?? output.base).nwArr.length
-    return { id, name, colour, summary, endReal: summary.endNetWorth / Math.pow(1 + l.settings.expInfl / 100, years), changes }
+    const nw = (output.withFees ?? output.base).nwArr
+    return { id, name, colour, summary, endReal: summary.endNetWorth / Math.pow(1 + l.settings.expInfl / 100, nw.length), changes, shown: true, netWorth: nw }
   }
   return [
     row(null, 'Your plan', null, live, runProjections(buildProjectionInputs(baseline, live)), 0),
     ...runScenarios(baseline, live, h.scenarios, ownSchedule).map(r =>
-      row(r.scenario.id, r.scenario.name, r.colour, r.live, r.output, countChanges(validOverrides(readOverrides(r.scenario.overrides))))),
+      ({ ...row(r.scenario.id, r.scenario.name, r.colour, r.live, r.output, countChanges(validOverrides(readOverrides(r.scenario.overrides)))), shown: r.scenario.enabled })),
   ]
 }

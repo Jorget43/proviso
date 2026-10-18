@@ -8,10 +8,10 @@ import { router } from 'expo-router'
 import { fmt, fmtK } from '@proviso/core/formatting'
 import { useHousehold } from '@/data/DataProvider'
 import { futureView, cashflowView, compareView, type CompareRow, type FutureView } from '@/data/views'
-import { removeScenario } from '@/data/whatif'
+import { removeScenario, showScenario } from '@/data/whatif'
 import { confirmAction } from '@/ui/confirm'
 import { Button, Card, H2, Screen, T } from '@/ui/kit'
-import { NetWorthBars } from '@/ui/NetWorthBars'
+import { ScrubChart, type ChartSeries } from '@/ui/ScrubChart'
 import { usePalette, space, radius, touch } from '@/ui/theme'
 
 export default function Future() {
@@ -30,7 +30,15 @@ export default function Future() {
         <T tone="t2">
           In today’s money ({fmtK(v.endNetWorth)} in {v.labels[v.labels.length - 1]} dollars). You’re at {fmtK(v.netWorthToday)} now.
         </T>
-        <NetWorthBars labels={v.labels} values={v.netWorth} />
+        <View style={{ marginTop: space.md }}>
+          <ScrubChart title="Net worth by year" labels={v.labels} series={[
+            { key: 'plan', label: compare.length ? 'Your plan' : 'Net worth', data: v.netWorth, color: p.green, area: true },
+            ...compare.filter(r => r.id !== null && r.shown && r.colour).map((r): ChartSeries => ({
+              key: r.id!, label: r.name, data: fit(r.netWorth, v.labels.length), color: p[r.colour!], dashed: true, compareTo: v.netWorth,
+            })),
+          ]} />
+          <T size="caption" tone="t3">In each year’s dollars, without super.</T>
+        </View>
         <T size="small" tone="t2" style={{ marginTop: space.sm }}>Try a pay rise, fewer days at work or buying a home, and see what changes.</T>
         <View style={{ alignItems: 'flex-start' }}>
           <Button title="What if?" onPress={() => router.push('/whatif')} />
@@ -38,8 +46,10 @@ export default function Future() {
       </Card>
 
       {compare.length > 0 && (
-        <Compare rows={compare} onRemove={row => confirmAction(`Delete “${row.name}”?`, 'Your plan isn’t affected.', 'Delete',
-          () => { void change(db => removeScenario(db, row.id!)) })} />
+        <Compare rows={compare}
+          onShow={row => { void change(db => showScenario(db, row.id!, !row.shown)) }}
+          onRemove={row => confirmAction(`Delete “${row.name}”?`, 'Your plan isn’t affected.', 'Delete',
+            () => { void change(db => removeScenario(db, row.id!)) })} />
       )}
 
       <Pressable accessibilityRole="button" accessibilityHint="Cash in the bank month by month" onPress={() => router.push('/cashflow')}
@@ -114,6 +124,17 @@ export default function Future() {
             <T tone="amber">Savings outside super run out in {v.retirement.bridgeShortYear}, before super can be reached at 60.</T>
           )}
           <T size="small" tone="t2">In today’s money. Counts super and your savings outside it; doesn’t count the Age Pension.</T>
+          {v.retirement.superByYear.some(x => x > 0) && (
+            <View style={{ marginTop: space.sm }}>
+              <ScrubChart title="Super and savings by year" labels={v.labels} height={160}
+                defaultIndex={v.retirement.firstRetireYear ? v.labels.indexOf(String(v.retirement.firstRetireYear)) : undefined}
+                series={[
+                  { key: 'super', label: 'Super', data: v.retirement.superByYear, color: p.teal, area: true },
+                  { key: 'outside', label: 'Savings outside super', data: v.retirement.outsideByYear, color: p.blue, dashed: true },
+                ]} />
+              <T size="caption" tone="t3">In each year’s dollars. Opens at the year you first stop work.</T>
+            </View>
+          )}
         </Card>
       </View>
 
@@ -154,7 +175,10 @@ export default function Future() {
 }
 
 /** The plan and each saved scenario, side by side. */
-function Compare({ rows, onRemove }: { rows: CompareRow[]; onRemove: (row: CompareRow) => void }) {
+/** A scenario's values fitted to the plan's years (it may look further ahead, or not as far). */
+const fit = (data: number[], length: number): (number | null)[] => Array.from({ length }, (_, i) => data[i] ?? null)
+
+function Compare({ rows, onRemove, onShow }: { rows: CompareRow[]; onRemove: (row: CompareRow) => void; onShow: (row: CompareRow) => void }) {
   const p = usePalette()
   const plan = rows[0]
   return (
@@ -184,7 +208,8 @@ function Compare({ rows, onRemove }: { rows: CompareRow[]; onRemove: (row: Compa
                 Lowest cash {fmtK(s.lowestCash.value)} in {s.lowestCash.year}.
               </T>
               {r.id !== null && (
-                <View style={{ alignItems: 'flex-start' }}>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>
+                  <Button kind="quiet" title={r.shown ? 'Hide from chart' : 'Show on chart'} onPress={() => onShow(r)} />
                   <Button kind="danger" title="Delete" onPress={() => onRemove(r)} />
                 </View>
               )}
