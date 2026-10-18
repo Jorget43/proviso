@@ -1,8 +1,10 @@
 'use client'
+// School fees year by year, stacked by child (any number, eldest first), with
+// the yearly family fee on top. Each child's bar is after any sibling
+// discount and includes entry fees (@proviso/core/schoolFees).
 import { Chart as ChartJS, BarElement, LinearScale, CategoryScale } from 'chart.js'
 import { Bar } from 'react-chartjs-2'
 import { fmtK } from '@proviso/core/formatting'
-import { SF_LEVELS } from '@proviso/core/schoolFees'
 import { crosshair, SCRUB_BASE, kTicks } from '@/lib/chartPlugins'
 import { useChartColors, axisTicks } from '@/lib/chartTheme'
 import ScrubChart from '@/components/ui/ScrubChart'
@@ -11,32 +13,34 @@ ChartJS.register(BarElement, LinearScale, CategoryScale)
 
 interface SchoolFeeChartProps {
   labels:      string[]
-  sfC1Arr:     number[]
-  sfC2Arr:     number[]
-  sfSibArr:    number[]
-  sfTotalArr:  number[]
-  sfC1Start:   number
-  sfC1ExitIdx: number
-  sfC2Start:   number
-  sfC2ExitIdx: number
+  /** Each child's fees by year, eldest first. */
+  childArrs:   number[][]
+  childNames:  string[]
+  familyArr:   number[]
+  sibArr:      number[]
+  totalArr:    number[]
+  /** Fee rises a year, %. */
+  inflation:   number
   /** Scenarios' total fees each year, as lines over the plan's bars. */
   overlays?:   Overlay[]
 }
 
-export default function SchoolFeeChart({ labels, sfC1Arr, sfC2Arr, sfSibArr, sfTotalArr, sfC1Start, sfC1ExitIdx, sfC2Start, sfC2ExitIdx, overlays }: SchoolFeeChartProps) {
-  const c = useChartColors()
-  const totalC1   = sfC1Arr.reduce((s, v) => s + v, 0)
-  const totalC2   = sfC2Arr.reduce((s, v) => s + v, 0)
-  const totalSib  = sfSibArr.reduce((s, v) => s + v, 0)
-  const grandTotal = sfTotalArr.reduce((s, v) => s + v, 0)
+const CHILD_COLOURS = ['blue', 'green', 'purple', 'pink', 'teal', 'amber'] as const
 
+export default function SchoolFeeChart({ labels, childArrs, childNames, familyArr, sibArr, totalArr, inflation, overlays }: SchoolFeeChartProps) {
+  const c = useChartColors()
+  const sum = (a: number[]) => a.reduce((s, v) => s + v, 0)
   const datasets: Record<string, unknown>[] = [
-    { label: 'Child 1',          data: sfC1Arr,  backgroundColor: c.a(c.blue, 0.75),  stack: 'a', borderRadius: 3 },
-    { label: 'Child 2',          data: sfC2Arr,  backgroundColor: c.a(c.green, 0.75),  stack: 'a', borderRadius: 3 },
-    { label: 'Sibling discount', data: sfSibArr, backgroundColor: c.a(c.amber, 0.4),  stack: 'a' },
-    ...overlayDatasets(overlays, c, labels.length, sfTotalArr, 0, 'line'),
+    ...childArrs.map((data, i) => ({ label: childNames[i], data, backgroundColor: c.a(c[CHILD_COLOURS[i % CHILD_COLOURS.length]], 0.75), stack: 'a', borderRadius: 3 })),
+    { label: 'Family fee', data: familyArr, backgroundColor: c.a(c.amber, 0.45), stack: 'a' },
+    ...overlayDatasets(overlays, c, labels.length, totalArr, 0, 'line'),
   ]
-  const peakIdx = sfTotalArr.indexOf(Math.max(...sfTotalArr))
+  const peakIdx = totalArr.indexOf(Math.max(...totalArr))
+  const tiles = [
+    ...childArrs.map((a, i) => ({ label: childNames[i], val: sum(a), color: `var(--${CHILD_COLOURS[i % CHILD_COLOURS.length]})` })),
+    ...(sum(sibArr) > 0 ? [{ label: 'Saved by sibling discounts', val: sum(sibArr), color: 'var(--green)' }] : []),
+    { label: 'All fees', val: sum(totalArr), color: 'var(--red)' },
+  ]
 
   return (
     <>
@@ -49,13 +53,8 @@ export default function SchoolFeeChart({ labels, sfC1Arr, sfC2Arr, sfSibArr, sfT
           },
         }} />
       </ScrubChart>
-      <div className="mini-stats four">
-        {[
-          { label: 'Child 1 total',  val: totalC1,   color: 'var(--blue)' },
-          { label: 'Child 2 total',  val: totalC2,   color: 'var(--green)' },
-          { label: 'Sibling discount', val: totalSib, color: 'var(--amber)' },
-          { label: 'All fees',       val: grandTotal, color: 'var(--red)' },
-        ].map(({ label, val, color }) => (
+      <div className="mini-stats fit">
+        {tiles.map(({ label, val, color }) => (
           <div key={label} className="mini-stat">
             <span>{label}</span>
             <strong style={{ color }}>{fmtK(val)}</strong>
@@ -63,8 +62,7 @@ export default function SchoolFeeChart({ labels, sfC1Arr, sfC2Arr, sfSibArr, sfT
         ))}
       </div>
       <p className="proj-note" style={{ marginTop: '0.5rem' }}>
-        C1: {sfC1Start} → {SF_LEVELS[sfC1ExitIdx]} · C2: {sfC2Start} → {SF_LEVELS[sfC2ExitIdx]}<br />
-        Fees inflated from 2026 schedule. Sibling discount 15% on Child 2 tuition while both enrolled. CML $350/yr per family.
+        Fees rise {inflation}% a year from 2026 prices and stop after Year 12. Each child&rsquo;s bar is after any sibling discount and includes entry fees; your fee rules and each child&rsquo;s schools are in What if? &rarr; Plans.
       </p>
     </>
   )

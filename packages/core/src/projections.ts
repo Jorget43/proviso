@@ -6,7 +6,7 @@
 
 import { calcAfterTax, calcHELPRepayment } from './tax';
 import { simulateMortgageYear, computeMonthlyRepayment } from './mortgage';
-import { schoolFeesForYear, type FeeSchedule } from './schoolFees';
+import { schoolFeesYear, LEGACY_FEE_RULES, SF_BASE as SF_DEFAULT, type FeeSchedule, type SchoolKid, type SchoolFeeRules } from './schoolFees';
 import { lifePhaseCostForYear } from './lifephases';
 import type { LifePhaseOverlay } from './lifephases';
 import { PPL_TOTAL, NEAR_TERM_INFLATION_HORIZON } from './constants';
@@ -125,6 +125,13 @@ export interface ProjectionInputs {
   sfC2ExitIdx:        number;
   sfInfl:             number;
   sfSchedule?:        FeeSchedule;
+  /**
+   * School fees v2: every child's school years and fee tables, eldest first,
+   * and the household's fee rules. Without them, the two children above
+   * (sfC1Start…) on sfSchedule with the rules before v2.
+   */
+  schoolKids?:        SchoolKid[];
+  sfRules?:           SchoolFeeRules;
 
   // Life phase overlays (the mutable set from DB or defaults)
   lifePhases:         LifePhaseOverlay[];
@@ -186,6 +193,10 @@ export interface ProjectionResult {
   sfC2Arr:        number[];
   sfSibArr:       number[];
   sfTotalArr:     number[];
+  /** Each child's fees by year (after sibling discounts, entry fees included), eldest first: sfChildArr[child][year]. */
+  sfChildArr:     number[][];
+  /** The yearly family fee. */
+  sfFamilyArr:    number[];
   leaveYrs:       number[];
   person1HelpClearedYr: number | null;
   person2HelpClearedYr: number | null;
@@ -297,6 +308,7 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
     person1Phases, person2Phases, baseMonthlyExpenses, oneoffs,
     parentalLeaveEnabled,
     schoolFeesOn, sfC1Start, sfC1ExitIdx, sfC2Start, sfC2ExitIdx, sfInfl, sfSchedule,
+    schoolKids, sfRules,
     lifePhases, currentYear,
     rentMode, monthlyRent, rentIncreaseRate,
     purchasePlanEnabled, targetPurchaseYear, targetPropertyValue, depositPct,
@@ -328,6 +340,12 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
   // Gross base salaries for projection
   const p1GrossBase = taxMode ? person1FTE : person1MonthlyNet * 12 / 0.72;
   const p2GrossBase = taxMode ? person2FTE  : person2MonthlyNet * 12 / 0.72;
+
+  const legacySchedule = sfSchedule ?? SF_DEFAULT;
+  const legacyKid = (start: number, exitIdx: number): SchoolKid =>
+    ({ start, exitIdx, primary: legacySchedule, secondary: legacySchedule, primaryChoice: 'custom', secondaryChoice: 'custom' });
+  const kids: SchoolKid[] = schoolKids ?? [legacyKid(sfC1Start, sfC1ExitIdx), legacyKid(sfC2Start, sfC2ExitIdx)];
+  const rules = sfRules ?? LEGACY_FEE_RULES;
 
   function runProjection(includeSchoolFees: boolean): ProjectionResult {
     let expBase   = baseMonthlyExpenses * 12;
@@ -382,6 +400,8 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
     const sfC2Arr:        number[] = [];
     const sfSibArr:       number[] = [];
     const sfTotalArr:     number[] = [];
+    const sfChildArr:     number[][] = kids.map(() => []);
+    const sfFamilyArr:    number[] = [];
     const leaveYrs:       number[] = [];
     const rentArr:        number[] = [];
     const super1Arr:      number[] = [];
@@ -528,12 +548,14 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
 
       // ── School fees ──
       const sf = includeSchoolFees
-        ? schoolFeesForYear(yr, sfC1Start, sfC1ExitIdx, sfC2Start, sfC2ExitIdx, sfInfl, sfSchedule)
-        : { total: 0, c1: 0, c2: 0, sibSaving: 0, cml: 0 };
-      sfC1Arr.push(Math.round(sf.c1));
-      sfC2Arr.push(Math.round(sf.c2));
+        ? schoolFeesYear(yr, kids, rules, sfInfl)
+        : { total: 0, perChild: kids.map(() => 0), sibSaving: 0, family: 0 };
+      sfC1Arr.push(Math.round(sf.perChild[0] ?? 0));
+      sfC2Arr.push(Math.round(sf.perChild[1] ?? 0));
       sfSibArr.push(Math.round(sf.sibSaving));
       sfTotalArr.push(Math.round(sf.total));
+      sf.perChild.forEach((v, i) => sfChildArr[i].push(Math.round(v)));
+      sfFamilyArr.push(Math.round(sf.family));
 
       // ── Life phase overlay ──
       const phaseOverlay = lifePhaseCostForYear(yr, lifePhases, yearInflRate * 100, cI * 100);
@@ -659,7 +681,7 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
     return {
       nwArr, incArr, expArr, mortArr, cashArr, investArr,
       person1Arr, person2Arr, phaseArr, deficitArr, cashRunningArr, funArr, bufferArr, stageArr, owedArr, mortStressArr,
-      sfC1Arr, sfC2Arr, sfSibArr, sfTotalArr, leaveYrs, person1HelpClearedYr, person2HelpClearedYr,
+      sfC1Arr, sfC2Arr, sfSibArr, sfTotalArr, sfChildArr, sfFamilyArr, leaveYrs, person1HelpClearedYr, person2HelpClearedYr,
       rentArr, purchaseYr, purchase,
       super1Arr, super2Arr, superArr, superDrawArr, retiredArr,
       person1RetireYr: lc ? cy + lc.person1RetirementAge - lc.person1Age : null,

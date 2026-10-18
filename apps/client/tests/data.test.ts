@@ -37,7 +37,8 @@ function sampleExport(): HouseholdExport {
   // A NAS household always has this row (seeded); parental leave is off here.
   h.projectionSettings.push({ id: SETTINGS_ID.projections, deletedAt: null, person1Growth: 3.5, person2Growth: 3, expInflNear: 4, expInfl: 2.5,
     childcareInfl: 6, propGrowth: 3.5, savingsRate: 10, investReturn: 3.5, projYears: 20, schoolFeesOn: false, sfC1Start: 2032, sfC1ExitIdx: 13,
-    sfC2Start: 2035, sfC2ExitIdx: 13, sfInfl: 5, sfPresetKey: null, parentalLeaveEnabled: false, horizonAge: 95, cashBufferMonths: 0, funPct: 0, lifeStagesOn: true, childLeavesHomeAge: 18 })
+    sfC2Start: 2035, sfC2ExitIdx: 13, sfInfl: 5, sfPresetKey: null, parentalLeaveEnabled: false, horizonAge: 95, cashBufferMonths: 0, funPct: 0, lifeStagesOn: true, childLeavesHomeAge: 18,
+    sfSib2Pct: 15, sfSib3Pct: 15, sfSib4Pct: 15, sfFamilyFee: 350, sfEntryFee: 0 })
   h.rentSettings.push({ id: SETTINGS_ID.rent, deletedAt: null, enabled: true, monthlyRent: 2400, annualIncreaseRate: 5, purchasePlanEnabled: false,
     targetPurchaseYear: 2031, targetPropertyValue: 800000, depositPct: 20, depositFromCash: 0, depositFromInvestments: 0, newMortgageRate: 6, newMortgageTermYrs: 30, stampDutyPct: 4 })
   return {
@@ -319,6 +320,22 @@ describe('future', () => {
     await startHousehold(db, buildStarterHousehold(family, estimateLivingCosts(family), NOW))
     return db
   }
+
+  it('school fees v2: a new household starts with no sibling discount or levy; each child’s schools set the fees', async () => {
+    const db = await setUp()
+    const h = await loadHousehold(db)
+    expect(h.projection).toMatchObject({ sfSib2Pct: 0, sfSib3Pct: 0, sfSib4Pct: 0, sfFamilyFee: 0, sfEntryFee: 0 })
+    const independent = futureView(h, NOW).schoolFees.total
+    expect(independent).toBeGreaterThan(0)
+    // Government primary and secondary for both: less than independent all through.
+    for (const c of h.children) await saveChild(db, c.id, { name: '', birthYear: c.birthYear, birthMonth: null, primarySchool: 'government', secondarySchool: 'government' })
+    const gov = await loadHousehold(db)
+    expect(gov.children.map(c => [c.primarySchool, c.secondarySchool])).toEqual([['government', 'government'], ['government', 'government']])
+    expect(futureView(gov, NOW).schoolFees.total).toBeLessThan(independent)
+    // Not counted at all: no fees.
+    for (const c of gov.children) await saveChild(db, c.id, { name: '', birthYear: c.birthYear, birthMonth: null, primarySchool: 'none', secondarySchool: 'none' })
+    expect(futureView(await loadHousehold(db), NOW).schoolFees.total).toBe(0)
+  })
 
   it('projects net worth, milestones and retirement from the household', async () => {
     const db = await setUp()

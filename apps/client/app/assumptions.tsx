@@ -36,6 +36,7 @@ export default function AssumptionsSheet() {
     save: String(s.savingsRate), buffer: String(s.cashBufferMonths), fun: String(s.funPct), prop: String(s.propGrowth), age: String(s.horizonAge), monthly: String(Math.round(goal / 12)),
     fees: s.schoolFeesOn,
     stages: s.lifeStagesOn, leave: String(s.childLeavesHomeAge), regional: h.settings.regional,
+    sib2: String(s.sfSib2Pct), sib3: String(s.sfSib3Pct), sib4: String(s.sfSib4Pct), family: String(s.sfFamilyFee), entry: String(s.sfEntryFee),
   })
   const [error, setError] = useState<string | null>(null)
   const set = (k: keyof typeof f) => (v: string) => setF(x => ({ ...x, [k]: v }))
@@ -54,10 +55,14 @@ export default function AssumptionsSheet() {
     if (!(fun >= 0 && fun + pct[4] <= 100)) { setError('Investing and fun together can’t be more than 100%.'); return }
     const leave = n(f.leave)
     if (!Number.isInteger(leave) || leave < DEFAULT_LEAVE_HOME_AGE || leave > MAX_LEAVE_HOME_AGE) { setError(`Children leave home between ${DEFAULT_LEAVE_HOME_AGE} and ${MAX_LEAVE_HOME_AGE}.`); return }
+    const rules = [n(f.sib2), n(f.sib3), n(f.sib4)]
+    if (rules.some(x => !(x >= 0 && x <= 100))) { setError('Sibling discounts are 0 to 100%.'); return }
+    if (!(n(f.family) >= 0 && n(f.entry) >= 0)) { setError('Check the school fees.'); return }
     if (f.regional !== h.settings.regional) await change(db => saveRegional(db, f.regional))
     await change(db => saveAssumptions(db, {
       person1Growth: pct[0], person2Growth: pct[1], expInfl: pct[2], investReturn: pct[3], savingsRate: pct[4], propGrowth: pct[5],
       cashBufferMonths: buffer, funPct: fun, lifeStagesOn: f.stages, childLeavesHomeAge: leave, horizonAge: age, schoolFeesOn: f.fees,
+      sfSib2Pct: rules[0], sfSib3Pct: rules[1], sfSib4Pct: rules[2], sfFamilyFee: n(f.family), sfEntryFee: n(f.entry),
     }, Math.round(n(f.monthly) * 12)))
     router.back()
   }
@@ -117,9 +122,20 @@ export default function AssumptionsSheet() {
         </>
       )}
       {hasKids && (
-        <Field label="Model school fees year by year?" hint="Fees rise each year and stop after Year 12, for the two eldest children. Their school costs in Spending are left out of the projection so they aren’t counted twice.">
+        <Field label="Model school fees year by year?" hint="Fees rise each year and stop after Year 12, for every child, at the schools chosen for each (Settings → People). Their school costs in Spending are left out of the projection so they aren’t counted twice.">
           <Choice label="Model school fees" options={YES_NO} value={f.fees ? 'yes' : 'no'} onChange={k => setF(x => ({ ...x, fees: k === 'yes' }))} />
         </Field>
+      )}
+      {hasKids && f.fees && (
+        <>
+          <T weight="600">Your school’s fee rules</T>
+          <T size="small" tone="t2">Discounts count the children at school in the same year, eldest first. In today’s dollars.</T>
+          <Field label="Off tuition for a 2nd child"><NumberField unit="%" label="Discount for a 2nd child, percent" value={f.sib2} onChange={set('sib2')} /></Field>
+          <Field label="Off tuition for a 3rd child"><NumberField unit="%" label="Discount for a 3rd child, percent" value={f.sib3} onChange={set('sib3')} /></Field>
+          <Field label="Off tuition for a 4th child or later"><NumberField unit="%" label="Discount for a 4th child or later, percent" value={f.sib4} onChange={set('sib4')} /></Field>
+          <Field label="Family fee each year" hint="A building fund or levy, once per family."><NumberField label="Family fee each year" value={f.family} onChange={set('family')} /></Field>
+          <Field label="Entry fee per child at each new school" hint="Enrolment, uniform."><NumberField label="Entry fee per child" value={f.entry} onChange={set('entry')} /></Field>
+        </>
       )}
       {error && <T tone="red" accessibilityRole="alert">{error}</T>}
       <View style={{ gap: space.sm }}>

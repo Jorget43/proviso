@@ -67,6 +67,9 @@ export interface ChildLike {
   name:       string | null
   birthYear:  number
   birthMonth: number | null
+  /** School for Kinder–Year 6 and Years 7–12 (schema v8, a SchoolChoice); null follows the household's school type. */
+  primarySchool?:   string | null
+  secondarySchool?: string | null
 }
 
 /** Eldest first. A missing month counts as the middle of the year. */
@@ -108,4 +111,9 @@ export function schoolStartsFromChildren(children: ChildLike[], year: number): {
     sfC1Start: schoolFeeStartYear(schooling[0].birthYear),
     sfC2Start: schooling[1] ? schoolFeeStartYear(schooling[1].birthYear) : null,
   }
+}
+
+/** Children still at or before school this year, eldest first, with the year each starts the fee schedule. */
+export function schoolChildren<C extends ChildLike>(children: C[], year: number): { child: C; start: number }[] {
+  return sortChildren(children).filter(c => year - c.birthYear <= SCHOOL_END_AGE).map(child => ({ child, start: schoolFeeStartYear(child.birthYear) }))
 }

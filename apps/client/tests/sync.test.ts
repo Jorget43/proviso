@@ -219,7 +219,7 @@ describe('changes that can’t be applied yet are kept, never lost', () => {
     ])
     const h = await loadHousehold(db)
     expect(h.income).toMatchObject({ person1BirthYear: 1980, person1Age: 47 })
-    expect(h.children).toEqual([{ id: 'k1', deletedAt: null, name: null, birthYear: 2019, birthMonth: 7 }])
+    expect(h.children).toEqual([{ id: 'k1', deletedAt: null, name: null, birthYear: 2019, birthMonth: 7, primarySchool: null, secondarySchool: null }])
     expect((await syncState(db))!.waiting).toBe(0)
   })
 })

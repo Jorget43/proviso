@@ -22,7 +22,7 @@
 import { sqliteTable, text, integer, real } from 'drizzle-orm/sqlite-core'
 
 /** Bumped by every migration. Travels with each sync message and export. */
-export const SCHEMA_VERSION = 7
+export const SCHEMA_VERSION = 8
 
 export type PersonKey = 'p1' | 'p2'
 export const PERSON_KEYS: readonly PersonKey[] = ['p1', 'p2']
@@ -144,6 +144,11 @@ export const child = sqliteTable('child', {
   name:       text('name'),                // optional; "Child 1" etc. when empty
   birthYear:  integer('birthYear').notNull(),
   birthMonth: integer('birthMonth'),       // 1–12, optional
+  // v8: school for Kinder–Year 6 and Years 7–12, a SchoolChoice (schoolFees.ts:
+  // 'government' | 'catholic' | 'independent' | 'custom' | 'none'). null follows
+  // the household's school type (projectionSettings.sfPresetKey).
+  primarySchool:   text('primarySchool'),
+  secondarySchool: text('secondarySchool'),
 })
 
 export const projectionSettings = sqliteTable('projectionSettings', {
@@ -176,6 +181,14 @@ export const projectionSettings = sqliteTable('projectionSettings', {
   // v6: costs that follow ages (lifeStages.ts), and the age children leave home.
   lifeStagesOn:         bool('lifeStagesOn').notNull().default(true),
   childLeavesHomeAge:   integer('childLeavesHomeAge').notNull().default(18),
+  // v8: the household's school-fee rules. The defaults are the rules before v8
+  // (15% off a younger sibling's tuition, a $350 yearly levy), so existing
+  // households keep their numbers; a new household is created with zeros.
+  sfSib2Pct:            real('sfSib2Pct').notNull().default(15),
+  sfSib3Pct:            real('sfSib3Pct').notNull().default(15),
+  sfSib4Pct:            real('sfSib4Pct').notNull().default(15),
+  sfFamilyFee:          real('sfFamilyFee').notNull().default(350),
+  sfEntryFee:           real('sfEntryFee').notNull().default(0),
 })
 
 export const lifePhase = sqliteTable('lifePhase', {

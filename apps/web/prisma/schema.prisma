@@ -59,6 +59,8 @@ model Child {
   name       String?
   birthYear  Int
   birthMonth Int?
+  primarySchool   String? // Kinder–Year 6: government | catholic | independent | custom | none; null = household type (schema v8)
+  secondarySchool String? // Years 7–12, same values (schema v8)
 }
 
 model ChildcareSettings {
@@ -123,6 +125,11 @@ model ProjectionSettings {
   funPct               Float   @default(0)  // % of the surplus above the buffer spent on lifestyle (schema v5)
   lifeStagesOn         Boolean @default(true) // costs that follow ages (schema v6)
   childLeavesHomeAge   Int     @default(18)   // children leave home in the year they turn this (schema v6)
+  sfSib2Pct            Float   @default(15)   // school fee rules (schema v8): % off tuition for the 2nd child at school
+  sfSib3Pct            Float   @default(15)   // … 3rd child
+  sfSib4Pct            Float   @default(15)   // … 4th or later
+  sfFamilyFee          Float   @default(350)  // yearly family fee while any child is at school
+  sfEntryFee           Float   @default(0)    // one-off when a child starts at a school
 }
 
 model LifePhase {

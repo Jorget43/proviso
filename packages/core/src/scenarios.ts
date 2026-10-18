@@ -53,7 +53,7 @@ export type ScenarioSuper = Pick<SuperSettingsLike,
 /** Renting vs owning isn't a scenario choice: today's spending already reflects it. */
 export type ScenarioRent = Omit<RentSettingsLike, 'enabled'>
 
-export interface ScenarioChild { name: string | null; birthYear: number; birthMonth: number | null }
+export interface ScenarioChild { name: string | null; birthYear: number; birthMonth: number | null; primarySchool?: string | null; secondarySchool?: string | null }
 
 export interface ScenarioOverrides {
   settings?:      Partial<ProjectionSettingsLike>
@@ -105,7 +105,9 @@ function pickValid(shape: Record<string, z.ZodType>, raw: unknown): Raw | undefi
 
 const phase   = z.object({ year: z.number().int().min(1900).max(2200), days: z.number().int().min(0).max(5) })
 const oneOff  = z.object({ name: z.string(), amt: z.number().finite(), year: z.number().int().min(1900).max(2200) })
-const childOf = z.object({ name: z.string().nullable().catch(null), birthYear: z.number().int().min(1900).max(2200), birthMonth: z.number().int().min(1).max(12).nullable().catch(null) })
+const school  = z.enum(['government', 'catholic', 'independent', 'custom', 'none']).nullable().catch(null)
+const childOf = z.object({ name: z.string().nullable().catch(null), birthYear: z.number().int().min(1900).max(2200), birthMonth: z.number().int().min(1).max(12).nullable().catch(null),
+  primarySchool: school.optional(), secondarySchool: school.optional() })
 
 function validList<T>(schema: z.ZodType<T>, raw: unknown): T[] | undefined {
   if (!Array.isArray(raw)) return undefined

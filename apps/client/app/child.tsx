@@ -1,5 +1,6 @@
 // Add or change a child (?id= to change). Their birth year sets when school
-// fees start and stop in the projection.
+// fees start and stop in the projection; their schools (primary, secondary)
+// set what each stage costs (@proviso/core/schoolFees).
 
 import { useState } from 'react'
 import { View } from 'react-native'
@@ -13,6 +14,11 @@ import { space } from '@/ui/theme'
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 const MONTH_OPTIONS = [{ key: '', label: 'Not sure' }, ...MONTHS.map((m, i) => ({ key: String(i + 1), label: m }))]
+const SCHOOLS = [
+  { key: 'government', label: 'Government' }, { key: 'catholic', label: 'Catholic' },
+  { key: 'independent', label: 'Independent' }, { key: 'none', label: 'Not counted' },
+]
+const TYPE_LABEL: Record<string, string> = { government: 'Government', catholic: 'Catholic', independent: 'Independent' }
 
 export default function Child() {
   const params = useLocalSearchParams<{ id?: string }>()
@@ -24,14 +30,22 @@ export default function Child() {
   const [name, setName] = useState(existing?.name ?? '')
   const [year, setYear] = useState(existing ? String(existing.birthYear) : '')
   const [month, setMonth] = useState(existing?.birthMonth ? String(existing.birthMonth) : '')
+  const [primary, setPrimary] = useState(existing?.primarySchool ?? '')
+  const [secondary, setSecondary] = useState(existing?.secondarySchool ?? '')
   const [error, setError] = useState<string | null>(null)
+  // "Usual" follows the household's school type; the NAS's "Your own fees" choice is kept if it was made there.
+  const householdType = TYPE_LABEL[h.projection.sfPresetKey?.split('|')[1] ?? ''] ?? 'your own fees'
+  const schoolOptions = (current: string) => [
+    { key: '', label: `Usual (${householdType})` }, ...SCHOOLS,
+    ...(current === 'custom' ? [{ key: 'custom', label: 'Your own fees' }] : []),
+  ]
 
   const y = parseAmount(year)
   const age = Number.isInteger(y) ? childAge({ name: null, birthYear: y, birthMonth: month ? Number(month) : null }, new Date()) : null
 
   async function save() {
     let problem: string | null = null
-    await change(async db => { problem = await saveChild(db, existing?.id ?? null, { name, birthYear: y, birthMonth: month ? Number(month) : null }) })
+    await change(async db => { problem = await saveChild(db, existing?.id ?? null, { name, birthYear: y, birthMonth: month ? Number(month) : null, primarySchool: primary || null, secondarySchool: secondary || null }) })
     if (problem) { setError(problem); return }
     router.back()
   }
@@ -57,6 +71,16 @@ export default function Child() {
         <Choice label="Month born" wrap options={MONTH_OPTIONS} value={month} onChange={setMonth} />
       </Field>
       {age !== null && year.length === 4 && <T size="small" tone="t2">{age === 0 ? 'Under 1 now.' : `${age} now.`} They start Prep the year they turn 5; school fees stop after Year 12.</T>}
+      {h.projection.schoolFeesOn && (
+        <>
+          <Field label="School for Kinder to Year 6" hint="Typical fees for that kind of school where you live.">
+            <Choice label="School for Kinder to Year 6" wrap options={schoolOptions(primary)} value={primary} onChange={setPrimary} />
+          </Field>
+          <Field label="School for Years 7 to 12">
+            <Choice label="School for Years 7 to 12" wrap options={schoolOptions(secondary)} value={secondary} onChange={setSecondary} />
+          </Field>
+        </>
+      )}
       {error && <T tone="red" accessibilityRole="alert">{error}</T>}
       <View style={{ gap: space.sm }}>
         <Button title="Save" onPress={save} />

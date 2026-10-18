@@ -269,6 +269,8 @@ export interface StarterHousehold {
     // ending after Year 12, and leaves their lines out (core/future.ts).
     schoolFeesOn: boolean
     sfC1Start: number; sfC2Start: number; sfPresetKey: string | null
+    // A new household starts with no sibling discount or family levy (schema v8 defaults keep older households' 15% / $350).
+    sfSib2Pct: number; sfSib3Pct: number; sfSib4Pct: number; sfFamilyFee: number; sfEntryFee: number
   }
   expenses:   { cat: string; name: string; freq: Freq; amt: number }[]
   assets:     { name: string; amt: number; isOffset: boolean }[]
@@ -325,6 +327,7 @@ export function buildStarterHousehold(a: StarterAnswers, lines: StarterLine[], n
       sfC1Start: schooling[0] ? startYear(schooling[0].child.age) : year + 6,
       sfC2Start: schooling[1] ? startYear(schooling[1].child.age) : year + 9,
       sfPresetKey: a.schoolType && a.children.length ? `${loc}|${a.schoolType}` : null,
+      sfSib2Pct: 0, sfSib3Pct: 0, sfSib4Pct: 0, sfFamilyFee: 0, sfEntryFee: 0,
     },
     expenses: [
       ...lines.map(({ cat, name, freq, amt }) => ({ cat, name, freq, amt })),

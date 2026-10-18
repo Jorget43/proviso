@@ -7,6 +7,8 @@ import { buildProjectionInputs, type ProjectionBaseline, type SuperSettingsLike 
 import { asDrawdownStrategy, PRESERVATION_AGE, DEFAULT_HORIZON_AGE, type DrawdownStrategy } from '@proviso/core/retirement'
 import { type FeeSchedule } from '@proviso/core/schoolFees'
 import { LOCATION_OPTIONS, presetScheduleFor, presetTotalFor } from '@proviso/core/educationCosts'
+import { childLabel, sortChildren } from '@proviso/core/people'
+import type { SchoolChoice } from '@proviso/core/schoolFees'
 
 interface FeeRow { id: number; level: string; tuition: number; fixed: number }
 import Panel from '@/components/ui/Panel'
@@ -39,6 +41,11 @@ interface ProjSettings {
   cashBufferMonths: number
   funPct:        number
   lifeStagesOn:  boolean
+  sfSib2Pct:     number
+  sfSib3Pct:     number
+  sfSib4Pct:     number
+  sfFamilyFee:   number
+  sfEntryFee:    number
   childLeavesHomeAge: number
   parentalLeaveEnabled: boolean
   schoolFeesOn:  boolean
@@ -102,6 +109,8 @@ interface ProjectionsClientProps {
   partnerEnabled:       boolean
   initialChildren:      ChildRow[]
   initialRegional:      boolean
+  /** Where the household lives (a state key), for typical school fees. */
+  initialState:         string | null
   initialScenarios:     ScenarioRow[]
 }
 
@@ -121,6 +130,10 @@ const DRAWDOWN_CHOICES: { key: DrawdownStrategy; label: string; hint: string }[]
   { key: 'percentOfBalance', label: 'A set % each year',   hint: 'Super pays a fixed share of whatever is there. The amount changes, but it never runs out.' },
   { key: 'minimum',          label: 'Legal minimum',       hint: 'Super pays only the minimum the law requires: 4% a year under 65, rising with age.' },
 ]
+
+const SCHOOL_LABEL: Record<SchoolChoice, string> = {
+  government: 'Government', catholic: 'Catholic', independent: 'Independent', custom: 'Your own fees', none: 'Not counted',
+}
 
 const DEFAULT_RENT: RentSettingsType = {
   id: 1, enabled: false, monthlyRent: 0, annualIncreaseRate: 5.0,
@@ -163,7 +176,7 @@ export default function ProjectionsClient({
   initialSettings, initialPerson1Phases, initialPerson2Phases, initialOneoffs, initialLifePhases, initialFeeSchedule,
   income, baseline, mortRate, mortPayment, mortEndDate, currentYear,
   person1Name, person2Name, initialRentSettings, initialSnapshots,
-  superSettings, partnerEnabled, initialChildren, initialRegional, initialScenarios,
+  superSettings, partnerEnabled, initialChildren, initialRegional, initialState, initialScenarios,
 }: ProjectionsClientProps) {
   const [children,       setChildren]       = useState<ChildRow[]>(initialChildren)
   const [regional,       setRegional]       = useState(initialRegional)
@@ -200,16 +213,16 @@ export default function ProjectionsClient({
     })
   }, [feeRows])
 
+  const ownSchedule = useMemo<FeeSchedule>(() => Object.fromEntries(feeRows.map(r => [r.level, { tuition: r.tuition, fixed: r.fixed }])), [feeRows])
   // Assembled by @proviso/core/future, the same as the app's Future screen.
   const live = useMemo(() => ({
     income, settings, person1Phases, person2Phases, oneoffs, lifePhases, sfSchedule,
     rent: rentSt, mortgage: { rate: mortRate, payment: mortPayment }, currentYear,
     life: { partnerEnabled, person1Age: income.person1Age, person2Age: income.person2Age, super: sup },
-    children, regional,
-  }), [income, settings, person1Phases, person2Phases, oneoffs, lifePhases, sfSchedule, rentSt, mortRate, mortPayment, currentYear, partnerEnabled, sup, children, regional])
+    children, regional, state: initialState, ownSchedule,
+  }), [income, settings, person1Phases, person2Phases, oneoffs, lifePhases, sfSchedule, rentSt, mortRate, mortPayment, currentYear, partnerEnabled, sup, children, regional, initialState, ownSchedule])
   const inputs = useMemo(() => buildProjectionInputs(baseline, live), [baseline, live])
   // Scenarios run through the same engine, layered on the plan (@proviso/core/scenarios).
-  const ownSchedule = useMemo<FeeSchedule>(() => Object.fromEntries(feeRows.map(r => [r.level, { tuition: r.tuition, fixed: r.fixed }])), [feeRows])
   const runs = useMemo(() => runScenarios(baseline, live, scenarios, ownSchedule), [baseline, live, scenarios, ownSchedule])
   const { person1HELPBalance, person2HELPBalance, netWorthToday } = baseline
 
@@ -531,6 +544,11 @@ export default function ProjectionsClient({
       changes: countChanges(validOverrides(readOverrides(r.scenario.overrides))) })),
   ] : []
   const compareFees = compareRows.some(r => r.s.schoolFees > 0)
+  // The school-fee chart's children: the ones still at or before school, eldest first, as the engine has them.
+  const schoolKidsNow = sortChildren(children).filter(k => currentYear - k.birthYear <= 17)
+  const feeChildNames = children.length
+    ? schoolKidsNow.map(k => childLabel(k, sortChildren(children).indexOf(k) + 1))
+    : ['Child 1', 'Child 2']
 
   const views: { key: View; label: string; takeaway: string }[] = [
     {
@@ -690,10 +708,8 @@ export default function ProjectionsClient({
               )}
               {current.key === 'fees' && (
                 <SchoolFeeChart
-                  labels={output.labels} sfC1Arr={main.sfC1Arr} sfC2Arr={main.sfC2Arr}
-                  sfSibArr={main.sfSibArr} sfTotalArr={main.sfTotalArr}
-                  sfC1Start={settings.sfC1Start} sfC1ExitIdx={settings.sfC1ExitIdx}
-                  sfC2Start={settings.sfC2Start} sfC2ExitIdx={settings.sfC2ExitIdx}
+                  labels={output.labels} childArrs={main.sfChildArr} childNames={feeChildNames}
+                  familyArr={main.sfFamilyArr} sibArr={main.sfSibArr} totalArr={main.sfTotalArr} inflation={settings.sfInfl}
                   overlays={overlays(x => x.sfTotalArr)}
                 />
               )}
@@ -1143,6 +1159,35 @@ export default function ProjectionsClient({
                       </div>
                     )
                   })()}
+                  {/* ── Each child's schools (school fees v2), or the old start years without children ── */}
+                  {ed.children.length > 0 ? (
+                    <div className="school-kids">
+                      {sortChildren(ed.children).filter(k => currentYear - k.birthYear <= 17).map(k => {
+                        const n = sortChildren(ed.children).indexOf(k) + 1
+                        const set = (patch: { primarySchool?: SchoolChoice | null; secondarySchool?: SchoolChoice | null }) =>
+                          (sc ? sc.kids.update(k.id, patch) : updateChild(k.id, patch))
+                        const typeName = SCHOOL_LABEL[(ed.settings.sfPresetKey?.split('|')[1] ?? 'custom') as SchoolChoice] ?? 'Your own fees'
+                        const pick = (label: string, value: string | null | undefined, key: 'primarySchool' | 'secondarySchool') => (
+                          <label className="wp-field">
+                            <span>{label}</span>
+                            <select value={value ?? ''} onChange={e => set({ [key]: (e.target.value || null) as SchoolChoice | null })}>
+                              <option value="">{`Same as above (${typeName})`}</option>
+                              {(['government', 'catholic', 'independent', 'custom', 'none'] as const).map(c => <option key={c} value={c}>{SCHOOL_LABEL[c]}</option>)}
+                            </select>
+                          </label>
+                        )
+                        return (
+                          <div key={k.id} className="school-kid">
+                            <strong>{childLabel(k, n)}</strong> <small>born {k.birthYear}</small>
+                            {pick('Kinder to Year 6', k.primarySchool, 'primarySchool')}
+                            {pick('Years 7 to 12', k.secondarySchool, 'secondarySchool')}
+                          </div>
+                        )
+                      })}
+                      <p className="slider-hint">Children are added in What if? &rarr; Family. &ldquo;Same as above&rdquo; follows the school type chosen above.</p>
+                    </div>
+                  ) : (
+                    <>
                   {/* ── Child settings ────────────────────────────────── */}
                   <div className="da-row">
                     <label style={{ flex: 1, color: 'var(--t2)', fontSize: '0.74rem' }}>Child 1 starts Kinder</label>
@@ -1164,11 +1209,35 @@ export default function ProjectionsClient({
                       {feeRows.map((r, i) => <option key={r.id} value={i}>{r.level}</option>)}
                     </select>
                   </div>
+                    </>
+                  )}
+                  {/* ── The school's fee rules ── */}
+                  <div className="school-rules">
+                    <div className="explorer-sub">Your school&rsquo;s fee rules</div>
+                    {([
+                      ['sfSib2Pct', 'Off tuition for a 2nd child', '%'],
+                      ['sfSib3Pct', 'Off tuition for a 3rd child', '%'],
+                      ['sfSib4Pct', 'Off tuition for a 4th child or later', '%'],
+                      ['sfFamilyFee', 'Family fee each year (building fund, levy)', '$'],
+                      ['sfEntryFee', 'Entry fee per child at each new school', '$'],
+                    ] as const).map(([key, label, unit]) => (
+                      <div key={key} className="da-row">
+                        <label style={{ flex: 1, color: 'var(--t2)', fontSize: '0.74rem' }}>{label}</label>
+                        <div className="input-prefix" style={{ width: 110 }}>
+                          <span>{unit}</span>
+                          <input type="number" min="0" max={unit === '%' ? 100 : undefined} step={unit === '%' ? 5 : 50}
+                            value={ed.settings[key]} style={{ textAlign: 'right' }}
+                            onChange={e => editSettings({ [key]: Math.max(0, parseFloat(e.target.value) || 0) })} />
+                        </div>
+                      </div>
+                    ))}
+                    <p className="slider-hint">Discounts count children at school in the same year, eldest first. Fees are in today&rsquo;s dollars and rise with fee inflation.</p>
+                  </div>
                   <div style={{ marginTop: '0.5rem' }}>
                     <Slider label="Fee inflation / yr" id="sfInfl" min={0} max={10} step={0.5} value={ed.settings.sfInfl} cls="teal-t" onChange={v => editSettings({ sfInfl: v })} />
                   </div>
                   {/* Editable fee schedule — only in Custom mode */}
-                  <details style={{ marginTop: 8, display: ed.settings.sfPresetKey ? 'none' : undefined }}>
+                  <details style={{ marginTop: 8, display: ed.settings.sfPresetKey && !ed.children.some(k => k.primarySchool === 'custom' || k.secondarySchool === 'custom') ? 'none' : undefined }}>
                     <summary style={{ fontSize: '0.73rem', color: 'var(--t2)', cursor: 'pointer', userSelect: 'none' }}>
                       Edit current fee schedule ({new Date().getFullYear()} $)
                     </summary>
@@ -1213,7 +1282,7 @@ export default function ProjectionsClient({
                       </table>
                       <p style={{ fontSize: '0.67rem', color: 'var(--t3)', marginTop: 6, lineHeight: 1.4 }}>
                         Enter today&apos;s fees. Projections inflate these at the &ldquo;Fee inflation&rdquo; rate above.
-                        A 15% sibling discount applies to Child 2&apos;s tuition when both are enrolled.
+                        Used for &ldquo;Your own fees&rdquo;; sibling discounts follow your fee rules.
                       </p>
                     </div>
                   </details>

@@ -6,7 +6,7 @@ import { fmt } from '@proviso/core/formatting'
 import { CHILD_STAGES, WORK_COST_MONTHLY, DEFAULT_LEAVE_HOME_AGE, MAX_LEAVE_HOME_AGE } from '@proviso/core/lifeStages'
 import { childLabel, sortChildren } from '@proviso/core/people'
 
-export interface ChildRow { id: number; name: string | null; birthYear: number; birthMonth: number | null }
+export interface ChildRow { id: number; name: string | null; birthYear: number; birthMonth: number | null; primarySchool?: string | null; secondarySchool?: string | null }
 
 interface Props {
   on:            boolean

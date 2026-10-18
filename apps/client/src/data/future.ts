@@ -17,6 +17,12 @@ export interface Assumptions {
   propGrowth:    number
   horizonAge:    number   // look ahead until the younger adult is this age
   schoolFeesOn:  boolean
+  /** School fee rules (schema v8): % off a 2nd, 3rd, 4th+ child's tuition, a yearly family fee, an entry fee. */
+  sfSib2Pct?:    number
+  sfSib3Pct?:    number
+  sfSib4Pct?:    number
+  sfFamilyFee?:  number
+  sfEntryFee?:   number
 }
 
 /** Where the household lives: typical costs differ outside the capital cities. */

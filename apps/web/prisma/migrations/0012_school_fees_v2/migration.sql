@@ -1,0 +1,8 @@
+-- AlterTable
+ALTER TABLE "Child" ADD COLUMN "primarySchool" TEXT;
+ALTER TABLE "Child" ADD COLUMN "secondarySchool" TEXT;
+ALTER TABLE "ProjectionSettings" ADD COLUMN "sfSib2Pct" REAL NOT NULL DEFAULT 15;
+ALTER TABLE "ProjectionSettings" ADD COLUMN "sfSib3Pct" REAL NOT NULL DEFAULT 15;
+ALTER TABLE "ProjectionSettings" ADD COLUMN "sfSib4Pct" REAL NOT NULL DEFAULT 15;
+ALTER TABLE "ProjectionSettings" ADD COLUMN "sfFamilyFee" REAL NOT NULL DEFAULT 350;
+ALTER TABLE "ProjectionSettings" ADD COLUMN "sfEntryFee" REAL NOT NULL DEFAULT 0;

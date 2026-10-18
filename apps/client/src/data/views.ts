@@ -257,6 +257,8 @@ function planOf(h: HouseholdData, year: number) {
     life: { partnerEnabled: h.settings.partnerEnabled, ...ages, super: h.superSettings },
     children: h.children,
     regional: h.settings.regional,
+    state: h.settings.state,
+    ownSchedule: feeScheduleFor(null, h.schoolFeeLevels),
   }
   return { baseline, live, ages, ownSchedule: feeScheduleFor(null, h.schoolFeeLevels) }
 }

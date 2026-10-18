@@ -398,7 +398,7 @@ The assumptions watchdog (`/admin/watchdog` for the CFO when `WATCHDOG_ENABLED=t
 - Medicare: single low-income threshold only; family/senior thresholds and the Medicare levy surcharge aren't modelled.
 - CCS: assumes Centre Based Day Care for a below-school-age child, a 10-hour session, and that the family's activity level covers the days booked; no withholding.
 - Projection shortfalls (Phase 29) are carried as money owed with no interest, and repaid before anything is invested.
-- The projection's school-fee model covers the two eldest children; a third child's school costs stay in the spending base as an ordinary, inflating line.
+- School fees (Phase 46): two stages per child (Kinder–Year 6, Years 7–12), not any year level; typical fees by school type and location come from the Futurity 2026 totals spread over year levels. One set of fee rules for the household, not per school; sibling discounts apply to tuition only, counting the children at school that year eldest first, whatever school they're at. An entry fee is charged at the first level and again at Year 7 only when secondary is a different kind of school. The old "exits after" setting still applies to the two eldest.
 - One-off costs aren't inflated: the amount is what's paid in that year.
 - Stamp duty is one percentage of the price (default 4%), not each state's duty scale or first-home-buyer concessions; the app doesn't store the state.
 - `marginalRate()` ignores the LITO taper and the Medicare shade-in band (headline rate only — used for guidance figures).
@@ -433,13 +433,14 @@ In [`docs/architecture.md`](docs/architecture.md) order. Phase 3 there (the sing
 **Start here next session**, in this order:
 1. **⏰ Remind the owner first — phone test still to do** (deferred 2026-10-08, "soon"). **The Android development build with Phases 34–35** (sync, camera, key backup): it built successfully on EAS on 2026-10-08 (so the key-backup Kotlin module and expo-camera compile); `npm run eas -w @proviso/client -- build:list --limit 1` shows the APK link. Install it and check on the phone: Settings → Recovery phrase → Save to Google Password Manager; Settings → Sync; Join a household (camera scan).
 2. **Run the relay on the NAS** with the owner: `docker compose --profile sync up -d` (image `ghcr.io/jorget43/proviso-relay`, published by CI from master since 2026-10-08), then `tailscale serve --bg --https=8443 http://localhost:8787` (README "Sync relay for the app"). Turn sync on in the app with the `https://<machine>.<tailnet>.ts.net:8443` address, then join from a second phone. Phones need Tailscale running to reach it.
-3. **Owner decisions pending**: none. (Phase 45 scenarios: owner OK 2026-10-18, merged and pushed f413a67; the NAS image runs Prisma `0011_scenarios` on its next start.)
+3. **Owner decisions pending**: **Phase 46 school fees v2** is on branch `phase-46-school-fees`, committed but not merged or pushed. Numbers move for some households (below); schema v8, so pushing publishes a NAS image that runs Prisma `0012_school_fees_v2`. Ask the owner to merge and push. (Phase 45 scenarios: merged and pushed f413a67.)
 4. **Step B of [`docs/plan-modelling-and-ux.md`](docs/plan-modelling-and-ux.md)**:
    - The life-course engine shipped as Phase 40 (merged to master 2026-10-09 with the owner's OK).
    - Phase 41 (birth years, the `child` table) merged to master 2026-10-12 with the owner's OK.
 5. **Step C**: the cash-buffer rule is Phase 43 (merged to master 2026-10-14). Life stages are Phase 44 (merged to master 2026-10-14 with the owner's OK).
 6. **Step D**: scenarios are Phase 45 (merged and pushed 2026-10-18). Next:
-   - **School fees v2** (plan item 7): fee choices per child, each a scenario; the School fees view stacked by child.
+   - School fees v2 (plan item 7) is Phase 46 (above).
+   - Then step E of the plan (uncertainty): item 8a, investment returns as ranges and a glide path; then 8b, Monte Carlo.
    - **The app's chart component** (`react-native-svg`, a native module, so it rides on the next development build). Then the app can show scenario lines and edit a saved scenario; today it saves What if? drafts as scenarios and compares them in a card.
    - Step A (dark mode, editing, chart trim) shipped as Phases 37–39.
    - Also open: the relay enforcing roles, and the iOS build once the Apple account is ready.
@@ -453,7 +454,7 @@ The full list:
 - **Dependency advisories**: GitHub lists some on master, believed to be all in Expo's build and dev-server tools (`braces`, `node-forge`, `uuid` via `xcode`, `decode-uri-component`), several with no fixed version yet. They don't reach the NAS image (CI audits exactly what it ships). Dependabot was preparing a security update for them on 2026-10-06: review it carefully, because Expo pins some of them, and React / React Native / `expo*` move only with the Expo SDK (`proviso-release` skill).
 - **Starter estimates** (`packages/core/src/starter.ts`): re-check the figures yearly with the July recalibration; electricity still uses the AER's 2020 usage benchmarks (no longer updated).
 
-### Where each feature lives (NAS ↔ app), as of Phase 45
+### Where each feature lives (NAS ↔ app), as of Phase 46
 
 | Feature | NAS web app | The app | Notes |
 |---|---|---|---|
@@ -470,7 +471,7 @@ The full list:
 | Future: Retirement (chart, drawdown strategy) | ✓ | Summary text only | App needs the chart component (plan item 2) and the strategy choice |
 | Future: look-ahead age, work changes, rent-then-buy | ✓ | ✓ (What if?) | Buying: deposit + stamp duty, paid from savings then investments, any rest on the loan (`buyHome`) |
 | Future: safety net, invest share, fun share | ✓ (What if? → Basics) | ✓ (What if?, Assumptions) | Phase 43; both off by default |
-| Future: school fees | ✓ chart | Total only | |
+| Future: school fees | ✓ chart stacked by child; each child's primary and secondary school; fee rules (What if? → Plans) | Total; each child's schools (Settings → People → child); fee rules (Assumptions) | `core/schoolFees.ts` v2, Phase 46. The custom fee table is NAS-only (the app keeps a NAS choice of it) |
 | Birth years (ages move on each year) | Set at onboarding; kept in step | ✓ edit (Settings → People) | `core/people.ts` |
 | Children (birth year, month, name; planned babies) | ✓ (What if? → Family) | ✓ edit (Settings); drive school-fee years | NAS `Child` table since Phase 44; with children recorded, school-fee years follow them on both |
 | Costs that change with age (life stages), where you live | ✓ (What if? → Family) | ✓ (Assumptions; What if? leave-home age); milestones | `core/lifeStages.ts`, Phase 44 |
@@ -565,6 +566,27 @@ Ideas that have been evaluated but aren't on the roadmap. Each links to its writ
 - **School fees decided**: the questionnaire's school-cost lines stay in today's budget; the projection models the two eldest children's fees year by year (ending after Year 12) and leaves those lines out (`isModelledSchoolLine`), so nothing is counted twice. The questionnaire switches `schoolFeesOn` on when there are children.
 - Typed routes are off in `apps/client` (the generated file only existed where a dev server ran, never in CI, and misread the monorepo).
 - Verified: 356 tests; the app at 390px (a Melbourne family of four: $2.32M in today's money in 20 years, HELP cleared 2028, school fees end 2039, loan paid off 2042; a $45k car in 2029 gives $2.28M); the NAS Projections and Super pages rendered against a scratch household. The NAS Super "consider a lower target" hint was fixed on the way (it would have subtracted the mortgage twice and suggested $0).
+
+### Phase 46 — Plan step D, part 2: school fees, properly (2026-10-18)
+
+Plan item 7. Owner's decisions (2026-10-18): a primary and a secondary school per child (not any number of stages); households that already exist keep today's 15% sibling discount and $350 levy, new households start with none; every child's fees are modelled, not just the two eldest. On branch `phase-46-school-fees`, not merged.
+
+- **Core** (`schoolFees.ts` v2, `future.ts`):
+  - `schoolFeesYear(yr, kids, rules, inflation)`: any number of children, eldest first. Each child has a fee table per stage (Kinder–Year 6, Years 7–12; `SECONDARY_FROM_IDX` = Year 7) or none. Rules: % off tuition for the 2nd, 3rd and 4th-or-later child at school that year; a yearly family fee while any child is at school; an entry fee when a child starts school, and again at Year 7 if secondary is a different kind of school. With the old rules it gives exactly the old figures (tested year by year).
+  - `schoolKidsFor(live)`: each stage is the child's choice (`government` / `catholic` / `independent` typical fees where the household lives, `custom` = the household's own table, `none`), else the household's school type (`sfPresetKey`). The location is the school type's, else the household's state and capital/regional. Without child records, the two children set by start year, as before.
+  - `schoolFeeRules(settings)` reads settings from before v8 as the old 15% / $350.
+  - Engine: inputs `schoolKids`, `sfRules` (without them, the old two children); outputs `sfChildArr` (per child) and `sfFamilyArr`; `sfC1Arr`/`sfC2Arr` stay as the first two.
+  - `isModelledSchoolLine` takes every child's "School costs: Child N" line out of the base, not just Child 1 and 2.
+- **Schema v8** (Drizzle `0007_school_fees_v2`, Prisma `0012_school_fees_v2`): `child.primarySchool`, `child.secondarySchool` (null = the household's type); `projectionSettings.sfSib2Pct`, `sfSib3Pct`, `sfSib4Pct` (default 15), `sfFamilyFee` (default 350), `sfEntryFee` (default 0). The defaults keep existing households' numbers; a new household is written with zeros (the app's setup, the NAS seed). Scenarios carry the children's schools.
+- **NAS** (What if? → Plans → School fees): each child at or before school gets "Kinder to Year 6" and "Years 7 to 12" choices ("Same as above" follows the school type buttons); the old start-year and exit inputs only show without child records; "Your school's fee rules" (three discounts, family fee, entry fee); the custom fee table shows when the type or any child uses it. The School fees chart stacks by child (any number) with the family fee on top, and tiles per child. All of it works while editing a scenario too.
+- **App**: the child sheet has the two school choices when school fees are on (Usual / Government / Catholic / Independent / Not counted; a NAS "Your own fees" choice is kept). Assumptions has the fee rules when school fees are on.
+- **Numbers that move** (owner's OK to model every child, 2026-10-18):
+  - Households with a third or later child: that child's school costs were an ever-inflating budget line; now they follow their schools and stop after Year 12.
+  - Households with children recorded but none still at school, with school fees on: they were charged fees for the stored start years; now nothing.
+  - Everyone else is unchanged (checked: the scratch NAS household kept $35.13M and $467k of fees).
+- **Verified:**
+  - 521 tests. New: v2 fees match the old rules year by year; birth-order discounts, the 4th-or-later rate, the family fee once, entry fees (and only for a different secondary school), stages not counted, exits; choices mapped to presets at the household's location; settings from before v8; three children through the engine; the app saves each child's schools and a new household starts with zero rules.
+  - Headless Edge, scratch NAS (port 3120) after migrating it: 1280px light, 390px dark (no sideways scroll). Switching Child 1's secondary school to Independent moved fees from $467k to $618k; setting the family fee to 0 saved and gave $611k. The app's web build after importing that household's export: the same $611k, and the child sheet showed the NAS's choice.
 
 ### Phase 45 — Plan step D, part 1: scenarios you can save and compare (2026-10-18)
 

@@ -72,6 +72,7 @@ export default async function ProjectionsPage() {
       partnerEnabled={hs?.partnerEnabled ?? false}
       initialChildren={children}
       initialRegional={hs?.regional ?? false}
+      initialState={hs?.state ?? null}
       initialScenarios={scenarios}
       superSettings={{
         // The NAS's column names predate the shared shape (@proviso/core/future).

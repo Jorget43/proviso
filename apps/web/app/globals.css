@@ -1123,6 +1123,11 @@ input[type=range] { width: 100%; accent-color: var(--t3); }
 }
 .mini-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 14px 0; }
 .mini-stats.four { grid-template-columns: repeat(4, 1fr); }
+.mini-stats.fit { grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); }
+.school-kids { display: flex; flex-direction: column; gap: 10px; }
+.school-kid { display: grid; gap: 6px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface2); }
+.school-kid small { color: var(--t3); }
+.school-rules { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); display: grid; gap: 8px; }
 .mini-stat { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--r); padding: 8px 10px; display: flex; flex-direction: column; gap: 2px; }
 .mini-stat span { font-size: 0.72rem; color: var(--t3); }
 .mini-stat strong { font-size: 1.05rem; font-weight: 500; }

@@ -112,3 +112,98 @@ describe('schoolFeesForYear — custom schedule override', () => {
     expect(r.c1).toBe(1000)
   })
 })
+
+// ── School fees v2 ───────────────────────────────────────────────────────────
+import { schoolFeesYear, LEGACY_FEE_RULES, schoolFeesForYear as legacyYear, SF_BASE as BASE, type SchoolKid, type FeeSchedule as Schedule } from '../src/schoolFees'
+import { schoolKidsFor, schoolFeeRules, type ProjectionLive } from '../src/future'
+import { EDUCATION_PRESETS as PRESETS } from '../src/educationCosts'
+
+// Every level $10,000 tuition + $1,000 fixed, so each figure can be checked by eye.
+const FLAT: Schedule = Object.fromEntries(Object.keys(BASE).map(l => [l, { tuition: 10_000, fixed: 1_000 }]))
+const kid = (start: number, over: Partial<SchoolKid> = {}): SchoolKid =>
+  ({ start, exitIdx: 13, primary: FLAT, secondary: FLAT, primaryChoice: 'custom', secondaryChoice: 'custom', ...over })
+
+describe('schoolFeesYear (v2)', () => {
+  it('matches the rules before v2 for two children', () => {
+    for (const yr of [2027, 2030, 2036, 2044]) {
+      const old = legacyYear(yr, 2027, 13, 2030, 13, 5)
+      const now = schoolFeesYear(yr, [kid(2027, { primary: BASE, secondary: BASE }), kid(2030, { primary: BASE, secondary: BASE })], LEGACY_FEE_RULES, 5)
+      expect(now.total).toBeCloseTo(old.total, 6)
+      expect(now.perChild[0]).toBeCloseTo(old.c1, 6)
+      expect(now.perChild[1]).toBeCloseTo(old.c2, 6)
+      expect(now.sibSaving).toBeCloseTo(old.sibSaving, 6)
+    }
+  })
+
+  it('gives each younger child at school their own discount, an entry fee when they start, and one family fee', () => {
+    // In 2030, no inflation: A in level 5, B in level 3, C starting (level 0).
+    // A 11,000; B 11,000 − 10% of 10,000 = 10,000; C 11,000 − 20% of 10,000 + 1,000 entry = 10,000; family 500.
+    const r = schoolFeesYear(2030, [kid(2025), kid(2027), kid(2030)], { siblingPct: [10, 20, 50], familyFee: 500, entryFee: 1_000 }, 0, 2030)
+    expect(r.perChild).toEqual([11_000, 10_000, 10_000])
+    expect(r.sibSaving).toBe(3_000)
+    expect(r.family).toBe(500)
+    expect(r.total).toBe(31_500)
+    // A fourth child at school gets the 4th-or-later rate: 11,000 − 50% of 10,000 = 6,000.
+    expect(schoolFeesYear(2030, [kid(2025), kid(2026), kid(2027), kid(2028)], { siblingPct: [10, 20, 50], familyFee: 0, entryFee: 0 }, 0, 2030).perChild[3]).toBe(6_000)
+  })
+
+  it('a stage that isn’t modelled costs nothing and doesn’t count as a sibling at school', () => {
+    // A is in primary but it's not modelled; B is then the first child at school: no discount.
+    const r = schoolFeesYear(2030, [kid(2027, { primary: null, primaryChoice: 'none' }), kid(2028)], { siblingPct: [10, 10, 10], familyFee: 0, entryFee: 0 }, 0, 2030)
+    expect(r.perChild).toEqual([0, 11_000])
+    // No one at school: no family fee either.
+    expect(schoolFeesYear(2050, [kid(2027)], { siblingPct: [0, 0, 0], familyFee: 500, entryFee: 0 }, 0, 2050).total).toBe(0)
+  })
+
+  it('charges an entry fee again only when secondary is a different school', () => {
+    const rules = { siblingPct: [0, 0, 0] as [number, number, number], familyFee: 0, entryFee: 2_000 }
+    // Level 8 (Year 7) in 2030.
+    expect(schoolFeesYear(2030, [kid(2022, { primaryChoice: 'government', secondaryChoice: 'independent' })], rules, 0, 2030).total).toBe(13_000)
+    expect(schoolFeesYear(2030, [kid(2022, { primaryChoice: 'independent', secondaryChoice: 'independent' })], rules, 0, 2030).total).toBe(11_000)
+  })
+
+  it('stops after the last level they attend', () => {
+    expect(schoolFeesYear(2030, [kid(2022, { exitIdx: 7 })], LEGACY_FEE_RULES, 0, 2030).total).toBe(0)
+  })
+})
+
+describe('schoolKidsFor', () => {
+  const settings = {
+    person1Growth: 3, person2Growth: 3, expInflNear: 3, expInfl: 2.5, childcareInfl: 6, propGrowth: 3.5,
+    savingsRate: 50, investReturn: 5, projYears: 20, schoolFeesOn: true,
+    sfC1Start: 2030, sfC1ExitIdx: 13, sfC2Start: 2033, sfC2ExitIdx: 13, sfInfl: 5, sfPresetKey: 'vic|catholic' as string | null, parentalLeaveEnabled: false,
+  }
+  const live = (over: Partial<ProjectionLive>): ProjectionLive => ({
+    income: { taxMode: true, person1FTE: 0, person2FTE: 0, person1MonthlyNet: 0, person2MonthlyNet: 0 },
+    settings, person1Phases: [], person2Phases: [], oneoffs: [], lifePhases: [], sfSchedule: PRESETS['vic|catholic'].schedule,
+    rent: { enabled: false, monthlyRent: 0, annualIncreaseRate: 5, purchasePlanEnabled: false, targetPurchaseYear: 2031, targetPropertyValue: 0, depositPct: 20, depositFromCash: 0, depositFromInvestments: 0, newMortgageRate: 6, newMortgageTermYrs: 30 },
+    mortgage: { rate: 6, payment: 0 }, currentYear: 2026, ...over,
+  })
+
+  it('takes each stage from the child’s choice, else the household’s school type, at the household’s location', () => {
+    const own = { ...FLAT }
+    const kids = schoolKidsFor(live({ ownSchedule: own, children: [
+      { name: null, birthYear: 2016, birthMonth: null, primarySchool: null, secondarySchool: 'independent' },
+      { name: null, birthYear: 2019, birthMonth: null, primarySchool: 'custom', secondarySchool: 'none' },
+      { name: null, birthYear: 2008, birthMonth: null },   // 18: finished school
+    ] }))
+    expect(kids).toHaveLength(2)
+    expect(kids[0]).toMatchObject({ start: 2020, primaryChoice: 'catholic', secondaryChoice: 'independent' })
+    expect(kids[0].primary).toBe(PRESETS['vic|catholic'].schedule)
+    expect(kids[0].secondary).toBe(PRESETS['vic|independent'].schedule)
+    expect(kids[1]).toMatchObject({ start: 2023, primaryChoice: 'custom', secondaryChoice: 'none', secondary: null })
+    expect(kids[1].primary).toBe(own)
+  })
+
+  it('without a school type, uses where the household lives', () => {
+    const kids = schoolKidsFor(live({ settings: { ...settings, sfPresetKey: null }, state: 'nsw', regional: true,
+      children: [{ name: null, birthYear: 2016, birthMonth: null, secondarySchool: 'government' }] }))
+    expect(kids[0].secondary).toBe(PRESETS['nsw_r|government'].schedule)
+  })
+
+  it('reads settings from before v2 as the old rules', () => {
+    expect(schoolFeeRules(settings)).toEqual(LEGACY_FEE_RULES)
+    expect(schoolFeeRules({ ...settings, sfSib2Pct: 10, sfSib3Pct: 20, sfSib4Pct: 100, sfFamilyFee: 0, sfEntryFee: 500 }))
+      .toEqual({ siblingPct: [10, 20, 100], familyFee: 0, entryFee: 500 })
+  })
+})

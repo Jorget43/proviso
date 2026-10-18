@@ -80,7 +80,11 @@ export async function fillBirthYears(db: Db, year: number): Promise<boolean> {
   return true
 }
 
-export interface ChildForm { name: string; birthYear: number; birthMonth: number | null }
+export interface ChildForm {
+  name: string; birthYear: number; birthMonth: number | null
+  /** Schools for Kinder–Year 6 and Years 7–12 (a SchoolChoice); null follows the household's school type. Left out: unchanged. */
+  primarySchool?: string | null; secondarySchool?: string | null
+}
 
 /** Checks a child's details; returns a problem in plain words, or null. */
 export function checkChild(c: ChildForm, year: number): string | null {
@@ -95,7 +99,11 @@ export function checkChild(c: ChildForm, year: number): string | null {
 export async function saveChild(db: Db, id: string | null, c: ChildForm, year: number = new Date().getFullYear()): Promise<string | null> {
   const problem = checkChild(c, year)
   if (problem) return problem
-  const row = { name: c.name.trim() || null, birthYear: c.birthYear, birthMonth: c.birthMonth }
+  const row = {
+    name: c.name.trim() || null, birthYear: c.birthYear, birthMonth: c.birthMonth,
+    ...(c.primarySchool !== undefined ? { primarySchool: c.primarySchool } : {}),
+    ...(c.secondarySchool !== undefined ? { secondarySchool: c.secondarySchool } : {}),
+  }
   if (id) await updateRow(db, 'child', id, row)
   else await insertRow(db, 'child', row)
   return null

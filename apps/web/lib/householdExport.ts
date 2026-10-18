@@ -196,7 +196,7 @@ export function mapLegacyHousehold(
     void _id
     t.projectionSettings.push({ ...live, ...rest, id: SETTINGS_ID.projections })
   }
-  for (const c of L.children) t.child.push({ ...live, id: legacyId('child', c.id), name: c.name, birthYear: c.birthYear, birthMonth: c.birthMonth })
+  for (const c of L.children) t.child.push({ ...live, id: legacyId('child', c.id), name: c.name, birthYear: c.birthYear, birthMonth: c.birthMonth, primarySchool: c.primarySchool, secondarySchool: c.secondarySchool })
   for (const p of L.lifePhases) {
     const type = p.type === 'recurring' || p.type === 'oneoff' || p.type === 'phaseout' ? p.type : 'recurring'
     if (type !== p.type) notes.push(`Life phase “${p.name}” had an unknown type “${p.type}”; brought across as recurring.`)

@@ -26,6 +26,8 @@ async function main() {
       projYears: 30, schoolFeesOn: false,
       sfC1Start: seedYear + 6, sfC1ExitIdx: 13, sfC2Start: seedYear + 9, sfC2ExitIdx: 13, sfInfl: 5.0,
       parentalLeaveEnabled: false,
+      // A new household starts with no sibling discount or family levy (schema v8).
+      sfSib2Pct: 0, sfSib3Pct: 0, sfSib4Pct: 0, sfFamilyFee: 0, sfEntryFee: 0,
     },
   });
 

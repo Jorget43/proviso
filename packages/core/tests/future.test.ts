@@ -68,10 +68,11 @@ describe('buildProjectionInputs', () => {
     const two = buildProjectionInputs(b, live({ children: [
       { name: null, birthYear: 2022, birthMonth: null }, { name: null, birthYear: 2018, birthMonth: 4 },
     ] }))
-    expect([two.sfC1Start, two.sfC2Start, two.sfC2ExitIdx]).toEqual([2022, 2026, 13])
+    // Eldest first: born 2018 is at the schedule's first level (Kinder) in 2022, born 2022 in 2026.
+    expect(two.schoolKids!.map(k => [k.start, k.exitIdx])).toEqual([[2022, 13], [2026, 13]])
     // Without children the stored years stand (NAS households, older app households).
     const none = buildProjectionInputs(b, live({ children: [] }))
-    expect([none.sfC1Start, none.sfC2Start]).toEqual([2030, 2033])
+    expect(none.schoolKids!.map(k => k.start)).toEqual([2030, 2033])
   })
 
   it('charges one child’s fees, not two, when there is one child', () => {
@@ -97,14 +98,27 @@ describe('buildProjectionInputs', () => {
     expect(buildProjectionInputs(projectionBaseline(source()), live({ mortgage: { rate: 6, payment: 0 } })).mortPayment).toBe(3000)
   })
 
-  it('takes the two eldest children’s school costs out only while the fee model is on', () => {
+  it('takes every child’s school costs out only while the fee model is on', () => {
     const src = source({ expenses: [...source().expenses,
       { id: 7, cat: 'Children', name: 'School costs: Child 1 (age 7)', freq: 'yearly', amt: 12_000 },
       { id: 8, cat: 'Children', name: 'School costs: Child 3 (age 5)', freq: 'yearly', amt: 6_000 }] })
     const b = projectionBaseline(src)
-    expect(b.modelledSchoolMonthly).toBe(1000)
+    // 12,000 + 6,000 a year = 1,500 a month; since school fees v2 a third child's fees are modelled too.
+    expect(b.modelledSchoolMonthly).toBe(1500)
     expect(buildProjectionInputs(b, live()).baseMonthlyExpenses).toBe(1100 + 1000 + 500)
-    expect(buildProjectionInputs(b, live({ settings: { ...settings, schoolFeesOn: true } })).baseMonthlyExpenses).toBe(1100 + 500)
+    expect(buildProjectionInputs(b, live({ settings: { ...settings, schoolFeesOn: true } })).baseMonthlyExpenses).toBe(1100)
+  })
+
+  it('models every child’s fees, each in its own line, and the family fee once', () => {
+    const b = projectionBaseline(source())
+    const kids = [2016, 2018, 2021].map(birthYear => ({ name: null, birthYear, birthMonth: null }))
+    const out = runProjections(buildProjectionInputs(b, live({ settings: { ...settings, schoolFeesOn: true }, children: kids })))
+    const r = out.withFees!
+    expect(r.sfChildArr).toHaveLength(3)
+    const i = out.labels.indexOf('2028')
+    expect(r.sfChildArr.every(c => c[i] > 0)).toBe(true)              // all three at school in 2028
+    expect(r.sfTotalArr[i]).toBeCloseTo(r.sfChildArr.reduce((t, c) => t + c[i], 0) + r.sfFamilyArr[i], -1)
+    expect(r.sfFamilyArr[i]).toBeCloseTo(350 * 1.05 ** 2, -1)           // the old levy, from 2026 prices at 5%
   })
 
   it('runs: the engine accepts what it builds', () => {
@@ -116,9 +130,10 @@ describe('buildProjectionInputs', () => {
 })
 
 describe('helpers', () => {
-  it('school lines: only Child 1 and 2', () => {
+  it('school lines: every child’s', () => {
     expect(isModelledSchoolLine({ cat: 'Children', name: 'School costs: Child 2 (age 9)' })).toBe(true)
-    expect(isModelledSchoolLine({ cat: 'Children', name: 'School costs: Child 3 (age 5)' })).toBe(false)
+    expect(isModelledSchoolLine({ cat: 'Children', name: 'School costs: Child 3 (age 5)' })).toBe(true)
+    expect(isModelledSchoolLine({ cat: 'Children', name: 'Sport: Child 3 (age 5)' })).toBe(false)
     expect(isModelledSchoolLine({ cat: 'Home', name: 'School costs: Child 1 (age 5)' })).toBe(false)
   })
 

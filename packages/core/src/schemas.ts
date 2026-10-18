@@ -86,6 +86,11 @@ export const projectionSettingsSchema = z
     funPct:               num.min(0).max(100),
     lifeStagesOn:         z.boolean(),
     childLeavesHomeAge:   int.min(18).max(25),
+    sfSib2Pct:            num.min(0).max(100),
+    sfSib3Pct:            num.min(0).max(100),
+    sfSib4Pct:            num.min(0).max(100),
+    sfFamilyFee:          num.min(0).max(100_000),
+    sfEntryFee:           num.min(0).max(100_000),
   })
   .partial()
 
@@ -103,6 +108,8 @@ export const childSchema = z
     name:       z.string().trim().max(40).nullable(),
     birthYear:  int.min(1950).max(2100),
     birthMonth: int.min(1).max(12).nullable(),
+    primarySchool:   z.enum(['government', 'catholic', 'independent', 'custom', 'none']).nullable(),
+    secondarySchool: z.enum(['government', 'catholic', 'independent', 'custom', 'none']).nullable(),
   })
   .partial()
 

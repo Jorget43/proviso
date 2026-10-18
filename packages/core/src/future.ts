@@ -20,23 +20,24 @@ import { findHelpDebt } from './members'
 import { toMonthly } from './formatting'
 import { workDaysForYear, type ProjectionInputs, type WorkPhase, type OneOff } from './projections'
 import { presetScheduleFor } from './educationCosts'
-import { SF_BASE, type FeeSchedule } from './schoolFees'
+import { SF_BASE, LEGACY_FEE_RULES, asSchoolChoice, type FeeSchedule, type SchoolChoice, type SchoolKid, type SchoolFeeRules } from './schoolFees'
+import { locationKey, type StateKey } from './starter'
 import type { LifePhaseOverlay } from './lifephases'
 import type { HouseholdSuperInputs, ProjectionContext } from './super'
 import { asDrawdownStrategy, yearsToAge, DEFAULT_HORIZON_AGE } from './retirement'
-import { schoolStartsFromChildren, type ChildLike } from './people'
+import { schoolChildren, type ChildLike } from './people'
 import { DEFAULT_LEAVE_HOME_AGE } from './lifeStages'
 
 /** The budget's home-loan repayment line(s). */
 export const isMortgageLine = (e: { cat: string; name: string }) => e.cat === 'Home' && /mortgage/i.test(e.name)
 
 /**
- * Budget lines for school costs of the children the engine models (the
- * questionnaire's "School costs: Child 1 (age 7)" lines; Child 1 and 2 are
- * the two eldest, the engine's sfC1 and sfC2).
+ * Budget lines for children's school costs (the questionnaire's
+ * "School costs: Child 1 (age 7)" lines). The engine models every child's
+ * fees since school fees v2, so all of them come out of the base.
  */
 export const isModelledSchoolLine = (e: { cat: string; name: string }) =>
-  e.cat === 'Children' && /^School costs: Child [12] /.test(e.name)
+  e.cat === 'Children' && /^School costs: Child \d+ /.test(e.name)
 
 export interface BaselineSource<E extends BudgetExpense> {
   expenses:       E[]
@@ -125,6 +126,12 @@ export interface ProjectionSettingsLike {
   lifeStagesOn?: boolean
   /** Children leave home in the year they turn this (schema v6). */
   childLeavesHomeAge?: number
+  /** School fee rules (schema v8): % off tuition for the 2nd, 3rd and 4th+ child at school, a yearly family fee, an entry fee per school. */
+  sfSib2Pct?:   number
+  sfSib3Pct?:   number
+  sfSib4Pct?:   number
+  sfFamilyFee?: number
+  sfEntryFee?:  number
 }
 
 export interface RentSettingsLike {
@@ -165,6 +172,54 @@ export interface ProjectionLive {
   children?:      ChildLike[]
   /** Lives outside a capital city (schema v6): lower typical costs. */
   regional?:      boolean
+  /** The household's state (schema v6), for typical school fees when the school type has no location yet. */
+  state?:         string | null
+  /** The household's own school-fee table ("Custom"); defaults to sfSchedule. */
+  ownSchedule?:   FeeSchedule
+}
+
+/** The household's school-fee rules; settings from before v8 read as the old 15% and $350. */
+export function schoolFeeRules(s: ProjectionSettingsLike): SchoolFeeRules {
+  const d = LEGACY_FEE_RULES
+  return {
+    siblingPct: [s.sfSib2Pct ?? d.siblingPct[0], s.sfSib3Pct ?? d.siblingPct[1], s.sfSib4Pct ?? d.siblingPct[2]],
+    familyFee: s.sfFamilyFee ?? d.familyFee, entryFee: s.sfEntryFee ?? d.entryFee,
+  }
+}
+
+/**
+ * Every child's school years for the engine (school fees v2). Each stage's
+ * school is the child's own choice, else the household's school type. A type
+ * uses the typical fees where the household lives; "custom" its own table.
+ * Without child records, the two children set by start year, as before.
+ */
+export function schoolKidsFor(l: ProjectionLive): SchoolKid[] {
+  const s = l.settings
+  const [presetLoc, presetType] = s.sfPresetKey?.split('|') ?? []
+  const loc = presetLoc ?? (l.state ? locationKey(l.state as StateKey, l.regional ?? false) : 'vic')
+  const own = l.ownSchedule ?? l.sfSchedule
+  const householdChoice: SchoolChoice = asSchoolChoice(presetType) ?? 'custom'
+  const scheduleFor = (c: SchoolChoice): FeeSchedule | null =>
+    c === 'none' ? null : c === 'custom' ? own : presetScheduleFor(`${loc}|${c}`) ?? own
+  const kids = l.children?.length ? schoolChildren(l.children, l.currentYear) : []
+  if (!kids.length) {
+    // The household's default schedule, which may be a preset at another location.
+    const legacy = (start: number, exitIdx: number): SchoolKid => ({ start, exitIdx, primary: l.sfSchedule, secondary: l.sfSchedule, primaryChoice: householdChoice, secondaryChoice: householdChoice })
+    return l.children?.length ? [] : [legacy(s.sfC1Start, s.sfC1ExitIdx), legacy(s.sfC2Start, s.sfC2ExitIdx)]
+  }
+  return kids.map(({ child, start }, i) => {
+    const primaryChoice = asSchoolChoice(child.primarySchool) ?? householdChoice
+    const secondaryChoice = asSchoolChoice(child.secondarySchool) ?? householdChoice
+    // The household's own default (no choice made) keeps the schedule exactly as before v2.
+    const stage = (c: SchoolChoice, own: string | null | undefined) => (asSchoolChoice(own) ? scheduleFor(c) : l.sfSchedule)
+    return {
+      start,
+      // "Exits after" from before v2 still applies to the two eldest.
+      exitIdx: i === 0 ? s.sfC1ExitIdx : i === 1 ? s.sfC2ExitIdx : 13,
+      primary: stage(primaryChoice, child.primarySchool), secondary: stage(secondaryChoice, child.secondarySchool),
+      primaryChoice, secondaryChoice,
+    }
+  })
 }
 
 export interface LifeLive {
@@ -186,12 +241,7 @@ export function buildProjectionInputs(b: ProjectionBaseline, l: ProjectionLive):
     - (s.schoolFeesOn ? b.modelledSchoolMonthly : 0)
   const life = l.life
   const sup  = life?.super
-  const kids = l.children?.length ? schoolStartsFromChildren(l.children, l.currentYear) : null
-  const school = kids
-    ? { sfC1Start: kids.sfC1Start, sfC2Start: kids.sfC2Start ?? kids.sfC1Start,
-        // No second child at school: an exit before the first level turns it off.
-        sfC2ExitIdx: kids.sfC2Start === null ? -1 : s.sfC2ExitIdx }
-    : { sfC1Start: s.sfC1Start, sfC2Start: s.sfC2Start, sfC2ExitIdx: s.sfC2ExitIdx }
+  const schoolKids = schoolKidsFor(l)
   return {
     person1FTE: l.income.person1FTE, person2FTE: l.income.person2FTE, taxMode: l.income.taxMode,
     // HELP is modelled whenever a balance is recorded: repayments are compulsory.
@@ -213,8 +263,9 @@ export function buildProjectionInputs(b: ProjectionBaseline, l: ProjectionLive):
     oneoffs: l.oneoffs,
     parentalLeaveEnabled: s.parentalLeaveEnabled,
     schoolFeesOn: s.schoolFeesOn,
-    sfC1Start: school.sfC1Start, sfC1ExitIdx: s.sfC1ExitIdx, sfC2Start: school.sfC2Start, sfC2ExitIdx: school.sfC2ExitIdx,
+    sfC1Start: s.sfC1Start, sfC1ExitIdx: s.sfC1ExitIdx, sfC2Start: s.sfC2Start, sfC2ExitIdx: s.sfC2ExitIdx,
     sfInfl: s.sfInfl, sfSchedule: l.sfSchedule,
+    schoolKids, sfRules: schoolFeeRules(s),
     lifePhases: l.lifePhases,
     currentYear: l.currentYear,
     rentMode: l.rent.enabled, monthlyRent: l.rent.monthlyRent, rentIncreaseRate: l.rent.annualIncreaseRate,

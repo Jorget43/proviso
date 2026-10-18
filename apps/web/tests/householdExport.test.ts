@@ -57,7 +57,7 @@ function legacy(): LegacyHousehold {
     rent: null,
     allowances: [{ id: 1, userId: 3, amount: 10, dayOfWeek: 5, createdAt: at, updatedAt: at }],
     pocketMoney: [{ id: 1, userId: 3, amount: 10, description: 'Allowance', date: '2026-10-03', category: 'general', createdAt: at }],
-    children: [{ id: 1, name: 'Kid', birthYear: 2015, birthMonth: 4 }, { id: 2, name: null, birthYear: 2028, birthMonth: null }],
+    children: [{ id: 1, name: 'Kid', birthYear: 2015, birthMonth: 4, primarySchool: 'government', secondarySchool: 'independent' }, { id: 2, name: null, birthYear: 2028, birthMonth: null, primarySchool: null, secondarySchool: null }],
     scenarios: [{ id: 1, name: 'Retire at 55', colour: 'amber', enabled: false, overrides: '{"super":{"person1RetirementAge":55}}' }],
   }
 }
@@ -100,7 +100,7 @@ describe('mapLegacyHousehold', () => {
   it('carries birth years, children (a planned one too) and where the household lives', () => {
     const t = exportOf().household
     expect(t.incomeSettings[0]).toMatchObject({ person1Age: 35, person1BirthYear: 1991, person2BirthYear: null })
-    expect(t.child.map(c => [c.name, c.birthYear, c.birthMonth])).toEqual([['Kid', 2015, 4], [null, 2028, null]])
+    expect(t.child.map(c => [c.name, c.birthYear, c.birthMonth, c.primarySchool, c.secondarySchool])).toEqual([['Kid', 2015, 4, 'government', 'independent'], [null, 2028, null, null, null]])
     expect(t.householdSettings[0]).toMatchObject({ state: 'vic', regional: true })
   })
 
