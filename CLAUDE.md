@@ -434,7 +434,7 @@ In [`docs/architecture.md`](docs/architecture.md) order. Phase 3 there (the sing
 **Start here next session**, in this order:
 1. **⏰ Remind the owner first — phone test still to do** (deferred 2026-10-08, "soon"). **The Android development build with Phases 34–35** (sync, camera, key backup): it built successfully on EAS on 2026-10-08 (so the key-backup Kotlin module and expo-camera compile); `npm run eas -w @proviso/client -- build:list --limit 1` shows the APK link. Install it and check on the phone: Settings → Recovery phrase → Save to Google Password Manager; Settings → Sync; Join a household (camera scan).
 2. **Run the relay on the NAS** with the owner: `docker compose --profile sync up -d` (image `ghcr.io/jorget43/proviso-relay`, published by CI from master since 2026-10-08), then `tailscale serve --bg --https=8443 http://localhost:8787` (README "Sync relay for the app"). Turn sync on in the app with the `https://<machine>.<tailnet>.ts.net:8443` address, then join from a second phone. Phones need Tailscale running to reach it.
-3. **Owner decisions pending**: **Phase 48 ranges of returns** is on branch `phase-48-return-ranges`, committed but not merged or pushed. No figure changes (the plan is the middle case); it adds a shaded range. Schema v9, so pushing publishes a NAS image that runs Prisma `0013_return_ranges`. Ask the owner to merge and push. (Phase 47 app charts: merged and pushed 0170ac8.)
+3. **Owner decisions pending**: none. (Phase 48 ranges of returns: owner OK 2026-10-18, merged and pushed a2b83c7; the NAS image runs Prisma `0013_return_ranges` on its next start.)
 4. **Step B of [`docs/plan-modelling-and-ux.md`](docs/plan-modelling-and-ux.md)**:
    - The life-course engine shipped as Phase 40 (merged to master 2026-10-09 with the owner's OK).
    - Phase 41 (birth years, the `child` table) merged to master 2026-10-12 with the owner's OK.
@@ -571,7 +571,7 @@ Ideas that have been evaluated but aren't on the roadmap. Each links to its writ
 
 ### Phase 48 — Plan step E, part 1: ranges of returns (2026-10-18)
 
-Plan item 8a. Owner's decisions (2026-10-18): bands first, with Monte Carlo later; the range covers super as well as investments outside it; the glide path waits for Monte Carlo. On branch `phase-48-return-ranges`, not merged.
+Plan item 8a. Owner's decisions (2026-10-18): bands first, with Monte Carlo later; the range covers super as well as investments outside it; the glide path waits for Monte Carlo. Merged and pushed with the owner's OK the same day (a2b83c7).
 
 - **Core** (`ranges.ts`): `runRange(inputs, spread)` runs the projection three times: as expected, and with every year's investment return and super return `spread` percentage points lower and higher (`shiftReturns`; super's rates are decimals). A spread of 0 runs once. `summariseRange` gives the end net worth and the age money runs short in each case.
 - **Schema v9** (Drizzle `0008_return_ranges`, Prisma `0013_return_ranges`): `projectionSettings.returnSpread`, default 2, from 0 (off) to 5. Scenarios can change it.
