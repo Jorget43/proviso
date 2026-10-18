@@ -433,12 +433,12 @@ In [`docs/architecture.md`](docs/architecture.md) order. Phase 3 there (the sing
 **Start here next session**, in this order:
 1. **⏰ Remind the owner first — phone test still to do** (deferred 2026-10-08, "soon"). **The Android development build with Phases 34–35** (sync, camera, key backup): it built successfully on EAS on 2026-10-08 (so the key-backup Kotlin module and expo-camera compile); `npm run eas -w @proviso/client -- build:list --limit 1` shows the APK link. Install it and check on the phone: Settings → Recovery phrase → Save to Google Password Manager; Settings → Sync; Join a household (camera scan).
 2. **Run the relay on the NAS** with the owner: `docker compose --profile sync up -d` (image `ghcr.io/jorget43/proviso-relay`, published by CI from master since 2026-10-08), then `tailscale serve --bg --https=8443 http://localhost:8787` (README "Sync relay for the app"). Turn sync on in the app with the `https://<machine>.<tailnet>.ts.net:8443` address, then join from a second phone. Phones need Tailscale running to reach it.
-3. **Owner decisions pending**: **Phase 45 scenarios** is on branch `phase-45-scenarios`, committed but not merged or pushed. No numbers move (the plan is untouched; scenarios are extra lines and a Compare card). It adds schema v7, so pushing it publishes a NAS image that runs Prisma migration `0011_scenarios`. Ask the owner to merge and push.
+3. **Owner decisions pending**: none. (Phase 45 scenarios: owner OK 2026-10-18, merged and pushed f413a67; the NAS image runs Prisma `0011_scenarios` on its next start.)
 4. **Step B of [`docs/plan-modelling-and-ux.md`](docs/plan-modelling-and-ux.md)**:
    - The life-course engine shipped as Phase 40 (merged to master 2026-10-09 with the owner's OK).
    - Phase 41 (birth years, the `child` table) merged to master 2026-10-12 with the owner's OK.
 5. **Step C**: the cash-buffer rule is Phase 43 (merged to master 2026-10-14). Life stages are Phase 44 (merged to master 2026-10-14 with the owner's OK).
-6. **Step D**: scenarios are Phase 45 (above). Next:
+6. **Step D**: scenarios are Phase 45 (merged and pushed 2026-10-18). Next:
    - **School fees v2** (plan item 7): fee choices per child, each a scenario; the School fees view stacked by child.
    - **The app's chart component** (`react-native-svg`, a native module, so it rides on the next development build). Then the app can show scenario lines and edit a saved scenario; today it saves What if? drafts as scenarios and compares them in a card.
    - Step A (dark mode, editing, chart trim) shipped as Phases 37–39.
@@ -568,7 +568,7 @@ Ideas that have been evaluated but aren't on the roadmap. Each links to its writ
 
 ### Phase 45 — Plan step D, part 1: scenarios you can save and compare (2026-10-18)
 
-Plan item 2. The owner asked for step D to start with scenarios (2026-10-18). On branch `phase-45-scenarios`, not merged.
+Plan item 2. The owner asked for step D to start with scenarios (2026-10-18). Merged and pushed with the owner's OK the same day (f413a67).
 
 - **Core** (`scenarios.ts`):
   - A scenario stores only what differs from the plan, as JSON (`overrides`): projection settings, retirement ages / extra super / income goal / drawdown, the home-purchase plan, and whole lists for each person's work pattern, one-offs and children. Everything else follows the plan.
