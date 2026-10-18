@@ -5,7 +5,8 @@
 import { computeHomeOverview, type HomeOverview } from '@proviso/core/overview'
 import { computeBudgetSummary, isManagedChildcare } from '@proviso/core/budgetSummary'
 import { workDaysForYear, runProjections, type PurchasePaid } from '@proviso/core/projections'
-import { projectionBaseline, buildProjectionInputs, feeScheduleFor, retirementIncomeGoal } from '@proviso/core/future'
+import { projectionBaseline, buildProjectionInputs, feeScheduleFor, retirementIncomeGoal, type ProjectionLive } from '@proviso/core/future'
+import { runScenarios, summariseRun, countChanges, validOverrides, readOverrides, type ScenarioColour, type ScenarioSummary } from '@proviso/core/scenarios'
 import { currentAges, childLabel, sortChildren } from '@proviso/core/people'
 import { situationFrom, situationLabels } from '@proviso/core/situation'
 import { toMonthly, possessive } from '@proviso/core/formatting'
@@ -233,8 +234,8 @@ export interface FutureView {
   assumptions: { salaryGrowth: number; inflation: number; investReturn: number; savingsRate: number; propGrowth: number; cashBufferMonths: number; funPct: number }
 }
 
-export function futureView(h: HouseholdData, now: Date): FutureView {
-  const year = now.getFullYear()
+/** The plan as the engine sees it: today's position and the settings modelled. */
+function planOf(h: HouseholdData, year: number) {
   const p = phases(h)
   const s = h.projection
   const ages = currentAges(h.income, year)
@@ -246,7 +247,7 @@ export function futureView(h: HouseholdData, now: Date): FutureView {
     person1Name: h.settings.person1Name, person2Name: h.settings.person2Name,
     debts: h.debts, assets: h.assets, mortgage: h.mortgage,
   })
-  const out = runProjections(buildProjectionInputs(baseline, {
+  const live: ProjectionLive = {
     income: h.income, settings: s,
     person1Phases: p.p1, person2Phases: p.p2,
     oneoffs: h.oneOffs, lifePhases: h.lifePhases,
@@ -256,7 +257,15 @@ export function futureView(h: HouseholdData, now: Date): FutureView {
     life: { partnerEnabled: h.settings.partnerEnabled, ...ages, super: h.superSettings },
     children: h.children,
     regional: h.settings.regional,
-  }))
+  }
+  return { baseline, live, ages, ownSchedule: feeScheduleFor(null, h.schoolFeeLevels) }
+}
+
+export function futureView(h: HouseholdData, now: Date): FutureView {
+  const year = now.getFullYear()
+  const s = h.projection
+  const { baseline, live, ages } = planOf(h, year)
+  const out = runProjections(buildProjectionInputs(baseline, live))
   const run = out.withFees ?? out.base
   const end = run.nwArr[run.nwArr.length - 1] ?? baseline.netWorthToday
   const deflate = Math.pow(1 + s.expInfl / 100, run.nwArr.length)
@@ -340,4 +349,33 @@ export function cashflowView(h: HouseholdData, now: Date): CashflowView {
     parentalLeave: h.settings.partnerEnabled && h.projection.parentalLeaveEnabled, now,
   })
   return { ...cf, person1Name: h.settings.person1Name, person2Name: h.settings.person2Name }
+}
+
+export interface CompareRow {
+  /** null for the plan itself. */
+  id:      string | null
+  name:    string
+  colour:  ScenarioColour | null
+  summary: ScenarioSummary
+  /** Net worth at the end in today's money (each run deflated by its own price rises). */
+  endReal: number
+  /** How many things the scenario changes. */
+  changes: number
+}
+
+/** The plan and each saved scenario, side by side (empty when there are none). */
+export function compareView(h: HouseholdData, now: Date): CompareRow[] {
+  if (!h.scenarios.length) return []
+  const year = now.getFullYear()
+  const { baseline, live, ownSchedule } = planOf(h, year)
+  const row = (id: string | null, name: string, colour: ScenarioColour | null, l: ProjectionLive, output: ReturnType<typeof runProjections>, changes: number): CompareRow => {
+    const summary = summariseRun(output, l)
+    const years = (output.withFees ?? output.base).nwArr.length
+    return { id, name, colour, summary, endReal: summary.endNetWorth / Math.pow(1 + l.settings.expInfl / 100, years), changes }
+  }
+  return [
+    row(null, 'Your plan', null, live, runProjections(buildProjectionInputs(baseline, live)), 0),
+    ...runScenarios(baseline, live, h.scenarios, ownSchedule).map(r =>
+      row(r.scenario.id, r.scenario.name, r.colour, r.live, r.output, countChanges(validOverrides(readOverrides(r.scenario.overrides))))),
+  ]
 }

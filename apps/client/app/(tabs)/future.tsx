@@ -7,17 +7,20 @@ import { Pressable, View } from 'react-native'
 import { router } from 'expo-router'
 import { fmt, fmtK } from '@proviso/core/formatting'
 import { useHousehold } from '@/data/DataProvider'
-import { futureView, cashflowView, type FutureView } from '@/data/views'
+import { futureView, cashflowView, compareView, type CompareRow, type FutureView } from '@/data/views'
+import { removeScenario } from '@/data/whatif'
+import { confirmAction } from '@/ui/confirm'
 import { Button, Card, H2, Screen, T } from '@/ui/kit'
 import { NetWorthBars } from '@/ui/NetWorthBars'
 import { usePalette, space, radius, touch } from '@/ui/theme'
 
 export default function Future() {
-  const { household } = useHousehold()
+  const { household, change } = useHousehold()
   const p = usePalette()
   const v = futureView(household, new Date())
   const cf = cashflowView(household, new Date())
   const a = v.assumptions
+  const compare = compareView(household, new Date())
 
   return (
     <Screen>
@@ -33,6 +36,11 @@ export default function Future() {
           <Button title="What if?" onPress={() => router.push('/whatif')} />
         </View>
       </Card>
+
+      {compare.length > 0 && (
+        <Compare rows={compare} onRemove={row => confirmAction(`Delete “${row.name}”?`, 'Your plan isn’t affected.', 'Delete',
+          () => { void change(db => removeScenario(db, row.id!)) })} />
+      )}
 
       <Pressable accessibilityRole="button" accessibilityHint="Cash in the bank month by month" onPress={() => router.push('/cashflow')}
         style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
@@ -142,6 +150,50 @@ export default function Future() {
         </Card>
       </View>
     </Screen>
+  )
+}
+
+/** The plan and each saved scenario, side by side. */
+function Compare({ rows, onRemove }: { rows: CompareRow[]; onRemove: (row: CompareRow) => void }) {
+  const p = usePalette()
+  const plan = rows[0]
+  return (
+    <View style={{ gap: space.sm }}>
+      <H2>Compare</H2>
+      <Card style={{ gap: 0, paddingVertical: space.sm }}>
+        {rows.map((r, i) => {
+          const diff = r.endReal - plan.endReal
+          const s = r.summary
+          return (
+            <View key={r.id ?? 'plan'} style={{ gap: space.xs, paddingVertical: space.md, borderTopWidth: i ? 1 : 0, borderTopColor: p.border }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
+                <View style={{ width: 18, borderTopWidth: 3, borderStyle: r.colour ? 'dashed' : 'solid', borderColor: r.colour ? p[r.colour] : p.green }} />
+                <T weight="600" style={{ flex: 1 }}>{r.name}</T>
+                <T weight="700">{fmtK(r.endReal)}</T>
+              </View>
+              {r.id !== null && (
+                <T size="small" tone="t2">
+                  {s.endYear !== plan.summary.endYear ? `Looks ahead to ${s.endYear}.` : Math.abs(diff) < 500 ? 'Same as your plan.' : `${fmtK(Math.abs(diff))} ${diff > 0 ? 'more' : 'less'} than your plan.`}
+                  {r.changes === 0 ? ' No changes yet.' : ` ${r.changes} change${r.changes === 1 ? '' : 's'}.`}
+                </T>
+              )}
+              <T size="small" tone="t2">
+                {s.tightYear ? `Money gets tight in ${s.tightYear}. ` : ''}
+                {s.runsOutAge !== null ? `Retirement money runs short at ${s.runsOutAge}. ` : `Retirement money lasts past ${s.lastAge}. `}
+                {s.schoolFees > 0 ? `School fees ${fmtK(s.schoolFees)}. ` : ''}
+                Lowest cash {fmtK(s.lowestCash.value)} in {s.lowestCash.year}.
+              </T>
+              {r.id !== null && (
+                <View style={{ alignItems: 'flex-start' }}>
+                  <Button kind="danger" title="Delete" onPress={() => onRemove(r)} />
+                </View>
+              )}
+            </View>
+          )
+        })}
+      </Card>
+      <T size="small" tone="t2">Net worth in today’s money, without super. Make another in What if? → Save as a scenario.</T>
+    </View>
   )
 }
 

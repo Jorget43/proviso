@@ -9,6 +9,7 @@ import { fmtK } from '@proviso/core/formatting'
 import { crosshair, SCRUB_BASE, kTicks } from '@/lib/chartPlugins'
 import { useChartColors, axisTicks } from '@/lib/chartTheme'
 import ScrubChart from '@/components/ui/ScrubChart'
+import { overlayDatasets, type Overlay } from '@/lib/scenarioOverlay'
 ChartJS.register(BarElement, LineElement, PointElement, LinearScale, CategoryScale)
 
 interface Props {
@@ -25,17 +26,24 @@ interface Props {
   cashData:     number[]
   /** Taken out of super to live on, stacked on the pay bars (retirement). */
   superData?:   number[]
+  /** Scenarios' spending, as lines over the plan's, with what's left over in the readout. */
+  overlays?:    Overlay[]
 }
 
-const signed = (v: number) => (v > 0 ? '+' : '') + fmtK(v)
+export const signed = (v: number) => (v > 0 ? '+' : '') + fmtK(v)
+
+/** Money in each year: take-home pay plus anything taken from super to live on. */
+export function moneyIn(r: { person1Arr: number[]; person2Arr: number[]; superDrawArr?: number[] }, showPerson2: boolean): number[] {
+  return r.person1Arr.map((v, i) => v + (showPerson2 ? r.person2Arr[i] ?? 0 : 0) + (r.superDrawArr?.[i] ?? 0))
+}
 
 export default function MoneyInOutChart({
-  labels, person1Data, person2Data, person1Name, person2Name, showPerson2, leaveYrs, spendData, sfTotalData, phaseData, cashData, superData,
+  labels, person1Data, person2Data, person1Name, person2Name, showPerson2, leaveYrs, spendData, sfTotalData, phaseData, cashData, superData, overlays,
 }: Props) {
   const c = useChartColors()
   const leave = new Set(leaveYrs)
   const fromSuper = superData?.some(v => v > 0) ? superData : null
-  const income = person1Data.map((v, i) => v + (showPerson2 ? person2Data[i] ?? 0 : 0) + (fromSuper?.[i] ?? 0))
+  const income = moneyIn({ person1Arr: person1Data, person2Arr: person2Data, superDrawArr: fromSuper ?? undefined }, showPerson2)
   const gap = income.map((v, i) => v - (spendData[i] ?? 0))
   // Readout-only series: listed with the year's values, not drawn.
   // On their own hidden scale, so they don't stretch the chart.
@@ -52,6 +60,7 @@ export default function MoneyInOutChart({
     { ...readOnly, label: 'Of the spending: school fees', data: sfTotalData, borderColor: c.amber },
     { ...readOnly, label: 'Of the spending: life stages', data: phaseData, borderColor: c.teal },
     { ...readOnly, label: 'Cash at the end of the year', data: cashData, borderColor: c.blue },
+    ...overlayDatasets(overlays, c, labels.length, spendData, 0, 'line'),
   ]
 
   return (

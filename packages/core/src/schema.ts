@@ -22,7 +22,7 @@
 import { sqliteTable, text, integer, real } from 'drizzle-orm/sqlite-core'
 
 /** Bumped by every migration. Travels with each sync message and export. */
-export const SCHEMA_VERSION = 6
+export const SCHEMA_VERSION = 7
 
 export type PersonKey = 'p1' | 'p2'
 export const PERSON_KEYS: readonly PersonKey[] = ['p1', 'p2']
@@ -197,6 +197,20 @@ export const oneOff = sqliteTable('oneOff', {
   year: integer('year').notNull(),
 })
 
+/**
+ * v7: a named set of changes layered on the plan (scenarios.ts), e.g.
+ * "Retire at 55". `overrides` is JSON holding only what differs from the
+ * plan; as one field, the latest edit wins for the whole set. `colour` is a
+ * palette name (SCENARIO_COLOURS); `enabled` shows it on the Future charts.
+ */
+export const scenario = sqliteTable('scenario', {
+  id: id(), deletedAt: deletedAt(),
+  name:      text('name').notNull(),
+  colour:    text('colour').notNull().default('blue'),
+  enabled:   bool('enabled').notNull().default(true),
+  overrides: text('overrides').notNull().default('{}'),
+})
+
 /** A bank transaction. id = contentId('transaction', date, description, amt), so re-importing a statement never duplicates. */
 export const transaction = sqliteTable('transaction', {
   id: id(), deletedAt: deletedAt(),
@@ -369,7 +383,7 @@ export const pocketMoneyTx = sqliteTable('pocketMoneyTx', {
 /** Tables in the household space, in an order that respects references. */
 export const HOUSEHOLD_TABLES = {
   householdSettings, member, expense, annualExpense, debt, asset, mortgageSettings,
-  childcareSettings, incomeSettings, workPhase, child, projectionSettings, lifePhase, oneOff,
+  childcareSettings, incomeSettings, workPhase, child, projectionSettings, lifePhase, oneOff, scenario,
   transaction, categorisationRule, suggestionState, actualsSettings, schoolFeeLevel,
   helpDebtDetail, superSettings, superHistory, investmentParcel, netWorthSnapshot,
   donation, workExpense, rentSettings,
@@ -379,7 +393,7 @@ export const HOUSEHOLD_TABLES = {
  * The schema version that added each table after the baseline. Export files
  * and backups from before it don't have the table; it's read as empty.
  */
-export const TABLE_SINCE: Partial<Record<keyof typeof HOUSEHOLD_TABLES, number>> = { child: 3 }
+export const TABLE_SINCE: Partial<Record<keyof typeof HOUSEHOLD_TABLES, number>> = { child: 3, scenario: 7 }
 
 /** Tables in a pocket-money space. */
 export const POCKET_MONEY_TABLES = { allowanceSchedule, pocketMoneyTx } as const

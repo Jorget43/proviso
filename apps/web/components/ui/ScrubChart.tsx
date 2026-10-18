@@ -21,6 +21,8 @@ export interface ScrubSeries {
   readout?:         boolean
   /** How this series' value reads (default: the chart's format, e.g. $12k). */
   format?:          (v: number) => string
+  /** The plan's values: the readout adds the difference from them (scenarios). */
+  compareTo?:       (number | null)[]
 }
 
 interface ScrubChartProps {
@@ -97,6 +99,8 @@ export default function ScrubChart({ labels, datasets, height, format = fmtK, de
         <div className="scrub-items">
           {items.map(({ d, k }) => {
             const v = d.data[idx]
+            const base = d.compareTo?.[idx]
+            const diff = v != null && base != null ? v - base : null
             const off = hidden.has(k)
             return (
               <button key={k} type="button" className={`scrub-item${off ? ' off' : ''}`}
@@ -105,6 +109,11 @@ export default function ScrubChart({ labels, datasets, height, format = fmtK, de
                 <span className="scrub-dot" style={{ background: colorAt(d.borderColor, idx) ?? colorAt(d.backgroundColor, idx) ?? 'var(--t3)' }} />
                 <span className="scrub-label">{d.label}</span>
                 <strong>{v == null ? '—' : (d.format ?? format)(v)}</strong>
+                {diff !== null && (
+                  <small className={`scrub-diff${diff > 0 ? ' up' : diff < 0 ? ' down' : ''}`}>
+                    {Math.abs(diff) < 1 ? 'same as plan' : `${diff > 0 ? '+' : '−'}${(d.format ?? format)(Math.abs(diff)).replace(/^[+−-]/, '')} vs plan`}
+                  </small>
+                )}
               </button>
             )
           })}

@@ -106,6 +106,16 @@ export const childSchema = z
   })
   .partial()
 
+// A scenario (schema v7): `overrides` is the JSON scenarios.ts reads and writes.
+export const scenarioSchema = z
+  .object({
+    name:      z.string().trim().min(1).max(40),
+    colour:    z.enum(['blue', 'amber', 'pink', 'teal', 'purple']),
+    enabled:   z.boolean(),
+    overrides: z.string().max(20_000).refine(s => { try { const v: unknown = JSON.parse(s); return typeof v === 'object' && v !== null && !Array.isArray(v) } catch { return false } }, 'Not a set of changes'),
+  })
+  .partial()
+
 export const oneOffSchema = z
   .object({
     name: z.string().min(1),

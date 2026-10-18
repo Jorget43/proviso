@@ -1,6 +1,7 @@
 // What if?: try changes to the long-term plan and watch the result above the
-// controls change as you go. Nothing is saved until "Keep these changes"; the
-// NAS's Projections page has the same controls (its What if? drawer).
+// controls change as you go. Nothing is saved until "Keep these changes", or
+// "Save as a scenario", which leaves the plan alone and adds the draft to
+// Future's Compare card. The NAS's Projections page has the same controls.
 
 import type { PurchasePaid } from '@proviso/core/projections'
 import { useMemo, useState } from 'react'
@@ -9,8 +10,8 @@ import { router, Stack } from 'expo-router'
 import { fmt, fmtK, possessive } from '@proviso/core/formatting'
 import { useHousehold } from '@/data/DataProvider'
 import { futureView } from '@/data/views'
-import { addWorkChange, applyWhatIf, hasChanges, keepWhatIf, startWhatIf, type WhatIf } from '@/data/whatif'
-import { Button, Card, Choice, Field, H2, NumberField, Sheet, Stepper, T, parseAmount } from '@/ui/kit'
+import { addWorkChange, applyWhatIf, hasChanges, keepWhatIf, saveAsScenario, startWhatIf, type WhatIf } from '@/data/whatif'
+import { Button, Card, Choice, Field, H2, NumberField, Sheet, Stepper, T, TextField, parseAmount } from '@/ui/kit'
 import { NetWorthBars } from '@/ui/NetWorthBars'
 import { DEFAULT_LEAVE_HOME_AGE, MAX_LEAVE_HOME_AGE } from '@proviso/core/lifeStages'
 import { usePalette, space } from '@/ui/theme'
@@ -30,6 +31,7 @@ export default function WhatIfSheet() {
   const year = now.getFullYear()
   const [w, setW] = useState<WhatIf>(() => startWhatIf(h))
   const [group, setGroup] = useState<Group>('basics')
+  const [scenarioName, setScenarioName] = useState(`Scenario ${h.scenarios.length + 1}`)
 
   const plan = useMemo(() => futureView(h, now), [h, now])
   const tried = useMemo(() => futureView(applyWhatIf(h, w), now), [h, w, now])
@@ -53,6 +55,11 @@ export default function WhatIfSheet() {
 
   async function keep() {
     await change(db => keepWhatIf(db, h, w))
+    router.back()
+  }
+
+  async function saveScenario() {
+    await change(db => saveAsScenario(db, h, w, scenarioName))
     router.back()
   }
 
@@ -128,6 +135,17 @@ export default function WhatIfSheet() {
         )}
 
         {group === 'home' && h.rent.enabled && <BuyPlan r={r} setRent={setRent} year={year} paid={tried.purchase} />}
+
+        {dirty && (
+          <Card>
+            <T weight="600">Or save it to compare</T>
+            <T size="small" tone="t2">Your plan stays as it is. Future shows this side by side with it.</T>
+            <TextField label="Scenario name" value={scenarioName} onChange={setScenarioName} placeholder="For example, Retire at 58" />
+            <View style={{ alignItems: 'flex-start' }}>
+              <Button kind="quiet" title="Save as a scenario" onPress={saveScenario} />
+            </View>
+          </Card>
+        )}
 
         <View style={{ gap: space.sm }}>
           <Button title="Keep these changes" disabled={!dirty} onPress={keep} />

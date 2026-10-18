@@ -4,6 +4,7 @@ import { Line } from 'react-chartjs-2'
 import { crosshair, SCRUB_BASE, kTicks } from '@/lib/chartPlugins'
 import { useChartColors, axisTicks } from '@/lib/chartTheme'
 import ScrubChart, { type ScrubSeries } from '@/components/ui/ScrubChart'
+import { overlayDatasets, type Overlay } from '@/lib/scenarioOverlay'
 ChartJS.register(LineElement, PointElement, LinearScale, CategoryScale, Filler)
 
 interface NetWorthChartProps {
@@ -19,9 +20,11 @@ interface NetWorthChartProps {
   superData?:     number[] | null
   /** Count super in the net worth line (otherwise it's shown on its own). */
   includeSuper?:  boolean
+  /** Scenarios shown over the plan (net worth on the same basis as the plan's line). */
+  overlays?:      Overlay[]
 }
 
-export default function NetWorthChart({ labels, nwData, nwNoFees, investData, cashData, sfOn, historyLabels = [], historyData = [], superData = null, includeSuper = false }: NetWorthChartProps) {
+export default function NetWorthChart({ labels, nwData, nwNoFees, investData, cashData, sfOn, historyLabels = [], historyData = [], superData = null, includeSuper = false, overlays }: NetWorthChartProps) {
   const c = useChartColors()
   // Pad the projected series with leading nulls so they still start exactly
   // where they always did; the "Actual" series only has points in the
@@ -44,6 +47,8 @@ export default function NetWorthChart({ labels, nwData, nwNoFees, investData, ca
   if (sfOn && nwNoFees) {
     datasets.splice(1, 0, { label: `${nwLabel} (no school fees)`, data: pad(includeSuper && superData ? nwNoFees.map((v, i) => v + (superData[i] ?? 0)) : nwNoFees), borderColor: c.a(c.green, 0.4), borderDash: [6, 3], borderWidth: 1.8, pointRadius: 0, fill: false, tension: 0.4 })
   }
+
+  datasets.splice(1, 0, ...overlayDatasets(overlays, c, labels.length, pad(withSuper), historyLabels.length))
 
   return (
     <ScrubChart labels={allLabels} datasets={datasets} height={240}>

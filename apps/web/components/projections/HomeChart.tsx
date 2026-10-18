@@ -8,6 +8,7 @@ import { Line } from 'react-chartjs-2'
 import { crosshair, SCRUB_BASE, kTicks } from '@/lib/chartPlugins'
 import { useChartColors, axisTicks } from '@/lib/chartTheme'
 import ScrubChart from '@/components/ui/ScrubChart'
+import { overlayDatasets, type Overlay } from '@/lib/scenarioOverlay'
 ChartJS.register(LineElement, PointElement, LinearScale, CategoryScale, Filler)
 
 interface Props {
@@ -16,9 +17,11 @@ interface Props {
   stressData: number[]   // repayments as % of gross household income
   rentData:   number[]   // rent paid each year (0 when not renting)
   endDate:    string
+  /** Scenarios' loan balances, shown over the plan's. */
+  overlays?:  Overlay[]
 }
 
-export default function HomeChart({ labels, mortData, stressData, rentData, endDate }: Props) {
+export default function HomeChart({ labels, mortData, stressData, rentData, endDate, overlays }: Props) {
   const c = useChartColors()
   const pct = (v: number) => `${v.toFixed(0)}% of income`
   // On their own hidden scale, so they don't stretch the chart.
@@ -29,6 +32,7 @@ export default function HomeChart({ labels, mortData, stressData, rentData, endD
     { ...readOnly, label: 'Repayments', data: stressData, borderColor: c.amber, format: pct },
     { ...readOnly, label: 'Rent paid', data: rentData, borderColor: c.blue },
   ]
+  datasets.splice(1, 0, ...overlayDatasets(overlays, c, labels.length, mortData) as never[])
   return (
     <>
       <ScrubChart labels={labels} datasets={datasets} height={240}>

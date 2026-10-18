@@ -1,7 +1,8 @@
 'use client'
 import { useState, useMemo, useCallback } from 'react'
 import { fmt, fmtK, possessive } from '@proviso/core/formatting'
-import { runProjections } from '@proviso/core/projections'
+import { runProjections, type ProjectionResult } from '@proviso/core/projections'
+import { runScenarios, summariseRun, readOverrides, validOverrides, patchOverrides, writeOverrides, countChanges, scenarioColour, type ScenarioOverrides, type OverrideSection, type ScenarioSummary } from '@proviso/core/scenarios'
 import { buildProjectionInputs, type ProjectionBaseline, type SuperSettingsLike } from '@proviso/core/future'
 import { asDrawdownStrategy, PRESERVATION_AGE, DEFAULT_HORIZON_AGE, type DrawdownStrategy } from '@proviso/core/retirement'
 import { type FeeSchedule } from '@proviso/core/schoolFees'
@@ -11,7 +12,7 @@ interface FeeRow { id: number; level: string; tuition: number; fixed: number }
 import Panel from '@/components/ui/Panel'
 import ReadOnlyFence from '@/components/ui/ReadOnlyFence'
 import NetWorthChart      from './NetWorthChart'
-import MoneyInOutChart    from './MoneyInOutChart'
+import MoneyInOutChart, { moneyIn, signed } from './MoneyInOutChart'
 import HomeChart          from './HomeChart'
 import RetirementChart    from './RetirementChart'
 import SchoolFeeChart     from './SchoolFeeChart'
@@ -21,6 +22,7 @@ import LifePhasesPanel                            from './LifePhasesPanel'
 import LifeStagesPanel, { type ChildRow }         from './LifeStagesPanel'
 import NetWorthHistoryPanel, { type NetWorthSnapshotRow } from './NetWorthHistoryPanel'
 import type { LifePhase } from '@proviso/core/lifephases'
+import type { Overlay } from '@/lib/scenarioOverlay'
 
 interface ProjSettings {
   id:            number
@@ -75,6 +77,8 @@ interface RentSettingsType {
   stampDutyPct:          number
 }
 
+export interface ScenarioRow { id: number; name: string; colour: string; enabled: boolean; overrides: string }
+
 interface ProjectionsClientProps {
   canEdit:              boolean
   initialSettings:      ProjSettings
@@ -98,6 +102,7 @@ interface ProjectionsClientProps {
   partnerEnabled:       boolean
   initialChildren:      ChildRow[]
   initialRegional:      boolean
+  initialScenarios:     ScenarioRow[]
 }
 
 type View  = 'networth' | 'inout' | 'home' | 'fees' | 'retirement'
@@ -158,7 +163,7 @@ export default function ProjectionsClient({
   initialSettings, initialPerson1Phases, initialPerson2Phases, initialOneoffs, initialLifePhases, initialFeeSchedule,
   income, baseline, mortRate, mortPayment, mortEndDate, currentYear,
   person1Name, person2Name, initialRentSettings, initialSnapshots,
-  superSettings, partnerEnabled, initialChildren, initialRegional,
+  superSettings, partnerEnabled, initialChildren, initialRegional, initialScenarios,
 }: ProjectionsClientProps) {
   const [children,       setChildren]       = useState<ChildRow[]>(initialChildren)
   const [regional,       setRegional]       = useState(initialRegional)
@@ -175,6 +180,9 @@ export default function ProjectionsClient({
   const [sup,         setSup]         = useState<SuperSettingsLike>(superSettings)
   const [group,       setGroup]       = useState<Group>('basics')
   const [whatIfOpen,  setWhatIfOpen]  = useState(false)
+  const [scenarios,   setScenarios]   = useState<ScenarioRow[]>(initialScenarios)
+  /** The scenario What if? is changing, or null for the plan itself. */
+  const [editing,     setEditing]     = useState<number | null>(null)
 
   const sfSchedule = useMemo<FeeSchedule>(() => {
     if (settings.sfPresetKey) {
@@ -193,12 +201,16 @@ export default function ProjectionsClient({
   }, [feeRows])
 
   // Assembled by @proviso/core/future, the same as the app's Future screen.
-  const inputs = useMemo(() => buildProjectionInputs(baseline, {
+  const live = useMemo(() => ({
     income, settings, person1Phases, person2Phases, oneoffs, lifePhases, sfSchedule,
     rent: rentSt, mortgage: { rate: mortRate, payment: mortPayment }, currentYear,
     life: { partnerEnabled, person1Age: income.person1Age, person2Age: income.person2Age, super: sup },
     children, regional,
-  }), [baseline, income, settings, person1Phases, person2Phases, oneoffs, lifePhases, sfSchedule, rentSt, mortRate, mortPayment, currentYear, partnerEnabled, sup, children, regional])
+  }), [income, settings, person1Phases, person2Phases, oneoffs, lifePhases, sfSchedule, rentSt, mortRate, mortPayment, currentYear, partnerEnabled, sup, children, regional])
+  const inputs = useMemo(() => buildProjectionInputs(baseline, live), [baseline, live])
+  // Scenarios run through the same engine, layered on the plan (@proviso/core/scenarios).
+  const ownSchedule = useMemo<FeeSchedule>(() => Object.fromEntries(feeRows.map(r => [r.level, { tuition: r.tuition, fixed: r.fixed }])), [feeRows])
+  const runs = useMemo(() => runScenarios(baseline, live, scenarios, ownSchedule), [baseline, live, scenarios, ownSchedule])
   const { person1HELPBalance, person2HELPBalance, netWorthToday } = baseline
 
   const output = useMemo(() => runProjections(inputs), [inputs])
@@ -387,6 +399,85 @@ export default function ProjectionsClient({
   }, [])
 
 
+  // ── Scenarios: named sets of changes layered on the plan ──
+  const saveScenario = useCallback(async (id: number, patch: Partial<Omit<ScenarioRow, 'id'>>) => {
+    setScenarios(prev => prev.map(x => x.id === id ? { ...x, ...patch } : x))
+    await fetch(`/api/scenarios/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch) })
+  }, [])
+
+  const newScenario = useCallback(async () => {
+    const res = await fetch('/api/scenarios', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: `Scenario ${scenarios.length + 1}` }) })
+    if (!res.ok) return  // failure is reported by SaveErrorToast
+    const created = await res.json() as ScenarioRow
+    setScenarios(prev => [...prev, created])
+    setEditing(created.id)
+  }, [scenarios.length])
+
+  const deleteScenario = useCallback(async (id: number) => {
+    if (!confirm('Delete this scenario? Your plan isn’t affected.')) return
+    setScenarios(prev => prev.filter(x => x.id !== id))
+    setEditing(null)
+    await fetch(`/api/scenarios/${id}`, { method: 'DELETE' })
+  }, [])
+
+  // Only Adults with edit rights store a chip's state; others switch it for themselves.
+  const toggleShown = useCallback((x: ScenarioRow) => {
+    if (canEdit) saveScenario(x.id, { enabled: !x.enabled })
+    else setScenarios(prev => prev.map(y => y.id === x.id ? { ...y, enabled: !y.enabled } : y))
+  }, [canEdit, saveScenario])
+
+  /** Applies a change to the scenario being edited (computed from the latest state, so quick slider moves aren't lost). */
+  const changeScenario = useCallback((patch: { [K in OverrideSection]?: ScenarioOverrides[K] | null }) => {
+    if (editing === null) return
+    setScenarios(prev => prev.map(x => {
+      if (x.id !== editing) return x
+      const overrides = writeOverrides(patchOverrides(readOverrides(x.overrides), patch))
+      fetch(`/api/scenarios/${x.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ overrides }) })
+      return { ...x, overrides }
+    }))
+  }, [editing])
+
+  // What if? shows and changes `ed`: the plan, or the plan with the edited scenario on top.
+  const editingSc  = scenarios.find(x => x.id === editing) ?? null
+  const editingRun = runs.find(r => r.scenario.id === editing) ?? null
+  const ov         = useMemo(() => (editingSc ? validOverrides(readOverrides(editingSc.overrides)) : null), [editingSc])
+  const withIds    = <T,>(list: T[]) => list.map((r, i) => ({ ...r, id: i }))
+  const ed = {
+    settings:      { ...settings, ...ov?.settings } as ProjSettings,
+    sup:           { ...sup, ...ov?.super } as SuperSettingsLike,
+    rent:          { ...rentSt, ...ov?.rent } as RentSettingsType,
+    person1Phases: ov?.person1Phases ? withIds(ov.person1Phases) : person1Phases,
+    person2Phases: ov?.person2Phases ? withIds(ov.person2Phases) : person2Phases,
+    oneoffs:       ov?.oneoffs ? withIds(ov.oneoffs) : oneoffs,
+    children:      ov?.children ? withIds(ov.children) : children,
+  }
+  const editSettings = useCallback((patch: Partial<ProjSettings>) => (editing === null ? patchSettings(patch) : changeScenario({ settings: patch })), [editing, patchSettings, changeScenario])
+  const editSuper    = useCallback((patch: Partial<SuperSettingsLike>) => (editing === null ? patchSuper(patch) : changeScenario({ super: patch })), [editing, patchSuper, changeScenario])
+  const editRent     = useCallback((patch: Partial<RentSettingsType>) => (editing === null ? patchRent(patch) : changeScenario({ rent: patch })), [editing, patchRent, changeScenario])
+
+  // A scenario's lists (work changes, one-offs, children) are stored whole: each edit saves the full list.
+  type ListSection = 'person1Phases' | 'person2Phases' | 'oneoffs' | 'children'
+  function scenarioList<R extends { id: number }>(section: ListSection, rows: R[], make: () => Omit<R, 'id'>) {
+    const save = (next: R[]) => changeScenario({ [section]: next.map(({ id, ...r }) => { void id; return r }) } as never)
+    return {
+      add:    () => save([...rows, { ...make(), id: -1 } as R]),
+      update: (id: number, patch: Partial<R>) => save(rows.map(r => (r.id === id ? { ...r, ...patch } : r))),
+      remove: (id: number) => save(rows.filter(r => r.id !== id)),
+    }
+  }
+  const nextYear = (rows: { year: number }[]) => (rows.length ? Math.max(...rows.map(r => r.year)) : currentYear) + 2
+  const sc = editing === null ? null : {
+    p1:   scenarioList('person1Phases', ed.person1Phases, () => ({ year: nextYear(ed.person1Phases), days: 5 })),
+    p2:   scenarioList('person2Phases', ed.person2Phases, () => ({ year: nextYear(ed.person2Phases), days: 3 })),
+    one:  scenarioList('oneoffs', ed.oneoffs, () => ({ name: 'New expense', amt: 0, year: currentYear + 1 })),
+    kids: scenarioList('children', ed.children, () => ({ name: null, birthYear: currentYear + 1, birthMonth: null })),
+  }
+  const parseOneOff = (field: string, value: string | number) =>
+    field === 'name' ? String(value) : field === 'year' ? parseInt(String(value)) : parseFloat(String(value)) || 0
+  const edMain = editingRun ? (editingRun.output.withFees ?? editingRun.output.base) : main
+  // Lists keyed by length too: rows are numbered by position, so a removal re-mounts the inputs.
+  const listKey = (rows: unknown[]) => `${editing ?? 'plan'}-${editing === null ? '' : rows.length}`
+
   // ── Chart explorer: one chart at a time, each with a plain-language takeaway ──
   const lastLabel   = output.labels[output.labels.length - 1]
   const growth      = finalNW - initNW
@@ -425,6 +516,22 @@ export default function ProjectionsClient({
     return `${lasts}${bridge}${when} Doesn't count the Age Pension.`
   })()
 
+  // ── Scenarios on the charts: the ones switched on, plus the one being edited ──
+  const shownRuns = runs.filter(r => r.scenario.enabled || r.scenario.id === editing)
+  const resultOf  = (r: (typeof runs)[number]) => r.output.withFees ?? r.output.base
+  const overlays  = (pick: (x: ProjectionResult) => number[], readouts?: (x: ProjectionResult) => Overlay['readouts']): Overlay[] =>
+    shownRuns.map(r => ({ label: r.scenario.name, colour: r.colour, data: pick(resultOf(r)), readouts: readouts?.(resultOf(r)) }))
+  const leftOver  = (x: ProjectionResult) => moneyIn(x, partnerEnabled).map((v, i) => v - (x.expArr[i] ?? 0))
+  const feesInAny = sfOn || shownRuns.some(r => r.live.settings.schoolFeesOn)
+
+  // The Compare card: the plan, then every scenario.
+  const compareRows: { key: string; name: string; colour: string | null; s: ScenarioSummary; changes: number }[] = scenarios.length ? [
+    { key: 'plan', name: 'Your plan', colour: null, s: summariseRun(output, live), changes: 0 },
+    ...runs.map(r => ({ key: String(r.scenario.id), name: r.scenario.name, colour: r.colour, s: summariseRun(r.output, r.live),
+      changes: countChanges(validOverrides(readOverrides(r.scenario.overrides))) })),
+  ] : []
+  const compareFees = compareRows.some(r => r.s.schoolFees > 0)
+
   const views: { key: View; label: string; takeaway: string }[] = [
     {
       key: 'networth', label: 'Net worth',
@@ -455,9 +562,10 @@ export default function ProjectionsClient({
           ? ' Repayments stay under 30% of your income, a comfortable level.'
           : ` Repayments take more than 30% of your income in ${plural(stressIdx.length, 'year')}, peaking at ${peakStress.toFixed(0)}% in ${output.labels[main.mortStressArr.indexOf(peakStress)]}.`),
     }] : []),
-    ...(sfOn ? [{
+    ...(feesInAny ? [{
       key: 'fees' as const, label: 'School fees',
       takeaway: (() => {
+        if (!sfOn) return 'Your plan leaves school fees out. The dashed lines are scenarios that include them.'
         const peak = Math.max(0, ...main.sfTotalArr)
         return `School fees add up to ${fmtK(totalFees)}, peaking at ${fmtK(peak)} in ${output.labels[main.sfTotalArr.indexOf(peak)]}.`
       })(),
@@ -504,6 +612,21 @@ export default function ProjectionsClient({
             </div>
             <div className="panel-body">
               <p className="explorer-takeaway">{current.takeaway}</p>
+              {scenarios.length > 0 && (
+                <div className="scenario-chips" role="group" aria-label="Scenarios shown on the chart">
+                  <span className="scenario-chip plan"><i className="chip-line" />Your plan</span>
+                  {runs.map(r => {
+                    const on = r.scenario.enabled || r.scenario.id === editing
+                    return (
+                      <button key={r.scenario.id} type="button" className={`scenario-chip${on ? ' on' : ''}`} aria-pressed={on}
+                        disabled={r.scenario.id === editing} title={r.scenario.id === editing ? 'Shown while you change it' : undefined}
+                        onClick={() => toggleShown(r.scenario)}>
+                        <i className="chip-line dashed" style={{ borderColor: `var(--${r.colour})` }} />{r.scenario.name}
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
               {current.key === 'networth' && (
                 <>
                   {hasSuper && (
@@ -517,6 +640,7 @@ export default function ProjectionsClient({
                     investData={main.investArr} cashData={main.cashArr} sfOn={sfOn}
                     historyLabels={historyLabels} historyData={historyData}
                     superData={hasSuper ? superData : null} includeSuper={includeSuper}
+                    overlays={overlays(x => (includeSuper && hasSuper ? x.nwArr.map((v, i) => v + (x.superArr[i] ?? 0)) : x.nwArr))}
                   />
                 </>
               )}
@@ -526,10 +650,11 @@ export default function ProjectionsClient({
                   person1Name={person1Name} person2Name={person2Name} showPerson2={partnerEnabled}
                   leaveYrs={main.leaveYrs} spendData={main.expArr} sfTotalData={sfOn ? main.sfTotalArr : main.sfTotalArr.map(() => 0)}
                   phaseData={main.phaseArr} cashData={main.cashRunningArr} superData={main.superDrawArr}
+                  overlays={overlays(x => x.expArr, x => [{ label: 'Left over (or short)', data: leftOver(x), compareTo: leftOver(main), format: signed }])}
                 />
               )}
               {current.key === 'home' && (
-                <HomeChart labels={output.labels} mortData={main.mortArr} stressData={main.mortStressArr} rentData={main.rentArr} endDate={mortEndDate} />
+                <HomeChart labels={output.labels} mortData={main.mortArr} stressData={main.mortStressArr} rentData={main.rentArr} endDate={mortEndDate} overlays={overlays(x => x.mortArr)} />
               )}
               {current.key === 'retirement' && (
                 <>
@@ -540,6 +665,7 @@ export default function ProjectionsClient({
                     drawn={main.superDrawArr}
                     person1Name={person1Name} person2Name={person2Name}
                     marks={[p1RetireYear, ...(p2RetireYear ? [p2RetireYear] : [])]}
+                    overlays={overlays(x => x.superArr)}
                   />
                   <ReadOnlyFence canEdit={canEdit}>
                     <fieldset className="drawdown-choice">
@@ -568,10 +694,52 @@ export default function ProjectionsClient({
                   sfSibArr={main.sfSibArr} sfTotalArr={main.sfTotalArr}
                   sfC1Start={settings.sfC1Start} sfC1ExitIdx={settings.sfC1ExitIdx}
                   sfC2Start={settings.sfC2Start} sfC2ExitIdx={settings.sfC2ExitIdx}
+                  overlays={overlays(x => x.sfTotalArr)}
                 />
               )}
             </div>
           </section>
+
+          {compareRows.length > 0 && (
+            <Panel title="Compare" dotColor="var(--blue)">
+              <div className="compare" style={{ ['--compare-cols' as string]: compareFees ? 5 : 4 }}>
+                <div className="compare-row compare-head" aria-hidden="true">
+                  <span />
+                  <span>Net worth at the end</span>
+                  <span>Money gets tight</span>
+                  <span>Retirement money</span>
+                  {compareFees && <span>School fees</span>}
+                  <span>Lowest cash</span>
+                </div>
+                {compareRows.map(row => {
+                  const plan = compareRows[0].s
+                  const diff = row.s.endNetWorth - plan.endNetWorth
+                  const vsPlan = Math.abs(diff) < 500 ? 'same as plan' : `${diff > 0 ? '+' : '−'}${fmtK(Math.abs(diff))} vs plan`
+                  return (
+                    <div key={row.key} className="compare-row">
+                      <span className="compare-name">
+                        <i className={`chip-line${row.colour ? ' dashed' : ''}`} style={row.colour ? { borderColor: `var(--${row.colour})` } : undefined} />
+                        <span>{row.name}{row.colour && <small>{row.changes === 0 ? 'No changes yet' : `${row.changes} change${row.changes === 1 ? '' : 's'}`}</small>}</span>
+                      </span>
+                      <span data-label="Net worth at the end">
+                        <strong>{fmtK(row.s.endNetWorth)}</strong>
+                        <small>{row.colour && row.s.endYear === plan.endYear ? vsPlan : `in ${row.s.endYear}`}</small>
+                      </span>
+                      <span data-label="Money gets tight"><strong>{row.s.tightYear ?? 'Not while working'}</strong></span>
+                      <span data-label="Retirement money">
+                        <strong className={row.s.runsOutAge !== null ? 'warn' : undefined}>{row.s.runsOutAge !== null ? `Runs short at ${row.s.runsOutAge}` : `Lasts past ${row.s.lastAge}`}</strong>
+                      </span>
+                      {compareFees && <span data-label="School fees"><strong>{row.s.schoolFees > 0 ? fmtK(row.s.schoolFees) : 'None'}</strong></span>}
+                      <span data-label="Lowest cash"><strong>{fmtK(row.s.lowestCash.value)}</strong><small>in {row.s.lowestCash.year}</small></span>
+                    </div>
+                  )
+                })}
+              </div>
+              <p className="proj-note mt1">
+                Net worth leaves super out. &ldquo;Money gets tight&rdquo; is the first working year more goes out than comes in. Ages are {partnerEnabled ? possessive(person1Name) : 'yours'}. Change a scenario in What if?.
+              </p>
+            </Panel>
+          )}
 
           <Panel title="The numbers" dotColor="var(--purple)">
             <div className="proj-summary">
@@ -621,43 +789,71 @@ export default function ProjectionsClient({
               ))}
             </div>
           </div>
-          <div className="whatif-body">
+          <div className="whatif-body" key={editing ?? 'plan'}>
           <ReadOnlyFence canEdit={canEdit}>
+          <div className="scenario-editing">
+            <label className="scenario-editing-label" htmlFor="scenario-editing">Changes apply to</label>
+            <div className="scenario-editing-row">
+              <select id="scenario-editing" value={editing ?? ''} onChange={e => setEditing(e.target.value ? Number(e.target.value) : null)}>
+                <option value="">Your plan</option>
+                {scenarios.map(x => <option key={x.id} value={x.id}>{x.name}</option>)}
+              </select>
+              <button type="button" className="add-btn" onClick={newScenario}>+ New scenario</button>
+            </div>
+            {editingSc ? (
+              <div className="scenario-banner" style={{ borderLeftColor: `var(--${scenarioColour(editingSc.colour)})` }}>
+                <label className="scenario-name">
+                  <span>Name</span>
+                  <input defaultValue={editingSc.name} maxLength={40}
+                    onBlur={e => { const v = e.target.value.trim(); if (v && v !== editingSc.name) saveScenario(editingSc.id, { name: v }) }} />
+                </label>
+                <p>Only this scenario changes; your plan stays as it is. Where you live, the custom fee table and extra costs by year are shared with your plan.</p>
+                <div className="scenario-actions">
+                  {ov && countChanges(ov) > 0 && <button type="button" className="add-btn" onClick={() => saveScenario(editingSc.id, { overrides: '{}' })}>Undo its changes</button>}
+                  <button type="button" className="add-btn danger" onClick={() => deleteScenario(editingSc.id)}>Delete scenario</button>
+                </div>
+              </div>
+            ) : (
+              <p className="slider-hint">Changes here update your plan. To try something without changing it, start a new scenario.</p>
+            )}
+          </div>
           <div className="wi-group" data-group="basics">
             <Panel title="The basics" dotColor="var(--amber)">
               <Slider label={partnerEnabled ? 'Look ahead until the younger of you is' : 'Look ahead until you are'} min={70} max={105} step={1}
-                value={settings.horizonAge ?? DEFAULT_HORIZON_AGE} cls="amber-t" fmt={v => String(v)} onChange={v => patchSettings({ horizonAge: v })} />
-              <Slider label={`${possessive(person1Name)} pay rise each year`} min={0} max={15} step={0.5} value={settings.person1Growth} cls="blue-t" onChange={v => patchSettings({ person1Growth: v })} />
+                value={ed.settings.horizonAge ?? DEFAULT_HORIZON_AGE} cls="amber-t" fmt={v => String(v)} onChange={v => editSettings({ horizonAge: v })} />
+              <Slider label={`${possessive(person1Name)} pay rise each year`} min={0} max={15} step={0.5} value={ed.settings.person1Growth} cls="blue-t" onChange={v => editSettings({ person1Growth: v })} />
               {income.person2FTE > 0 && (
-                <Slider label={`${possessive(person2Name)} pay rise each year`} min={0} max={15} step={0.5} value={settings.person2Growth} cls="green-t" onChange={v => patchSettings({ person2Growth: v })} />
+                <Slider label={`${possessive(person2Name)} pay rise each year`} min={0} max={15} step={0.5} value={ed.settings.person2Growth} cls="green-t" onChange={v => editSettings({ person2Growth: v })} />
               )}
               <Slider label="Safety net kept as cash" hint="Months of spending. Leftover money tops it up first, before anything is invested."
-                min={0} max={24} step={1} value={settings.cashBufferMonths ?? 0} cls="purple-t"
-                fmt={v => v === 0 ? 'None' : `${v} month${v === 1 ? '' : 's'}`} onChange={v => patchSettings({ cashBufferMonths: v })} />
-              <Slider label="Leftover money you invest" hint={(settings.cashBufferMonths ?? 0) > 0 ? 'Of what’s above the safety net. The rest stays as cash.' : 'The rest stays as cash.'}
-                min={0} max={100} step={5} value={settings.savingsRate} cls="purple-t" onChange={v => patchSettings({ savingsRate: v })} />
+                min={0} max={24} step={1} value={ed.settings.cashBufferMonths ?? 0} cls="purple-t"
+                fmt={v => v === 0 ? 'None' : `${v} month${v === 1 ? '' : 's'}`} onChange={v => editSettings({ cashBufferMonths: v })} />
+              <Slider label="Leftover money you invest" hint={(ed.settings.cashBufferMonths ?? 0) > 0 ? 'Of what’s above the safety net. The rest stays as cash.' : 'The rest stays as cash.'}
+                min={0} max={100} step={5} value={ed.settings.savingsRate} cls="purple-t" onChange={v => editSettings({ savingsRate: v })} />
               <Slider label="Leftover money you spend on fun" hint="Holidays, treats, upgrades. It’s spent, so it doesn’t add to what you own."
-                min={0} max={100 - settings.savingsRate} step={5} value={Math.min(settings.funPct ?? 0, 100 - settings.savingsRate)} cls="purple-t"
-                onChange={v => patchSettings({ funPct: v })} />
-              <Slider label="Investment growth each year" min={0} max={15} step={0.5} value={settings.investReturn} cls="purple-t" onChange={v => patchSettings({ investReturn: v })} />
+                min={0} max={100 - ed.settings.savingsRate} step={5} value={Math.min(ed.settings.funPct ?? 0, 100 - ed.settings.savingsRate)} cls="purple-t"
+                onChange={v => editSettings({ funPct: v })} />
+              <Slider label="Investment growth each year" min={0} max={15} step={0.5} value={ed.settings.investReturn} cls="purple-t" onChange={v => editSettings({ investReturn: v })} />
               <details className="wi-more">
                 <summary>More assumptions</summary>
-                <Slider label={`Price rises, ${currentYear}–${String(currentYear + 2).slice(2)}`} min={0} max={10} step={0.5} value={settings.expInflNear} cls="red-t" onChange={v => patchSettings({ expInflNear: v })} />
-                <Slider label="Price rises after that" min={0} max={8} step={0.5} value={settings.expInfl} cls="red-t" onChange={v => patchSettings({ expInfl: v })} />
-                <Slider label="Childcare price rises" min={0} max={15} step={0.5} value={settings.childcareInfl} cls="pink-t" onChange={v => patchSettings({ childcareInfl: v })} />
-                <Slider label="Property value growth" min={0} max={12} step={0.5} value={settings.propGrowth} cls="amber-t" onChange={v => patchSettings({ propGrowth: v })} />
+                <Slider label={`Price rises, ${currentYear}–${String(currentYear + 2).slice(2)}`} min={0} max={10} step={0.5} value={ed.settings.expInflNear} cls="red-t" onChange={v => editSettings({ expInflNear: v })} />
+                <Slider label="Price rises after that" min={0} max={8} step={0.5} value={ed.settings.expInfl} cls="red-t" onChange={v => editSettings({ expInfl: v })} />
+                <Slider label="Childcare price rises" min={0} max={15} step={0.5} value={ed.settings.childcareInfl} cls="pink-t" onChange={v => editSettings({ childcareInfl: v })} />
+                <Slider label="Property value growth" min={0} max={12} step={0.5} value={ed.settings.propGrowth} cls="amber-t" onChange={v => editSettings({ propGrowth: v })} />
               </details>
             </Panel>
           </div>
 
           <div className="wi-group" data-group="work">
             <Panel title={`${possessive(person1Name)} work`} dotColor="var(--blue)">
-              <Slider label="Stops work at age" hint={`${income.person1Age} now; pay stops in ${p1RetireYear}.`} min={Math.max(40, income.person1Age)} max={80} step={1}
-                value={sup.person1RetirementAge} cls="blue-t" fmt={v => String(v)} onChange={v => patchSuper({ person1RetirementAge: v })} />
+              <Slider label="Stops work at age" hint={`${income.person1Age} now; pay stops in ${edMain.person1RetireYr ?? currentYear}.`} min={Math.max(40, income.person1Age)} max={80} step={1}
+                value={ed.sup.person1RetirementAge} cls="blue-t" fmt={v => String(v)} onChange={v => editSuper({ person1RetirementAge: v })} />
               <WorkPhaseTimeline
-                phases={person1Phases} currentYear={currentYear}
+                key={listKey(ed.person1Phases)}
+                phases={ed.person1Phases} currentYear={currentYear}
                 fte={income.person1FTE} showLeave={false}
-                onUpdate={updatePerson1Phase} onDelete={deletePerson1Phase} onAdd={addPerson1Phase}
+                onUpdate={sc ? (id, field, value) => sc.p1.update(id, { [field]: value }) : updatePerson1Phase}
+                onDelete={sc ? sc.p1.remove : deletePerson1Phase} onAdd={sc ? sc.p1.add : addPerson1Phase}
               />
             </Panel>
             <Panel
@@ -667,22 +863,24 @@ export default function ProjectionsClient({
                 <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.8rem', color: 'var(--t2)', cursor: 'pointer' }}>
                   <input
                     type="checkbox"
-                    checked={settings.parentalLeaveEnabled}
-                    onChange={e => patchSettings({ parentalLeaveEnabled: e.target.checked })}
+                    checked={ed.settings.parentalLeaveEnabled}
+                    onChange={e => editSettings({ parentalLeaveEnabled: e.target.checked })}
                   />
                   Parental leave
                 </label>
               }
             >
               {partnerEnabled && (
-                <Slider label="Stops work at age" hint={`${income.person2Age} now; pay stops in ${p2RetireYear}.`} min={Math.max(40, income.person2Age)} max={80} step={1}
-                  value={sup.person2RetirementAge} cls="green-t" fmt={v => String(v)} onChange={v => patchSuper({ person2RetirementAge: v })} />
+                <Slider label="Stops work at age" hint={`${income.person2Age} now; pay stops in ${edMain.person2RetireYr}.`} min={Math.max(40, income.person2Age)} max={80} step={1}
+                  value={ed.sup.person2RetirementAge} cls="green-t" fmt={v => String(v)} onChange={v => editSuper({ person2RetirementAge: v })} />
               )}
               <WorkPhaseTimeline
-                phases={person2Phases} currentYear={currentYear}
+                key={listKey(ed.person2Phases)}
+                phases={ed.person2Phases} currentYear={currentYear}
                 fte={income.person2FTE}
-                showLeave={settings.parentalLeaveEnabled}
-                onUpdate={updatePerson2Phase} onDelete={deletePerson2Phase} onAdd={addPerson2Phase}
+                showLeave={ed.settings.parentalLeaveEnabled}
+                onUpdate={sc ? (id, field, value) => sc.p2.update(id, { [field]: value }) : updatePerson2Phase}
+                onDelete={sc ? sc.p2.remove : deletePerson2Phase} onAdd={sc ? sc.p2.add : addPerson2Phase}
               />
             </Panel>
           </div>
@@ -690,27 +888,28 @@ export default function ProjectionsClient({
           <div className="wi-group" data-group="family">
             <Panel title="Costs that change with age" dotColor="var(--pink)">
               <LifeStagesPanel
-                on={settings.lifeStagesOn ?? true} leaveHomeAge={settings.childLeavesHomeAge ?? 18}
-                regional={regional} kids={children} currentYear={currentYear}
-                onSettings={patchSettings} onRegional={saveRegional}
-                onAddChild={addChild} onUpdateChild={updateChild} onDeleteChild={deleteChild}
+                on={ed.settings.lifeStagesOn ?? true} leaveHomeAge={ed.settings.childLeavesHomeAge ?? 18}
+                regional={regional} kids={ed.children} currentYear={currentYear} key={listKey(ed.children)}
+                onSettings={editSettings} onRegional={saveRegional}
+                onAddChild={sc ? sc.kids.add : addChild} onUpdateChild={sc ? sc.kids.update : updateChild} onDeleteChild={sc ? sc.kids.remove : deleteChild}
               />
             </Panel>
           </div>
 
           <div className="wi-group" data-group="home">
             <Panel title="Housing" dotColor="var(--purple)">
-              {/* Homeowner / Renter toggle */}
-              <div style={{ display: 'flex', gap: 5, marginBottom: 10 }}>
+              {/* Homeowner / Renter toggle (the plan only: today's spending already reflects it) */}
+              {editing !== null && <p className="slider-hint">{ed.rent.enabled ? 'Renting' : 'Owning'}, as in your plan. A scenario can change the home purchase.</p>}
+              <div style={{ display: editing === null ? 'flex' : 'none', gap: 5, marginBottom: 10 }}>
                 {(['Homeowner', 'Renter'] as const).map(mode => (
                   <button
                     key={mode}
                     type="button"
-                    onClick={() => patchRent({ enabled: mode === 'Renter' })}
+                    onClick={() => editRent({ enabled: mode === 'Renter' })}
                     style={{
                       flex: 1, padding: '5px 0', fontSize: '0.72rem', borderRadius: 5, cursor: 'pointer',
-                      background: rentSt.enabled === (mode === 'Renter') ? 'var(--blue)' : 'var(--surface2)',
-                      color: rentSt.enabled === (mode === 'Renter') ? 'var(--on-accent)' : 'var(--t2)',
+                      background: ed.rent.enabled === (mode === 'Renter') ? 'var(--blue)' : 'var(--surface2)',
+                      color: ed.rent.enabled === (mode === 'Renter') ? 'var(--on-accent)' : 'var(--t2)',
                       border: '1px solid var(--border)',
                     }}
                   >
@@ -719,7 +918,7 @@ export default function ProjectionsClient({
                 ))}
               </div>
 
-              {rentSt.enabled && (
+              {ed.rent.enabled && (
                 <div className="da-grid" style={{ gap: 8 }}>
                   <div className="da-row">
                     <label style={{ flex: 1, color: 'var(--t2)', fontSize: '0.74rem' }}>Monthly rent</label>
@@ -727,16 +926,16 @@ export default function ProjectionsClient({
                       <span>$</span>
                       <input
                         type="number" min="0" step="50"
-                        value={rentSt.monthlyRent}
-                        onChange={e => patchRent({ monthlyRent: parseFloat(e.target.value) || 0 })}
+                        value={ed.rent.monthlyRent}
+                        onChange={e => editRent({ monthlyRent: parseFloat(e.target.value) || 0 })}
                         style={{ textAlign: 'right' }}
                       />
                     </div>
                   </div>
                   <Slider
                     label="Annual rent increase" id="rentIncreaseRate" min={0} max={15} step={0.5}
-                    value={rentSt.annualIncreaseRate} cls="red-t"
-                    onChange={v => patchRent({ annualIncreaseRate: v })}
+                    value={ed.rent.annualIncreaseRate} cls="red-t"
+                    onChange={v => editRent({ annualIncreaseRate: v })}
                   />
                   <p style={{ fontSize: '0.67rem', color: 'var(--t3)', margin: '2px 0 4px', lineHeight: 1.4 }}>
                     Rent is modelled separately — remove any rent expense from your budget to avoid double-counting.
@@ -744,24 +943,24 @@ export default function ProjectionsClient({
 
                   {/* Purchase plan */}
                   <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8 }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.73rem', color: 'var(--t2)', cursor: 'pointer', marginBottom: rentSt.purchasePlanEnabled ? 10 : 0 }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.73rem', color: 'var(--t2)', cursor: 'pointer', marginBottom: ed.rent.purchasePlanEnabled ? 10 : 0 }}>
                       <input
                         type="checkbox"
-                        checked={rentSt.purchasePlanEnabled}
-                        onChange={e => patchRent({ purchasePlanEnabled: e.target.checked })}
+                        checked={ed.rent.purchasePlanEnabled}
+                        onChange={e => editRent({ purchasePlanEnabled: e.target.checked })}
                       />
                       Model home purchase
                     </label>
 
-                    {rentSt.purchasePlanEnabled && (
+                    {ed.rent.purchasePlanEnabled && (
                       <div className="da-grid" style={{ gap: 8 }}>
                         <div className="da-row">
                           <label style={{ flex: 1, color: 'var(--t2)', fontSize: '0.74rem' }}>Purchase year</label>
                           <input
                             className="da-input narrow" type="number"
-                            value={rentSt.targetPurchaseYear}
+                            value={ed.rent.targetPurchaseYear}
                             min={currentYear + 1} max={currentYear + 30}
-                            onChange={e => patchRent({ targetPurchaseYear: parseInt(e.target.value) })}
+                            onChange={e => editRent({ targetPurchaseYear: parseInt(e.target.value) })}
                           />
                         </div>
                         <div className="da-row">
@@ -770,21 +969,21 @@ export default function ProjectionsClient({
                             <span>$</span>
                             <input
                               type="number" min="0" step="10000"
-                              value={rentSt.targetPropertyValue}
-                              onChange={e => patchRent({ targetPropertyValue: parseFloat(e.target.value) || 0 })}
+                              value={ed.rent.targetPropertyValue}
+                              onChange={e => editRent({ targetPropertyValue: parseFloat(e.target.value) || 0 })}
                               style={{ textAlign: 'right' }}
                             />
                           </div>
                         </div>
                         <Slider
                           label="Deposit %" id="depositPct" min={5} max={40} step={5}
-                          value={rentSt.depositPct} cls="amber-t" fmt={v => v + '%'}
-                          onChange={v => patchRent({ depositPct: v })}
+                          value={ed.rent.depositPct} cls="amber-t" fmt={v => v + '%'}
+                          onChange={v => editRent({ depositPct: v })}
                         />
                         <Slider
                           label="Stamp duty & buying costs" id="stampDutyPct" min={0} max={8} step={0.5}
-                          value={rentSt.stampDutyPct} cls="amber-t" fmt={v => v + '%'}
-                          onChange={v => patchRent({ stampDutyPct: v })}
+                          value={ed.rent.stampDutyPct} cls="amber-t" fmt={v => v + '%'}
+                          onChange={v => editRent({ stampDutyPct: v })}
                         />
                         <p style={{ fontSize: '0.67rem', color: 'var(--t3)', margin: '2px 0', lineHeight: 1.4 }}>
                           Stamp duty depends on your state and the price; first-home buyers often pay less or none.
@@ -796,8 +995,8 @@ export default function ProjectionsClient({
                             <span>$</span>
                             <input
                               type="number" min="0" step="1000"
-                              value={rentSt.depositFromCash}
-                              onChange={e => patchRent({ depositFromCash: parseFloat(e.target.value) || 0 })}
+                              value={ed.rent.depositFromCash}
+                              onChange={e => editRent({ depositFromCash: parseFloat(e.target.value) || 0 })}
                               style={{ textAlign: 'right' }}
                             />
                           </div>
@@ -808,23 +1007,23 @@ export default function ProjectionsClient({
                             <span>$</span>
                             <input
                               type="number" min="0" step="1000"
-                              value={rentSt.depositFromInvestments}
-                              onChange={e => patchRent({ depositFromInvestments: parseFloat(e.target.value) || 0 })}
+                              value={ed.rent.depositFromInvestments}
+                              onChange={e => editRent({ depositFromInvestments: parseFloat(e.target.value) || 0 })}
                               style={{ textAlign: 'right' }}
                             />
                           </div>
                         </div>
                         <Slider
                           label="New mortgage rate" id="newMortgageRate" min={3} max={12} step={0.25}
-                          value={rentSt.newMortgageRate} cls="blue-t"
-                          onChange={v => patchRent({ newMortgageRate: v })}
+                          value={ed.rent.newMortgageRate} cls="blue-t"
+                          onChange={v => editRent({ newMortgageRate: v })}
                         />
                         <div className="da-row">
                           <label style={{ flex: 1, color: 'var(--t2)', fontSize: '0.74rem' }}>Mortgage term</label>
                           <select
                             className="freq-select"
-                            value={rentSt.newMortgageTermYrs}
-                            onChange={e => patchRent({ newMortgageTermYrs: parseInt(e.target.value) })}
+                            value={ed.rent.newMortgageTermYrs}
+                            onChange={e => editRent({ newMortgageTermYrs: parseInt(e.target.value) })}
                             style={{ width: 90 }}
                           >
                             {[20, 25, 30, 35].map(y => <option key={y} value={y}>{y} yrs</option>)}
@@ -837,17 +1036,17 @@ export default function ProjectionsClient({
                           background: 'var(--surface2)', borderRadius: 6, padding: '8px 10px',
                           fontSize: '0.72rem', color: 'var(--t2)', lineHeight: 1.5,
                         }}>
-                          <strong>Purchase {rentSt.targetPurchaseYear}</strong><br/>
-                          Property: {fmt(rentSt.targetPropertyValue)}<br/>
-                          {main.purchase ? (
+                          <strong>Purchase {ed.rent.targetPurchaseYear}</strong><br/>
+                          Property: {fmt(ed.rent.targetPropertyValue)}<br/>
+                          {edMain.purchase ? (
                             <>
-                              Upfront: {fmt(main.purchase.deposit)} deposit + {fmt(main.purchase.duty)} stamp duty &amp; costs<br/>
-                              Paid from: {fmt(main.purchase.fromCash)} savings
-                              {main.purchase.fromInvestments > 0 && <>, {fmt(main.purchase.fromInvestments)} investments ({fmt(main.purchase.cgt)} tax)</>}<br/>
-                              Mortgage: {fmt(rentSt.targetPropertyValue - main.purchase.deposit + main.purchase.borrowedExtra)} @ {rentSt.newMortgageRate}%
-                              {main.purchase.borrowedExtra > 0 && (
+                              Upfront: {fmt(edMain.purchase.deposit)} deposit + {fmt(edMain.purchase.duty)} stamp duty &amp; costs<br/>
+                              Paid from: {fmt(edMain.purchase.fromCash)} savings
+                              {edMain.purchase.fromInvestments > 0 && <>, {fmt(edMain.purchase.fromInvestments)} investments ({fmt(edMain.purchase.cgt)} tax)</>}<br/>
+                              Mortgage: {fmt(ed.rent.targetPropertyValue - edMain.purchase.deposit + edMain.purchase.borrowedExtra)} @ {ed.rent.newMortgageRate}%
+                              {edMain.purchase.borrowedExtra > 0 && (
                                 <span style={{ display: 'block', color: 'var(--amber)', marginTop: 4 }}>
-                                  Savings and investments fall {fmt(main.purchase.borrowedExtra)} short then, so that’s added to the loan. A lender may not allow it.
+                                  Savings and investments fall {fmt(edMain.purchase.borrowedExtra)} short then, so that’s added to the loan. A lender may not allow it.
                                 </span>
                               )}
                             </>
@@ -865,27 +1064,29 @@ export default function ProjectionsClient({
 
           <div className="wi-group" data-group="plans">
             <Panel title="Big one-off costs" dotColor="var(--blue)">
-              <OneOffPanel oneoffs={oneoffs} onAdd={addOneoff} onUpdate={updateOneoff} onDelete={deleteOneoff} />
+              <OneOffPanel key={listKey(ed.oneoffs)} oneoffs={ed.oneoffs} onAdd={sc ? sc.one.add : addOneoff}
+                onUpdate={sc ? (id, field, value) => sc.one.update(id, { [field]: parseOneOff(field, value) }) : updateOneoff}
+                onDelete={sc ? sc.one.remove : deleteOneoff} />
             </Panel>
             <Panel
               title="School fees"
               dotColor="var(--teal)"
               right={
                 <label className="toggle-switch">
-                  <input type="checkbox" checked={settings.schoolFeesOn} onChange={e => patchSettings({ schoolFeesOn: e.target.checked })} />
+                  <input type="checkbox" checked={ed.settings.schoolFeesOn} onChange={e => editSettings({ schoolFeesOn: e.target.checked })} />
                   <span className="toggle-slider" />
                 </label>
               }
             >
-              {settings.schoolFeesOn && (
+              {ed.settings.schoolFeesOn && (
                 <div className="da-grid" style={{ gap: 8 }}>
                   {/* ── Education preset selector ──────────────────────── */}
                   {(() => {
-                    const parts = settings.sfPresetKey?.split('|')
+                    const parts = ed.settings.sfPresetKey?.split('|')
                     const sfLoc  = parts?.[0] ?? 'vic'
                     const sfType = parts?.[1] ?? 'independent'
-                    const isCustom = !settings.sfPresetKey
-                    const preset13 = settings.sfPresetKey ? presetTotalFor(settings.sfPresetKey) : null
+                    const isCustom = !ed.settings.sfPresetKey
+                    const preset13 = ed.settings.sfPresetKey ? presetTotalFor(ed.settings.sfPresetKey) : null
                     return (
                       <div style={{ marginBottom: 4 }}>
                         <div style={{ fontSize: '0.68rem', color: 'var(--t3)', marginBottom: 5 }}>School type</div>
@@ -893,7 +1094,7 @@ export default function ProjectionsClient({
                           {(['government','catholic','independent'] as const).map(t => (
                             <button
                               key={t}
-                              onClick={() => patchSettings({ sfPresetKey: `${sfLoc}|${t}` })}
+                              onClick={() => editSettings({ sfPresetKey: `${sfLoc}|${t}` })}
                               style={{
                                 padding: '4px 10px', fontSize: '0.72rem', borderRadius: 5, cursor: 'pointer',
                                 background: !isCustom && sfType === t ? 'var(--blue)' : 'var(--surface2)',
@@ -905,7 +1106,7 @@ export default function ProjectionsClient({
                             </button>
                           ))}
                           <button
-                            onClick={() => patchSettings({ sfPresetKey: null })}
+                            onClick={() => editSettings({ sfPresetKey: null })}
                             style={{
                               padding: '4px 10px', fontSize: '0.72rem', borderRadius: 5, cursor: 'pointer',
                               background: isCustom ? 'var(--blue)' : 'var(--surface2)',
@@ -922,7 +1123,7 @@ export default function ProjectionsClient({
                             <select
                               className="freq-select"
                               value={sfLoc}
-                              onChange={e => patchSettings({ sfPresetKey: `${e.target.value}|${sfType}` })}
+                              onChange={e => editSettings({ sfPresetKey: `${e.target.value}|${sfType}` })}
                               style={{ flex: '0 0 auto', width: 165 }}
                             >
                               {LOCATION_OPTIONS.map(l => (
@@ -945,29 +1146,29 @@ export default function ProjectionsClient({
                   {/* ── Child settings ────────────────────────────────── */}
                   <div className="da-row">
                     <label style={{ flex: 1, color: 'var(--t2)', fontSize: '0.74rem' }}>Child 1 starts Kinder</label>
-                    <input className="da-input narrow" type="number" value={settings.sfC1Start} min={2024} max={2040} onChange={e => patchSettings({ sfC1Start: parseInt(e.target.value) })} />
+                    <input className="da-input narrow" type="number" value={ed.settings.sfC1Start} min={2024} max={2040} onChange={e => editSettings({ sfC1Start: parseInt(e.target.value) })} />
                   </div>
                   <div className="da-row">
                     <label style={{ flex: 1, color: 'var(--t2)', fontSize: '0.74rem' }}>Child 1 exits after</label>
-                    <select className="freq-select" value={settings.sfC1ExitIdx} onChange={e => patchSettings({ sfC1ExitIdx: parseInt(e.target.value) })} style={{ flex: '0 0 auto', width: 110 }}>
+                    <select className="freq-select" value={ed.settings.sfC1ExitIdx} onChange={e => editSettings({ sfC1ExitIdx: parseInt(e.target.value) })} style={{ flex: '0 0 auto', width: 110 }}>
                       {feeRows.map((r, i) => <option key={r.id} value={i}>{r.level}</option>)}
                     </select>
                   </div>
                   <div className="da-row">
                     <label style={{ flex: 1, color: 'var(--t2)', fontSize: '0.74rem' }}>Child 2 starts Kinder</label>
-                    <input className="da-input narrow" type="number" value={settings.sfC2Start} min={2024} max={2040} onChange={e => patchSettings({ sfC2Start: parseInt(e.target.value) })} />
+                    <input className="da-input narrow" type="number" value={ed.settings.sfC2Start} min={2024} max={2040} onChange={e => editSettings({ sfC2Start: parseInt(e.target.value) })} />
                   </div>
                   <div className="da-row">
                     <label style={{ flex: 1, color: 'var(--t2)', fontSize: '0.74rem' }}>Child 2 exits after</label>
-                    <select className="freq-select" value={settings.sfC2ExitIdx} onChange={e => patchSettings({ sfC2ExitIdx: parseInt(e.target.value) })} style={{ flex: '0 0 auto', width: 110 }}>
+                    <select className="freq-select" value={ed.settings.sfC2ExitIdx} onChange={e => editSettings({ sfC2ExitIdx: parseInt(e.target.value) })} style={{ flex: '0 0 auto', width: 110 }}>
                       {feeRows.map((r, i) => <option key={r.id} value={i}>{r.level}</option>)}
                     </select>
                   </div>
                   <div style={{ marginTop: '0.5rem' }}>
-                    <Slider label="Fee inflation / yr" id="sfInfl" min={0} max={10} step={0.5} value={settings.sfInfl} cls="teal-t" onChange={v => patchSettings({ sfInfl: v })} />
+                    <Slider label="Fee inflation / yr" id="sfInfl" min={0} max={10} step={0.5} value={ed.settings.sfInfl} cls="teal-t" onChange={v => editSettings({ sfInfl: v })} />
                   </div>
                   {/* Editable fee schedule — only in Custom mode */}
-                  <details style={{ marginTop: 8, display: settings.sfPresetKey ? 'none' : undefined }}>
+                  <details style={{ marginTop: 8, display: ed.settings.sfPresetKey ? 'none' : undefined }}>
                     <summary style={{ fontSize: '0.73rem', color: 'var(--t2)', cursor: 'pointer', userSelect: 'none' }}>
                       Edit current fee schedule ({new Date().getFullYear()} $)
                     </summary>

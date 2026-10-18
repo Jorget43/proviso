@@ -144,6 +144,16 @@ model OneOff {
   year Int
 }
 
+// A named set of changes layered on the plan (twin of core's scenario table;
+// schema v7). overrides is JSON read and written by @proviso/core/scenarios.
+model Scenario {
+  id        Int     @id @default(autoincrement())
+  name      String
+  colour    String  @default("blue")
+  enabled   Boolean @default(true)
+  overrides String  @default("{}")
+}
+
 model Transaction {
   id          Int      @id @default(autoincrement())
   dateStr     String

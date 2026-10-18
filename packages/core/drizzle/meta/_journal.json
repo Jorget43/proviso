@@ -43,6 +43,13 @@
       "when": 1791979715202,
       "tag": "0005_life_stages",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1792312714097,
+      "tag": "0006_scenarios",
+      "breakpoints": true
     }
   ]
 }

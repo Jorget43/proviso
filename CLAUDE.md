@@ -412,6 +412,7 @@ The assumptions watchdog (`/admin/watchdog` for the CFO when `WATCHDOG_ENABLED=t
   - Retirement before 60 leaves super in accumulation (taxed at 15%) until 60.
   - Excess minimum drawdowns pile up in cash, like any surplus. Since Phase 43, a safety net with invest + fun at 100% stops that; the share not invested or spent still stays as cash, by design.
   - Cash above the safety net from earlier years isn't swept into investments; only each year's surplus is split (Phase 43).
+- Scenarios (Phase 45) can't change renting vs owning, today's budget, balances, where you live, the custom fee table or the "extra costs by year" overlays: those are shared with the plan. A scenario's work pattern, one-offs and children are whole lists, so a later change to the plan's list doesn't reach a scenario that has its own.
 
 ### Security hardening still open
 Tracked in [`docs/security-privacy-legal.md`](docs/security-privacy-legal.md) § Cybersecurity. Phase 21 closed headers/CSP, HSTS, the audit log, session lifetime and automated dependency updates. Left:
@@ -426,17 +427,20 @@ Tracked in [`docs/security-privacy-legal.md`](docs/security-privacy-legal.md) §
 - ~~Small-text desktop layouts on phones~~ — done (v1.12.0), checked at 390px: Own & owe rows restacked, Investments labels/dropdowns fixed, work-pattern wording plain; EOFY, Super and the school-fee controls were already fine. Investment parcel cards rebuilt in Phase 24.
 - ~~Native app: token auth alongside the cookie session~~ — done (Phase 24), see [`docs/app-api.md`](docs/app-api.md). Still open for the app: passkey sign-in (WebAuthn from a native app needs the platform APIs and an associated domain), and CORS if the app is ever a web view on another origin.
 
-### The app — next steps (as of 2026-10-14)
+### The app — next steps (as of 2026-10-18)
 In [`docs/architecture.md`](docs/architecture.md) order. Phase 3 there (the single-device app) is built except for a store build; Phase 4 (sync) is built (Phases 34–35) and needs its first real run on the NAS. Settings passed the owner's phone check on 2026-10-07. The owner is enrolling in the Apple Developer Program.
 
 **Start here next session**, in this order:
 1. **⏰ Remind the owner first — phone test still to do** (deferred 2026-10-08, "soon"). **The Android development build with Phases 34–35** (sync, camera, key backup): it built successfully on EAS on 2026-10-08 (so the key-backup Kotlin module and expo-camera compile); `npm run eas -w @proviso/client -- build:list --limit 1` shows the APK link. Install it and check on the phone: Settings → Recovery phrase → Save to Google Password Manager; Settings → Sync; Join a household (camera scan).
 2. **Run the relay on the NAS** with the owner: `docker compose --profile sync up -d` (image `ghcr.io/jorget43/proviso-relay`, published by CI from master since 2026-10-08), then `tailscale serve --bg --https=8443 http://localhost:8787` (README "Sync relay for the app"). Turn sync on in the app with the `https://<machine>.<tailnet>.ts.net:8443` address, then join from a second phone. Phones need Tailscale running to reach it.
-3. **Owner decisions pending**: none. (Phase 44 life stages: owner OK 2026-10-14, merged.)
+3. **Owner decisions pending**: **Phase 45 scenarios** is on branch `phase-45-scenarios`, committed but not merged or pushed. No numbers move (the plan is untouched; scenarios are extra lines and a Compare card). It adds schema v7, so pushing it publishes a NAS image that runs Prisma migration `0011_scenarios`. Ask the owner to merge and push.
 4. **Step B of [`docs/plan-modelling-and-ux.md`](docs/plan-modelling-and-ux.md)**:
    - The life-course engine shipped as Phase 40 (merged to master 2026-10-09 with the owner's OK).
    - Phase 41 (birth years, the `child` table) merged to master 2026-10-12 with the owner's OK.
-5. **Step C**: the cash-buffer rule is Phase 43 (merged to master 2026-10-14). Life stages are Phase 44 (merged to master 2026-10-14 with the owner's OK). After that, step D of the plan: scenarios (save and compare) and school fees v2.
+5. **Step C**: the cash-buffer rule is Phase 43 (merged to master 2026-10-14). Life stages are Phase 44 (merged to master 2026-10-14 with the owner's OK).
+6. **Step D**: scenarios are Phase 45 (above). Next:
+   - **School fees v2** (plan item 7): fee choices per child, each a scenario; the School fees view stacked by child.
+   - **The app's chart component** (`react-native-svg`, a native module, so it rides on the next development build). Then the app can show scenario lines and edit a saved scenario; today it saves What if? drafts as scenarios and compares them in a card.
    - Step A (dark mode, editing, chart trim) shipped as Phases 37–39.
    - Also open: the relay enforcing roles, and the iOS build once the Apple account is ready.
 
@@ -449,7 +453,7 @@ The full list:
 - **Dependency advisories**: GitHub lists some on master, believed to be all in Expo's build and dev-server tools (`braces`, `node-forge`, `uuid` via `xcode`, `decode-uri-component`), several with no fixed version yet. They don't reach the NAS image (CI audits exactly what it ships). Dependabot was preparing a security update for them on 2026-10-06: review it carefully, because Expo pins some of them, and React / React Native / `expo*` move only with the Expo SDK (`proviso-release` skill).
 - **Starter estimates** (`packages/core/src/starter.ts`): re-check the figures yearly with the July recalibration; electricity still uses the AER's 2020 usage benchmarks (no longer updated).
 
-### Where each feature lives (NAS ↔ app), as of Phase 44
+### Where each feature lives (NAS ↔ app), as of Phase 45
 
 | Feature | NAS web app | The app | Notes |
 |---|---|---|---|
@@ -470,6 +474,7 @@ The full list:
 | Birth years (ages move on each year) | Set at onboarding; kept in step | ✓ edit (Settings → People) | `core/people.ts` |
 | Children (birth year, month, name; planned babies) | ✓ (What if? → Family) | ✓ edit (Settings); drive school-fee years | NAS `Child` table since Phase 44; with children recorded, school-fee years follow them on both |
 | Costs that change with age (life stages), where you live | ✓ (What if? → Family) | ✓ (Assumptions; What if? leave-home age); milestones | `core/lifeStages.ts`, Phase 44 |
+| Scenarios (save and compare) | ✓ make, edit, rename, delete in What if?; dashed lines on every Future chart; Compare card | Save a What if? draft as one; Compare card on Future; delete | `core/scenarios.ts`, Phase 45. App lines and editing wait on the chart component |
 | Life phases (calendar rows) | ✓ toggle ("Extra costs by year") | Read only | Kept as custom extras; life stages do the automatic part |
 | Next 2 years | ✓ | ✓ | `core/cashflow.ts` |
 | Parental-leave switch | ✓ | Read only | |
@@ -560,6 +565,28 @@ Ideas that have been evaluated but aren't on the roadmap. Each links to its writ
 - **School fees decided**: the questionnaire's school-cost lines stay in today's budget; the projection models the two eldest children's fees year by year (ending after Year 12) and leaves those lines out (`isModelledSchoolLine`), so nothing is counted twice. The questionnaire switches `schoolFeesOn` on when there are children.
 - Typed routes are off in `apps/client` (the generated file only existed where a dev server ran, never in CI, and misread the monorepo).
 - Verified: 356 tests; the app at 390px (a Melbourne family of four: $2.32M in today's money in 20 years, HELP cleared 2028, school fees end 2039, loan paid off 2042; a $45k car in 2029 gives $2.28M); the NAS Projections and Super pages rendered against a scratch household. The NAS Super "consider a lower target" hint was fixed on the way (it would have subtracted the mortgage twice and suggested $0).
+
+### Phase 45 — Plan step D, part 1: scenarios you can save and compare (2026-10-18)
+
+Plan item 2. The owner asked for step D to start with scenarios (2026-10-18). On branch `phase-45-scenarios`, not merged.
+
+- **Core** (`scenarios.ts`):
+  - A scenario stores only what differs from the plan, as JSON (`overrides`): projection settings, retirement ages / extra super / income goal / drawdown, the home-purchase plan, and whole lists for each person's work pattern, one-offs and children. Everything else follows the plan.
+  - `applyScenario` layers it on the plan's `ProjectionLive`; `runScenarios` runs each through the same engine; `summariseRun` gives the Compare figures (net worth at the end, the first tight working year, the age money runs short, school fees, lowest cash).
+  - `validOverrides` checks field by field, so one bad value doesn't cost the rest. `patchOverrides` edits the raw JSON, so keys from a newer app version survive an edit. Renting vs owning isn't a scenario choice.
+  - One JSON field: the latest edit wins for a scenario's whole set of changes, not per setting (noted in the plan).
+- **Schema v7** (Drizzle `0006_scenarios`, Prisma `0011_scenarios`): table `scenario` (name, colour as a palette name, enabled, overrides). `TABLE_SINCE` marks it, so older exports read it as empty; older app versions park its sync changes until they update (the generic rule). The NAS export carries it.
+- **NAS** (Future → Long term):
+  - What if? starts with **"Changes apply to: Your plan / a scenario"** and **+ New scenario**. While a scenario is picked, every control (sliders, work changes, children, one-offs, school type, home purchase) changes that scenario, and the plan stays put. Rename, "Undo its changes" and Delete sit in a banner. Renting vs owning, where you live, the custom fee table and extra costs by year stay with the plan.
+  - Chips above each chart switch scenarios on and off (stored for Adults with edit rights; other Adults switch them just for themselves). Each one shown is a dashed line in its colour on Net worth, Money in & out (spending, plus "left over" in the readout), Home (loan), Retirement (total super) and School fees (total). The scrub readout shows the difference from the plan. The School fees tab appears when a shown scenario has fees on, even if the plan doesn't.
+  - A **Compare** card lists the plan and every scenario: a table on desktop, stacked cards on phones.
+  - API: `/api/scenarios` (+ `[id]`), `budget:write` to change.
+- **App**: What if? → **"Save as a scenario"** (named), which stores only what the draft changed (`overridesFromWhatIf`). Future gets a **Compare** card (net worth in today's money, the difference from the plan, tight year, retirement, school fees, lowest cash) with Delete. Scenario lines and editing wait on the chart component.
+- **Numbers**: none move. The plan's projection is unchanged; scenarios are extra runs.
+- **Verified:**
+  - 511 tests. `scenarios.test.ts` covers reading damaged or newer JSON, field-by-field validation, patching that keeps unknown keys, no-change = plan, retiring at 55 vs 67 (2041 vs 2053), school-type switching, planned babies, colours, and hand-worked Compare figures. Client tests cover saving a draft (only the changes stored, plan untouched) and Compare matching the preview. A sync test covers v7 rows alongside a v6 device's edit. The NAS export test covers the table.
+  - Headless Edge against a scratch NAS (port 3120) with a made-up couple and three scenarios: 1280px light, 390px dark (no sideways scroll), editing a scenario from the UI (its overrides changed, the plan's settings and one-offs didn't), delete. Found and fixed on the way: lines stacked on the stacked school-fee bars, a doubled sign in the readout, chips crowding the phone drawer.
+  - The app's web build at 390px, light and dark, after importing the scratch NAS's export: the same plan figures as the NAS ($35.13M in 2083, $8.60M in today's money), and a What if? draft saved as a scenario matching its preview ($309k less).
 
 ### Phase 44 — Plan step C, part 2: costs that change with age (2026-10-14)
 

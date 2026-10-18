@@ -6,6 +6,7 @@ import { SF_LEVELS } from '@proviso/core/schoolFees'
 import { crosshair, SCRUB_BASE, kTicks } from '@/lib/chartPlugins'
 import { useChartColors, axisTicks } from '@/lib/chartTheme'
 import ScrubChart from '@/components/ui/ScrubChart'
+import { overlayDatasets, type Overlay } from '@/lib/scenarioOverlay'
 ChartJS.register(BarElement, LinearScale, CategoryScale)
 
 interface SchoolFeeChartProps {
@@ -18,26 +19,29 @@ interface SchoolFeeChartProps {
   sfC1ExitIdx: number
   sfC2Start:   number
   sfC2ExitIdx: number
+  /** Scenarios' total fees each year, as lines over the plan's bars. */
+  overlays?:   Overlay[]
 }
 
-export default function SchoolFeeChart({ labels, sfC1Arr, sfC2Arr, sfSibArr, sfTotalArr, sfC1Start, sfC1ExitIdx, sfC2Start, sfC2ExitIdx }: SchoolFeeChartProps) {
+export default function SchoolFeeChart({ labels, sfC1Arr, sfC2Arr, sfSibArr, sfTotalArr, sfC1Start, sfC1ExitIdx, sfC2Start, sfC2ExitIdx, overlays }: SchoolFeeChartProps) {
   const c = useChartColors()
   const totalC1   = sfC1Arr.reduce((s, v) => s + v, 0)
   const totalC2   = sfC2Arr.reduce((s, v) => s + v, 0)
   const totalSib  = sfSibArr.reduce((s, v) => s + v, 0)
   const grandTotal = sfTotalArr.reduce((s, v) => s + v, 0)
 
-  const datasets = [
+  const datasets: Record<string, unknown>[] = [
     { label: 'Child 1',          data: sfC1Arr,  backgroundColor: c.a(c.blue, 0.75),  stack: 'a', borderRadius: 3 },
     { label: 'Child 2',          data: sfC2Arr,  backgroundColor: c.a(c.green, 0.75),  stack: 'a', borderRadius: 3 },
     { label: 'Sibling discount', data: sfSibArr, backgroundColor: c.a(c.amber, 0.4),  stack: 'a' },
+    ...overlayDatasets(overlays, c, labels.length, sfTotalArr, 0, 'line'),
   ]
   const peakIdx = sfTotalArr.indexOf(Math.max(...sfTotalArr))
 
   return (
     <>
-      <ScrubChart labels={labels} datasets={datasets} height={230} defaultIndex={peakIdx >= 0 ? peakIdx : undefined}>
-        <Bar plugins={[crosshair]} data={{ labels, datasets }} options={{
+      <ScrubChart labels={labels} datasets={datasets as never[]} height={230} defaultIndex={peakIdx >= 0 ? peakIdx : undefined}>
+        <Bar plugins={[crosshair]} data={{ labels, datasets: datasets as never[] }} options={{
           ...SCRUB_BASE,
           scales: {
             x: { stacked: true, ticks: axisTicks(c), grid: { display: false } },

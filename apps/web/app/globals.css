@@ -1167,6 +1167,58 @@ input[type=range] { width: 100%; accent-color: var(--t3); }
 .wi-more summary { font-size: 0.85rem; font-weight: 500; color: var(--blue); cursor: pointer; padding: 4px 0 10px; }
 .whatif-head, .whatif-fab { display: none; }
 
+/* ── Scenarios: chips over the chart, the Compare card, editing in What if? ── */
+.scrub-diff { font-size: 0.72rem; color: var(--t3); font-variant-numeric: tabular-nums; }
+.scenario-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: -4px 0 12px; }
+.scenario-chip {
+  display: inline-flex; align-items: center; gap: 8px; min-height: 36px;
+  font-family: inherit; font-size: 0.85rem; color: var(--t3);
+  background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 4px 12px; cursor: pointer;
+}
+.scenario-chip.on { color: var(--t1); border-color: var(--border-md); background: var(--surface2); }
+.scenario-chip:not(.on) .chip-line { opacity: 0.4; }
+.scenario-chip.plan { color: var(--t1); cursor: default; }
+.scenario-chip:disabled { cursor: default; }
+.chip-line { display: inline-block; width: 18px; height: 0; border-top: 2.5px solid var(--green); flex-shrink: 0; }
+.chip-line.dashed { border-top-style: dashed; }
+.compare { display: flex; flex-direction: column; }
+.compare-row {
+  display: grid; grid-template-columns: minmax(120px, 1.3fr) repeat(var(--compare-cols, 4), minmax(0, 1fr));
+  gap: 10px; align-items: baseline; padding: 9px 0; font-size: 0.9rem;
+}
+.compare-row + .compare-row { border-top: 1px solid var(--border); }
+.compare-head { font-size: 0.72rem; color: var(--t3); text-transform: uppercase; letter-spacing: 0.05em; padding-top: 0; }
+.compare-row > span { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.compare-row strong { font-weight: 500; font-variant-numeric: tabular-nums; }
+.compare-row strong.warn { color: var(--amber); }
+.compare-row small { font-size: 0.75rem; color: var(--t3); }
+.compare-name { flex-direction: row !important; align-items: baseline; gap: 8px !important; font-weight: 500; }
+.compare-name > span { display: flex; flex-direction: column; min-width: 0; overflow-wrap: anywhere; }
+.compare-name .chip-line { transform: translateY(-3px); }
+@media (max-width: 640px) {
+  .compare-head { display: none; }
+  .compare-row { grid-template-columns: 1fr 1fr; gap: 8px 12px; padding: 12px 0; }
+  .compare-name { grid-column: 1 / -1; }
+  .compare-row > span[data-label]::before { content: attr(data-label); font-size: 0.72rem; color: var(--t3); }
+}
+.scenario-editing { margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+.scenario-editing-label { display: block; font-size: 0.8rem; font-weight: 500; color: var(--t2); margin-bottom: 4px; }
+.scenario-editing-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.scenario-editing-row select {
+  flex: 1 1 160px; min-width: 0; font: inherit; font-size: 1rem; min-height: 44px; padding: 0 10px;
+  border: 1px solid var(--border-md); border-radius: 8px; background: var(--surface); color: var(--t1);
+}
+.scenario-editing-row .add-btn, .scenario-actions .add-btn { min-height: 44px; }
+.scenario-banner { margin-top: 10px; padding: 10px 12px; background: var(--surface2); border: 1px solid var(--border); border-left: 4px solid var(--blue); border-radius: 8px; }
+.scenario-banner p { font-size: 0.8rem; color: var(--t2); line-height: 1.45; margin: 8px 0; }
+.scenario-name { display: flex; flex-direction: column; gap: 3px; font-size: 0.75rem; color: var(--t3); }
+.scenario-name input {
+  font: inherit; font-size: 1rem; color: var(--t1); min-height: 42px; padding: 0 10px;
+  border: 1px solid var(--border-md); border-radius: 8px; background: var(--surface);
+}
+.scenario-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.add-btn.danger { color: var(--red); border-color: var(--red); }
+
 @media (max-width: 900px) {
   .proj-lede { font-size: 1.35rem; }
   .mini-stats.four { grid-template-columns: repeat(2, 1fr); }
@@ -1212,6 +1264,7 @@ input[type=range] { width: 100%; accent-color: var(--t3); }
   .proj.whatif-open { padding-bottom: 50vh; }
   .proj.whatif-open .explorer-tabs,
   .proj.whatif-open .explorer-takeaway,
+  .proj.whatif-open .scenario-chips,
   .proj.whatif-open .scrub-hint,
   .proj.whatif-open .whatif-fab { display: none; }
   .proj.whatif-open .scrub-area { height: 180px !important; }

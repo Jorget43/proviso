@@ -58,6 +58,7 @@ function legacy(): LegacyHousehold {
     allowances: [{ id: 1, userId: 3, amount: 10, dayOfWeek: 5, createdAt: at, updatedAt: at }],
     pocketMoney: [{ id: 1, userId: 3, amount: 10, description: 'Allowance', date: '2026-10-03', category: 'general', createdAt: at }],
     children: [{ id: 1, name: 'Kid', birthYear: 2015, birthMonth: 4 }, { id: 2, name: null, birthYear: 2028, birthMonth: null }],
+    scenarios: [{ id: 1, name: 'Retire at 55', colour: 'amber', enabled: false, overrides: '{"super":{"person1RetirementAge":55}}' }],
   }
 }
 
@@ -101,6 +102,11 @@ describe('mapLegacyHousehold', () => {
     expect(t.incomeSettings[0]).toMatchObject({ person1Age: 35, person1BirthYear: 1991, person2BirthYear: null })
     expect(t.child.map(c => [c.name, c.birthYear, c.birthMonth])).toEqual([['Kid', 2015, 4], [null, 2028, null]])
     expect(t.householdSettings[0]).toMatchObject({ state: 'vic', regional: true })
+  })
+
+  it('carries scenarios with their changes as stored', () => {
+    const t = exportOf().household
+    expect(t.scenario).toMatchObject([{ name: 'Retire at 55', colour: 'amber', enabled: false, overrides: '{"super":{"person1RetirementAge":55}}', deletedAt: null }])
   })
 
   it('gives the same ids every time it runs', () => {

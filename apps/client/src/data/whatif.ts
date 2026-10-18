@@ -5,6 +5,7 @@
 // nothing is written until you keep the draft (through mutate.ts).
 
 import { newId } from '@proviso/core/ids'
+import { nextScenarioColour, writeOverrides, type ScenarioOverrides } from '@proviso/core/scenarios'
 import type { Db } from './db'
 import type { HouseholdData } from './household'
 import { insertRow, updateRow, deleteRow, saveSettings } from './mutate'
@@ -64,6 +65,39 @@ export function addWorkChange(w: WhatIf, person: 'p1' | 'p2', currentYear: numbe
     : [phase(currentYear, 5), phase(currentYear + 1, 5)]
   return { ...w, workPhases: [...w.workPhases, ...added] }
 }
+
+/**
+ * The draft as a scenario's changes (@proviso/core/scenarios): only what
+ * differs from the plan. A person's work pattern goes in whole once any of it
+ * changed. Renting vs owning stays with the plan.
+ */
+export function overridesFromWhatIf(h: HouseholdData, w: WhatIf): ScenarioOverrides {
+  const { id: _p, deletedAt: _pd, ...settings } = changed(h.projection, w.projection)
+  const { id: _r, deletedAt: _rd, enabled: _re, ...rent } = changed(h.rent, w.rent)
+  const o: ScenarioOverrides = {}
+  if (Object.keys(settings).length) o.settings = settings
+  if (Object.keys(rent).length) o.rent = rent
+  for (const person of ['p1', 'p2'] as const) {
+    const mine = (list: WorkPhase[]) => list.filter(p => p.person === person)
+    const c = workChanges(mine(h.workPhases), mine(w.workPhases))
+    if (c.added.length + c.updated.length + c.removed.length === 0) continue
+    o[person === 'p1' ? 'person1Phases' : 'person2Phases'] =
+      mine(w.workPhases).sort((a, b) => a.year - b.year).map(p => ({ year: p.year, days: p.days }))
+  }
+  return o
+}
+
+/** Saves the draft as a new scenario; the plan is left as it is. */
+export async function saveAsScenario(db: Db, h: HouseholdData, w: WhatIf, name: string): Promise<string> {
+  return insertRow(db, 'scenario', {
+    name: name.trim() || `Scenario ${h.scenarios.length + 1}`,
+    colour: nextScenarioColour(h.scenarios.map(s => s.colour)),
+    enabled: true,
+    overrides: writeOverrides(overridesFromWhatIf(h, w) as Record<string, unknown>),
+  })
+}
+
+export const removeScenario = (db: Db, id: string) => deleteRow(db, 'scenario', id)
 
 /** Writes what the draft changed, and nothing else. */
 export async function keepWhatIf(db: Db, h: HouseholdData, w: WhatIf): Promise<void> {

@@ -9,12 +9,12 @@ import { savePeople, saveRent, saveChildcare, fillBirthYears, saveChild, removeC
 import { encryptBackup, decryptBackup, newHouseholdKey } from '@proviso/core/backup'
 import { parseHouseholdExport } from '@proviso/core/householdExport'
 import { insertRow, updateRow, deleteRow, saveSettings } from '@/data/mutate'
-import { homeView, spendingView, wealthView, futureView, cashflowView } from '@/data/views'
+import { homeView, spendingView, wealthView, futureView, cashflowView, compareView } from '@/data/views'
 import { saveCost, removeCost, kindOf, type CostDraft } from '@/data/costs'
 import { startHousehold, savePay } from '@/data/setup'
 import { saveAsset, removeAsset, saveDebt, saveLoan, saveSuper } from '@/data/wealth'
 import { saveAssumptions, saveOneOff, removeOneOff, saveRegional } from '@/data/future'
-import { startWhatIf, applyWhatIf, hasChanges, addWorkChange, keepWhatIf } from '@/data/whatif'
+import { startWhatIf, applyWhatIf, hasChanges, addWorkChange, keepWhatIf, saveAsScenario, overridesFromWhatIf, removeScenario } from '@/data/whatif'
 import { estimateLivingCosts, buildStarterHousehold, type StarterAnswers } from '@proviso/core/starter'
 
 import type { DatabaseSync } from 'node:sqlite'
@@ -471,6 +471,36 @@ describe('what if', () => {
     now = await loadHousehold(db)
     expect(now.workPhases.filter(p => p.person === 'p2').map(p => [p.year, p.days])).toEqual([[2026, 5]])
     expect(futureView(now, NOW).endNetWorth).toBe(futureView(h, NOW).endNetWorth)
+  })
+
+  it('saves a draft as a scenario: only what changed is stored, and the plan stays as it is', async () => {
+    const db = await setUp()
+    const h = await loadHousehold(db)
+    expect(compareView(h, NOW)).toEqual([])            // no scenarios, no Compare card
+    let w = addWorkChange(startWhatIf(h), 'p2', 2026)
+    const added = w.workPhases.find(p => p.person === 'p2' && p.year === 2027)!
+    w = { ...w, projection: { ...w.projection, savingsRate: 90 }, workPhases: w.workPhases.map(p => (p.id === added.id ? { ...p, days: 3 } : p)) }
+    expect(overridesFromWhatIf(h, w)).toEqual({ settings: { savingsRate: 90 }, person2Phases: [{ year: 2026, days: 5 }, { year: 2027, days: 3 }] })
+
+    await saveAsScenario(db, h, w, '  Sam part-time  ')
+    const after = await loadHousehold(db)
+    expect(after.projection.savingsRate).toBe(h.projection.savingsRate)
+    expect(after.workPhases).toHaveLength(h.workPhases.length)
+    expect(after.scenarios).toMatchObject([{ name: 'Sam part-time', colour: 'blue', enabled: true }])
+
+    // Compare: the plan first, then the scenario with the same figures the draft previewed.
+    const rows = compareView(after, NOW)
+    expect(rows.map(r => [r.name, r.colour, r.changes])).toEqual([['Your plan', null, 0], ['Sam part-time', 'blue', 2]])
+    expect(rows[0].summary.endNetWorth).toBeCloseTo(futureView(h, NOW).endNetWorth)
+    expect(rows[1].summary.endNetWorth).toBeCloseTo(futureView(applyWhatIf(h, w), NOW).endNetWorth)
+    expect(rows[1].endReal).toBeCloseTo(futureView(applyWhatIf(h, w), NOW).endNetWorthReal)
+
+    // A second one takes the next colour; deleting leaves the plan alone.
+    await saveAsScenario(db, after, startWhatIf(after), '')
+    const two = await loadHousehold(db)
+    expect(two.scenarios.map(x => [x.name, x.colour])).toEqual([['Sam part-time', 'blue'], ['Scenario 2', 'amber']])
+    await removeScenario(db, two.scenarios[0].id)
+    expect((await loadHousehold(db)).scenarios.map(x => x.name)).toEqual(['Scenario 2'])
   })
 
   it('with no work phases, a change starts from full-time now', () => {

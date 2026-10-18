@@ -185,6 +185,23 @@ describe('changes that can’t be applied yet are kept, never lost', () => {
     expect(await syncState(db)).toMatchObject({ waiting: 2, needsUpdate: true })
   })
 
+  it('scenarios (v7) arrive alongside a v6 device’s plan edits; changes from a newer version are kept', async () => {
+    const db = (await migratedTestDb()).db
+    await prepareJoin(db, RELAY)
+    const overrides = JSON.stringify({ super: { person1RetirementAge: 58 }, fromNewerApp: { x: 1 } })
+    const sc = (n: number, column: string, value: string | boolean | null) =>
+      ({ change: { hlc: at(n), table: 'scenario', row: 's1', column, value }, schema: SCHEMA_VERSION })
+    await applyChanges(db, [
+      sc(1, 'name', 'Retire at 58'), sc(2, 'colour', 'pink'), sc(3, 'enabled', true), sc(4, 'overrides', overrides), sc(5, 'deletedAt', null),
+      // An older device, which has no scenarios, changes the plan itself.
+      { change: { hlc: at(6), table: 'projectionSettings', row: 'projections', column: 'savingsRate', value: 30 }, schema: SCHEMA_VERSION - 1 },
+    ])
+    const h = await loadHousehold(db)
+    expect(h.scenarios).toEqual([{ id: 's1', deletedAt: null, name: 'Retire at 58', colour: 'pink', enabled: true, overrides }])
+    expect(h.projection.savingsRate).toBe(30)
+    expect((await syncState(db))!.waiting).toBe(0)
+  })
+
   it('birth years and children (v3) live alongside a v2 device’s age edits', async () => {
     const db = (await migratedTestDb()).db
     await prepareJoin(db, RELAY)

@@ -5,6 +5,7 @@ import { possessive } from '@proviso/core/formatting'
 import { crosshair, SCRUB_BASE, kTicks } from '@/lib/chartPlugins'
 import { useChartColors, axisTicks } from '@/lib/chartTheme'
 import ScrubChart, { type ScrubSeries } from '@/components/ui/ScrubChart'
+import { overlayDatasets, type Overlay } from '@/lib/scenarioOverlay'
 ChartJS.register(LineElement, PointElement, LinearScale, CategoryScale, Filler)
 
 // Retirement from the life-course projection (@proviso/core/projections):
@@ -20,9 +21,11 @@ interface RetirementChartProps {
   person2Name:  string
   /** Years marked on the axis: each person's retirement. */
   marks:        number[]
+  /** Scenarios' total super, shown over the plan's. */
+  overlays?:    Overlay[]
 }
 
-export default function RetirementChart({ labels, super1, super2, outside, drawn, person1Name, person2Name, marks }: RetirementChartProps) {
+export default function RetirementChart({ labels, super1, super2, outside, drawn, person1Name, person2Name, marks, overlays }: RetirementChartProps) {
   const c = useChartColors()
   const datasets: (ScrubSeries & Record<string, unknown>)[] = [
     { label: super2 ? `${possessive(person1Name)} super` : 'Super', data: super1, borderColor: c.teal, backgroundColor: c.a(c.teal, 0.08), fill: true, tension: 0.3, borderWidth: 2.2, pointRadius: 0 },
@@ -30,6 +33,7 @@ export default function RetirementChart({ labels, super1, super2, outside, drawn
     { label: 'Savings outside super', data: outside, borderColor: c.blue, borderDash: [5, 4], tension: 0.3, borderWidth: 1.6, pointRadius: 0, fill: false },
     { label: 'Taken from super that year', data: drawn, borderColor: c.amber, borderDash: [2, 3], tension: 0.2, borderWidth: 1.4, pointRadius: 0, fill: false },
   ]
+  datasets.splice(super2 ? 2 : 1, 0, ...overlayDatasets(overlays, c, labels.length, super1.map((v, i) => v + (super2?.[i] ?? 0))))
   const first = labels.findIndex(l => marks.includes(Number(l)))
 
   return (

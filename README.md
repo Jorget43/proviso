@@ -41,7 +41,7 @@ npm run web -w @proviso/client   # http://localhost:8080
 
 The Expo app for iOS, Android and the web. It's local-first (data on the device) and is being built towards the plan in [`docs/architecture.md`](docs/architecture.md). It has:
 - a setup questionnaire that fills in typical costs
-- Home, Spending, Wealth and Future, with What if? and the life-course projection to age 95
+- Home, Spending, Wealth and Future, with What if?, saved scenarios to compare, and the life-course projection to age 95
 - Settings, with a 24-word recovery phrase and encrypted backups
 - sync between devices through the relay (below)
 
@@ -135,7 +135,7 @@ Built for phones first (Add to Home Screen opens it like an app), with the same 
 - **Home** — what's left over each month, things worth a look, where you stand, bills coming up
 - **Spending** — Budget · Actual spending (bank/card statement import)
 - **Wealth** — Own & owe · Super · Investments
-- **Future** — Long term (net worth, money in and out, home, school fees and retirement, projected until you're 95, with "What if?") · Next 2 years (cashflow)
+- **Future** — Long term (net worth, money in and out, home, school fees and retirement, projected until you're 95, with "What if?" and saved scenarios shown side by side) · Next 2 years (cashflow)
 
 The projection follows a life course:
 - pay stops when each person retires
