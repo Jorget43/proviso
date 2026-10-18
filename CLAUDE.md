@@ -433,7 +433,7 @@ In [`docs/architecture.md`](docs/architecture.md) order. Phase 3 there (the sing
 **Start here next session**, in this order:
 1. **⏰ Remind the owner first — phone test still to do** (deferred 2026-10-08, "soon"). **The Android development build with Phases 34–35** (sync, camera, key backup): it built successfully on EAS on 2026-10-08 (so the key-backup Kotlin module and expo-camera compile); `npm run eas -w @proviso/client -- build:list --limit 1` shows the APK link. Install it and check on the phone: Settings → Recovery phrase → Save to Google Password Manager; Settings → Sync; Join a household (camera scan).
 2. **Run the relay on the NAS** with the owner: `docker compose --profile sync up -d` (image `ghcr.io/jorget43/proviso-relay`, published by CI from master since 2026-10-08), then `tailscale serve --bg --https=8443 http://localhost:8787` (README "Sync relay for the app"). Turn sync on in the app with the `https://<machine>.<tailnet>.ts.net:8443` address, then join from a second phone. Phones need Tailscale running to reach it.
-3. **Owner decisions pending**: **Phase 47 app charts** is on branch `phase-47-app-charts`, committed but not merged or pushed. App only: no numbers move, no schema change, and the NAS image doesn't change (CI drops the app's workspaces). It adds `react-native-svg`, which Expo Go already includes, so the phone test can also use Expo Go. Ask the owner to merge and push. (Phase 46 school fees v2: merged and pushed ca152c6.)
+3. **Owner decisions pending**: none. (Phase 47 app charts: owner OK 2026-10-18, merged and pushed 0170ac8.)
 4. **Step B of [`docs/plan-modelling-and-ux.md`](docs/plan-modelling-and-ux.md)**:
    - The life-course engine shipped as Phase 40 (merged to master 2026-10-09 with the owner's OK).
    - Phase 41 (birth years, the `child` table) merged to master 2026-10-12 with the owner's OK.
@@ -441,7 +441,7 @@ In [`docs/architecture.md`](docs/architecture.md) order. Phase 3 there (the sing
 6. **Step D**: scenarios are Phase 45 (merged and pushed 2026-10-18). Next:
    - School fees v2 (plan item 7) is Phase 46 (merged and pushed 2026-10-18).
    - Then step E of the plan (uncertainty): item 8a, investment returns as ranges and a glide path; then 8b, Monte Carlo.
-   - The app's chart component is Phase 47 (on branch `phase-47-app-charts`, not merged; see "Owner decisions pending"). Still open for the app: editing a saved scenario, the Money in & out and Home charts, and the drawdown strategy choice.
+   - The app's chart component is Phase 47 (merged and pushed 2026-10-18). Still open for the app: editing a saved scenario, the Money in & out and Home charts, and the drawdown strategy choice.
    - Step A (dark mode, editing, chart trim) shipped as Phases 37–39.
    - Also open: the relay enforcing roles, and the iOS build once the Apple account is ready.
 
@@ -569,7 +569,7 @@ Ideas that have been evaluated but aren't on the roadmap. Each links to its writ
 
 ### Phase 47 — The app's charts (2026-10-18)
 
-Plan item 2's chart component. The owner picked it next (2026-10-18). On branch `phase-47-app-charts`, not merged.
+Plan item 2's chart component. The owner picked it next (2026-10-18). Merged and pushed with the owner's OK the same day (0170ac8).
 
 - **`apps/client/src/ui/ScrubChart.tsx`** on `react-native-svg` 15.15.4 (installed with `expo install`; Expo Go includes it). It behaves like the NAS charts:
   - Drag sideways to move through the years, or move the mouse on the web. Up-and-down drags still scroll: the chart lets go when a drag is mostly vertical.
