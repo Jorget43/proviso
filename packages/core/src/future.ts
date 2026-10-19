@@ -27,6 +27,7 @@ import type { HouseholdSuperInputs, ProjectionContext } from './super'
 import { asDrawdownStrategy, yearsToAge, DEFAULT_HORIZON_AGE } from './retirement'
 import { schoolChildren, type ChildLike } from './people'
 import { DEFAULT_LEAVE_HOME_AGE } from './lifeStages'
+import type { PackagedItemLike } from './packaging'
 import { DEFAULT_DIVIDEND_YIELD, DEFAULT_FRANKED_PCT, DEFAULT_CASH_RATE, DEFAULT_PERSON1_SHARE } from './investmentIncome'
 
 /** The budget's home-loan repayment line(s). */
@@ -183,6 +184,8 @@ export interface ProjectionLive {
    * single child is charged as one.
    */
   children?:      ChildLike[]
+  /** Salary packaging items (packaging.ts), paid from pre-tax pay while working. */
+  packaging?:     PackagedItemLike[]
   /** Lives outside a capital city (schema v6): lower typical costs. */
   regional?:      boolean
   /** The household's state (schema v6), for typical school fees when the school type has no location yet. */
@@ -287,6 +290,7 @@ export function buildProjectionInputs(b: ProjectionBaseline, l: ProjectionLive):
     depositFromCash: l.rent.depositFromCash, depositFromInvestments: l.rent.depositFromInvestments,
     newMortgageRate: l.rent.newMortgageRate, newMortgageTermYrs: l.rent.newMortgageTermYrs,
     stampDutyPct: l.rent.stampDutyPct ?? 0,
+    packaging: l.packaging,
     investIncome: {
       dividendYield: s.dividendYield ?? DEFAULT_DIVIDEND_YIELD, frankedPct: s.frankedPct ?? DEFAULT_FRANKED_PCT,
       cashRate: s.cashRate ?? DEFAULT_CASH_RATE, person1Share: s.person1InvestShare ?? DEFAULT_PERSON1_SHARE,

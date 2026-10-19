@@ -6,6 +6,8 @@ import { computeBudgetSummary, isManagedChildcare, CHILDCARE_CAT, CHILDCARE_NAME
 import MetricCard from '@/components/ui/MetricCard'
 import ReadOnlyFence from '@/components/ui/ReadOnlyFence'
 import IncomePanel, { type IncomeSettings } from './IncomePanel'
+import PackagingPanel, { type PackagedItemRow } from './PackagingPanel'
+import { packagingNow, type PackageKind } from '@proviso/core/packaging'
 import ExpenseTable, { type Expense, type AnnualExpense } from './ExpenseTable'
 import ChildcarePanel, { type ChildcareSettings } from './ChildcarePanel'
 import SpendDonut from './SpendDonut'
@@ -36,6 +38,7 @@ interface BudgetClientProps {
   initialChildcare: ChildcareSettings
   initialAnnualExpenses: AnnualExpense[]
   initialRentSettings: RentSettings | null
+  initialPackagedItems: PackagedItemRow[]
   person1Days: number
   person2Days: number
   partnerEnabled: boolean
@@ -51,6 +54,7 @@ export default function BudgetClient({
   initialChildcare,
   initialAnnualExpenses,
   initialRentSettings,
+  initialPackagedItems,
   person1Days,
   person2Days,
   partnerEnabled,
@@ -63,15 +67,33 @@ export default function BudgetClient({
   const [childcare, setChildcare] = useState<ChildcareSettings>(initialChildcare)
   const [annualExpenses, setAnnualExpenses] = useState<AnnualExpense[]>(initialAnnualExpenses)
   const [rentSettings, setRentSettings] = useState<RentSettings | null>(initialRentSettings)
+  const [packaged, setPackaged] = useState<PackagedItemRow[]>(initialPackagedItems)
+  const packagingThisYear = useMemo(() => packagingNow(packaged, new Date().getFullYear(), { p1: person1Days, p2: person2Days }),
+    [packaged, person1Days, person2Days])
 
   const {
-    familyIncome, person1Net, person2Net, monthlyIncome, childcareNet,
+    familyIncome, person1Net, person2Net, monthlyIncome, packagingMonthly, childcareNet,
     shownExpenses, monthlyExpenses, catMonthly, delta, savingsRate,
   } = useMemo(() => computeBudgetSummary({
     expenses, annualExpenses, income, childcare,
     rentMonthly: rentSettings?.enabled ? rentSettings.monthlyRent : null,
-    person1Days, person2Days, partnerEnabled,
-  }), [expenses, annualExpenses, income, childcare, rentSettings, person1Days, person2Days, partnerEnabled])
+    person1Days, person2Days, partnerEnabled, packaging: packagingThisYear,
+  }), [expenses, annualExpenses, income, childcare, rentSettings, person1Days, person2Days, partnerEnabled, packagingThisYear])
+
+  // ── Salary packaging ───────────────────────────────────────────────────────
+  const addPackaged = useCallback(async (kind: PackageKind) => {
+    const draft = { person: 'p1', kind, amount: 0, carPrice: kind === 'evLease' ? 60_000 : null, startYear: new Date().getFullYear(), endYear: null }
+    const res = await fetch('/api/packaging', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(draft) })
+    if (res.ok) { const row = await res.json() as PackagedItemRow; setPackaged(prev => [...prev, row]) }
+  }, [])
+  const updatePackaged = useCallback(async (id: number, patch: Partial<PackagedItemRow>) => {
+    setPackaged(prev => prev.map(i => i.id === id ? { ...i, ...patch } : i))
+    await fetch(`/api/packaging/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch) })
+  }, [])
+  const deletePackaged = useCallback(async (id: number) => {
+    setPackaged(prev => prev.filter(i => i.id !== id))
+    await fetch(`/api/packaging/${id}`, { method: 'DELETE' })
+  }, [])
 
   // ── Regular expense CRUD ────────────────────────────────────────────────────
   const updateExpense = useCallback(async (id: number, field: string, value: string | number) => {
@@ -231,6 +253,15 @@ export default function BudgetClient({
           person2Net={person2Net}
         />
       </ReadOnlyFence>
+
+      {income.taxMode && (
+        <ReadOnlyFence canEdit={canEdit}>
+          <Panel title="Salary packaging" dotColor="var(--teal)">
+            <PackagingPanel items={packaged} partnerEnabled={partnerEnabled} person1Name={person1Name} person2Name={person2Name}
+              monthlySaving={packagingMonthly} onAdd={addPackaged} onUpdate={updatePackaged} onDelete={deletePackaged} />
+          </Panel>
+        </ReadOnlyFence>
+      )}
 
       {/* Phones: one pinned line instead of five metric cards */}
       <div className={`budget-bar ${delta >= 0 ? 'good' : 'bad'}`} aria-label="Monthly summary">

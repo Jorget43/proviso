@@ -153,6 +153,18 @@ model LifePhase {
   sortOrder  Int     @default(0)
 }
 
+// Salary packaging (twin of core's packagedItem; schema v12). person is
+// p1 / p2; kind is a core PackageKind, kept as text.
+model PackagedItem {
+  id        Int     @id @default(autoincrement())
+  person    String
+  kind      String
+  amount    Float
+  carPrice  Float?
+  startYear Int
+  endYear   Int?
+}
+
 model OneOff {
   id   Int    @id @default(autoincrement())
   name String

@@ -18,7 +18,7 @@
 import type {
   Expense, AnnualExpense, Debt, Asset, MortgageSettings, ChildcareSettings, IncomeSettings,
   Person1Phase, Person2Phase, ProjectionSettings, LifePhase, OneOff, Transaction,
-  CategoriationRule, SuggestionState, ActualsSettings, HouseholdSettings, SchoolFeeLevel, Child, Scenario,
+  CategoriationRule, SuggestionState, ActualsSettings, HouseholdSettings, SchoolFeeLevel, Child, Scenario, PackagedItem,
   HelpDebtDetail, SuperSettings, SuperHistory, InvestmentParcel, User, AllowanceSchedule,
   PocketMoneyTx, NetWorthSnapshot, Donation, WorkExpense, RentSettings,
 } from '@prisma/client'
@@ -45,6 +45,7 @@ export interface LegacyHousehold {
   projection:         ProjectionSettings | null
   children:           Child[]
   scenarios:          Scenario[]
+  packagedItems:      PackagedItem[]
   lifePhases:         LifePhase[]
   oneOffs:            OneOff[]
   transactions:       Transaction[]
@@ -69,7 +70,7 @@ export async function readLegacyHousehold(): Promise<LegacyHousehold> {
     householdSettings, users, expenses, annualExpenses, debts, assets, mortgage, childcare, income,
     person1Phases, person2Phases, projection, lifePhases, oneOffs, transactions, rules, suggestions,
     actuals, schoolFeeLevels, helpDetails, superSettings, superHistory, parcels, netWorthSnapshots,
-    donations, workExpenses, rent, allowances, pocketMoney, children, scenarios,
+    donations, workExpenses, rent, allowances, pocketMoney, children, scenarios, packagedItems,
   ] = await Promise.all([
     prisma.householdSettings.findUnique({ where: { id: 1 } }),
     prisma.user.findMany({ select: { id: true, name: true, role: true }, orderBy: { id: 'asc' } }),
@@ -102,12 +103,13 @@ export async function readLegacyHousehold(): Promise<LegacyHousehold> {
     prisma.pocketMoneyTx.findMany({ orderBy: { id: 'asc' } }),
     prisma.child.findMany({ orderBy: { id: 'asc' } }),
     prisma.scenario.findMany({ orderBy: { id: 'asc' } }),
+    prisma.packagedItem.findMany({ orderBy: { id: 'asc' } }),
   ])
   return {
     householdSettings, users, expenses, annualExpenses, debts, assets, mortgage, childcare, income,
     person1Phases, person2Phases, projection, lifePhases, oneOffs, transactions, rules, suggestions,
     actuals, schoolFeeLevels, helpDetails, superSettings, superHistory, parcels, netWorthSnapshots,
-    donations, workExpenses, rent, allowances, pocketMoney, children, scenarios,
+    donations, workExpenses, rent, allowances, pocketMoney, children, scenarios, packagedItems,
   }
 }
 
@@ -204,6 +206,10 @@ export function mapLegacyHousehold(
       startYear: p.startYear, endYear: p.endYear, cat: p.cat, enabled: p.enabled, sortOrder: p.sortOrder })
   }
   for (const o of L.oneOffs) t.oneOff.push({ ...live, id: legacyId('oneOff', o.id), name: o.name, amt: o.amt, year: o.year })
+  for (const p of L.packagedItems) {
+    t.packagedItem.push({ ...live, id: legacyId('packagedItem', p.id), person: p.person === 'p2' ? 'p2' : 'p1', kind: p.kind,
+      amount: p.amount, carPrice: p.carPrice, startYear: p.startYear, endYear: p.endYear })
+  }
   for (const s of L.scenarios) t.scenario.push({ ...live, id: legacyId('scenario', s.id), name: s.name, colour: s.colour, enabled: s.enabled, overrides: s.overrides })
 
   const txnIds = new Map<number, string>()

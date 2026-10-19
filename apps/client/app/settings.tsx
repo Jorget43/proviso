@@ -101,6 +101,7 @@ export default function Settings() {
           <Row label="Rent" value={h.rent.enabled ? `${fmt(h.rent.monthlyRent)} a month` : 'Not renting'} onPress={() => router.push('/rent')} />
           <Row label="Childcare" value={h.childcare.enabled ? `${h.childcare.daysPerWeek} days a week` : 'None'} onPress={() => router.push('/childcare')} />
           <Row label="Pay" value="Salaries and days worked" onPress={() => router.push('/income')} />
+          <Row label="Salary packaging" value={h.packagedItems.length ? `${h.packagedItems.length} item${h.packagedItems.length === 1 ? '' : 's'}` : 'None'} onPress={() => router.push('/packaging')} />
         </Card>
       </View>
 

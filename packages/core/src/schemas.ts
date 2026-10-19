@@ -140,6 +140,19 @@ export const oneOffSchema = z
   })
   .partial()
 
+// Salary packaging (packaging.ts). Unknown kinds are refused here: the NAS
+// writes only kinds it knows.
+export const packagedItemSchema = z
+  .object({
+    person:    z.enum(['p1', 'p2']),
+    kind:      z.enum(['pbi', 'hospital', 'mealEntertainment', 'evLease']),
+    amount:    num.min(0).max(200_000),
+    carPrice:  num.min(0).max(1_000_000).nullable(),
+    startYear: int.min(1900).max(2200),
+    endYear:   int.min(1900).max(2200).nullable(),
+  })
+  .partial()
+
 export const lifePhaseSchema = z
   .object({
     name:       z.string().min(1),

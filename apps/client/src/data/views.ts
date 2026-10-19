@@ -2,6 +2,7 @@
 // come from @proviso/core, so they match the NAS web app exactly; these only
 // arrange them for the app's screens.
 
+import { packagingNow } from '@proviso/core/packaging'
 import { computeHomeOverview, type HomeOverview } from '@proviso/core/overview'
 import { computeBudgetSummary, isManagedChildcare } from '@proviso/core/budgetSummary'
 import { workDaysForYear, runProjections, type PurchasePaid } from '@proviso/core/projections'
@@ -45,6 +46,7 @@ export function homeView(h: HouseholdData, now: Date): HomeView {
     superBalances: { p1: h.superSettings.person1Balance, p2: h.superSettings.person2Balance },
     snapshots: h.netWorthSnapshots,
     childrenMissing: h.projection.schoolFeesOn && h.children.length === 0,
+    packaging: h.packagedItems,
   })
   const situation = situationFrom({ partnerEnabled: h.settings.partnerEnabled, childcare: h.childcare, rent: h.rent, projection: h.projection })
   return { ...o, person1Name: h.settings.person1Name, person2Name: h.settings.person2Name, situation: situationLabels(situation, h.settings.person2Name) }
@@ -90,6 +92,7 @@ export function spendingView(h: HouseholdData, now: Date): SpendingView {
     rentMonthly: rentMonthly(h),
     person1Days: workDaysForYear(p.p1, year), person2Days: workDaysForYear(p.p2, year),
     partnerEnabled: h.settings.partnerEnabled,
+    packaging: packagingNow(h.packagedItems, year, { p1: workDaysForYear(p.p1, year), p2: workDaysForYear(p.p2, year) }),
   })
 
   const lines = new Map<string, SpendingLine[]>()
@@ -281,6 +284,7 @@ function planOf(h: HouseholdData, year: number) {
     currentYear: year,
     life: { partnerEnabled: h.settings.partnerEnabled, ...ages, super: h.superSettings },
     children: h.children,
+    packaging: h.packagedItems,
     regional: h.settings.regional,
     state: h.settings.state,
     ownSchedule: feeScheduleFor(null, h.schoolFeeLevels),
@@ -388,6 +392,7 @@ export function cashflowView(h: HouseholdData, now: Date): CashflowView {
     rentMonthly: rentMonthly(h),
     person1Days: workDaysForYear(p.p1, year), person2Days: workDaysForYear(p.p2, year),
     partnerEnabled: h.settings.partnerEnabled,
+    packaging: packagingNow(h.packagedItems, year, { p1: workDaysForYear(p.p1, year), p2: workDaysForYear(p.p2, year) }),
   })
   const cf = computeCashflow({
     budget, annualExpenses: h.annualExpenses, cashOnHand: computeCashOnHand(h.assets),

@@ -9,7 +9,7 @@ import ProjectionsClient from '@/components/projections/ProjectionsClient'
 
 export default async function ProjectionsPage() {
   const me = await requireAdult()
-  const [savedIncome, settings, person1Phases, person2Phases, oneoffs, lifePhases, expenses, debts, assets, mortgage, hs, feeSchedule, rentSettings, snapshots, annualExpenses, childcare, sup, children, scenarios] = await Promise.all([
+  const [savedIncome, settings, person1Phases, person2Phases, oneoffs, lifePhases, expenses, debts, assets, mortgage, hs, feeSchedule, rentSettings, snapshots, annualExpenses, childcare, sup, children, scenarios, packagedItems] = await Promise.all([
     prisma.incomeSettings.findUniqueOrThrow({ where: { id: 1 } }),
     prisma.projectionSettings.findUniqueOrThrow({ where: { id: 1 } }),
     prisma.person1Phase.findMany({ orderBy: { year: 'asc' } }),
@@ -29,6 +29,7 @@ export default async function ProjectionsPage() {
     prisma.superSettings.findFirst(),
     prisma.child.findMany({ orderBy: [{ birthYear: 'asc' }, { id: 'asc' }] }),
     prisma.scenario.findMany({ orderBy: { id: 'asc' } }),
+    prisma.packagedItem.findMany({ orderBy: { id: 'asc' } }),
   ])
 
   const person1Name = hs?.person1Name ?? 'Person 1'
@@ -74,6 +75,7 @@ export default async function ProjectionsPage() {
       initialRegional={hs?.regional ?? false}
       initialState={hs?.state ?? null}
       initialScenarios={scenarios}
+      packaging={packagedItems}
       superSettings={{
         // The NAS's column names predate the shared shape (@proviso/core/future).
         sgRate: sup?.sgRate ?? 0.12, investmentReturn: sup?.investmentReturn ?? 0.06,

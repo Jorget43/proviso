@@ -6,6 +6,7 @@
 
 import { calcAfterTax, calcHELPRepayment } from './tax';
 import { investIncomeYear, grossFromNet, type InvestIncomeSettings } from './investmentIncome';
+import { packageYear, netPay, NO_PACKAGE, type PackagedItemLike } from './packaging';
 import { simulateMortgageYear, computeMonthlyRepayment } from './mortgage';
 import { schoolFeesYear, LEGACY_FEE_RULES, SF_BASE as SF_DEFAULT, type FeeSchedule, type SchoolKid, type SchoolFeeRules } from './schoolFees';
 import { lifePhaseCostForYear } from './lifephases';
@@ -103,6 +104,8 @@ export interface ProjectionInputs {
    * Without it, cash earns nothing and investments grow untaxed (as before Phase 50).
    */
   investIncome?:       InvestIncomeSettings;
+  /** Salary packaging items (packaging.ts): paid from pre-tax pay, in tax mode, while working. */
+  packaging?:          PackagedItemLike[];
 
   projYears:          number;
 
@@ -204,6 +207,8 @@ export interface ProjectionResult {
   dividendArr:    number[];
   investTaxArr:   number[];
   investIncArr:   number[];
+  /** Extra take-home pay from salary packaging each year (tax saved, less any extra HELP). */
+  packagingArr:   number[];
   /** The cash buffer aimed for at the end of each year (0 without one). */
   bufferArr:      number[];
   /** Shortfalls not covered by cash or investments, carried as money owed (in net worth). */
@@ -414,6 +419,7 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
     const dividendArr:    number[] = [];
     const investTaxArr:   number[] = [];
     const investIncArr:   number[] = [];
+    const packagingArr:   number[] = [];
     const stageArr:       number[] = [];
     // Prices relative to today, for amounts given in today's dollars.
     let priceIdx  = 1;
@@ -495,10 +501,16 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
       const p1Sacrifice = lc && p1Days > 0 ? Math.min(Math.max(0, lc.person1ExtraSuper), p1DaysGross) : 0;
       // Compulsory repayment, capped at what's still owed, so the clearing year
       // only deducts the residual.
-      const p1Repay     = p1HELP > 0 ? Math.min(p1HELP, calcHELPRepayment(p1DaysGross)) : 0;
+      // Salary packaging: paid from pre-tax pay; its reportable amount counts for HELP.
+      const pk1         = inputs.packaging && taxMode && p1Days > 0 ? packageYear(inputs.packaging, 'p1', yr) : NO_PACKAGE;
+      const p1Repay     = p1HELP > 0 ? Math.min(p1HELP, calcHELPRepayment(p1DaysGross + pk1.reportable)) : 0;
       let p1Annual: number;
+      let packSaved = 0;
       if (taxMode) {
-        p1Annual = calcAfterTax(p1DaysGross - p1Sacrifice) - p1Repay;
+        p1Annual = netPay(p1DaysGross, p1Sacrifice, false, pk1) - p1Repay;
+        if (pk1.pretax > 0) {
+          packSaved += p1Annual - (calcAfterTax(p1DaysGross - p1Sacrifice) - (p1HELP > 0 ? Math.min(p1HELP, calcHELPRepayment(p1DaysGross)) : 0));
+        }
       } else {
         // Simple mode: the entered net pay is taken as already net of HELP.
         p1Annual = person1MonthlyNet * 12 * Math.pow(1 + jG, i + 1) * (p1Days / 5) - p1Sacrifice * NET_MODE_KEEP;
@@ -511,6 +523,7 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
       const p2DaysGross = p2Retired || isLeave ? 0 : p2GrossBase * Math.pow(1 + gG, i + 1) * (phase.days / 5);
       const p2Sacrifice = lc && p2DaysGross > 0 ? Math.min(Math.max(0, lc.person2ExtraSuper), p2DaysGross) : 0;
       let p2Annual: number;
+      let pk2Pretax = 0;
       if (p2Retired) {
         p2Annual = 0;
       } else if (isLeave) {
@@ -518,10 +531,15 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
         p2Annual = isFirstLeave ? calcAfterTax(pplGross) : 0;
         leaveYrs.push(yr);
       } else {
-        const p2Repay     = p2HELP > 0 ? Math.min(p2HELP, calcHELPRepayment(p2DaysGross)) : 0;
+        const pk2         = inputs.packaging && taxMode && p2DaysGross > 0 ? packageYear(inputs.packaging, 'p2', yr) : NO_PACKAGE;
+        pk2Pretax         = Math.min(pk2.pretax, Math.max(0, p2DaysGross - p2Sacrifice));
+        const p2Repay     = p2HELP > 0 ? Math.min(p2HELP, calcHELPRepayment(p2DaysGross + pk2.reportable)) : 0;
 
         if (taxMode) {
-          p2Annual = calcAfterTax(p2DaysGross - p2Sacrifice) - p2Repay;
+          p2Annual = netPay(p2DaysGross, p2Sacrifice, false, pk2) - p2Repay;
+          if (pk2.pretax > 0) {
+            packSaved += p2Annual - (calcAfterTax(p2DaysGross - p2Sacrifice) - (p2HELP > 0 ? Math.min(p2HELP, calcHELPRepayment(p2DaysGross)) : 0));
+          }
         } else {
           // Simple mode mirrors Person 1: entered net pay, own growth rate.
           p2Annual = person2MonthlyNet * 12 * Math.pow(1 + gG, i + 1) * (phase.days / 5) - p2Sacrifice * NET_MODE_KEEP;
@@ -586,9 +604,9 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
       // each person's other taxable income (investmentIncome.ts).
       let investCash = 0;
       if (inputs.investIncome) {
-        const p1Taxable = p1Retired ? 0 : taxMode ? p1DaysGross - p1Sacrifice : grossFromNet(p1Annual);
+        const p1Taxable = p1Retired ? 0 : taxMode ? Math.max(0, p1DaysGross - p1Sacrifice - pk1.pretax) : grossFromNet(p1Annual);
         const p2Taxable = p2Retired ? 0 : isLeave ? (isFirstLeave ? pplGross : 0)
-          : taxMode ? p2DaysGross - p2Sacrifice : grossFromNet(p2Annual);
+          : taxMode ? Math.max(0, p2DaysGross - p2Sacrifice - pk2Pretax) : grossFromNet(p2Annual);
         const partner = lc ? lc.partnerEnabled : (person2FTE > 0 || person2MonthlyNet > 0);
         const yi = investIncomeYear(inputs.investIncome, { cash, loan: mb, invest }, [p1Taxable, p2Taxable], partner);
         investCash = yi.cash;
@@ -597,6 +615,8 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
       } else {
         interestArr.push(0); dividendArr.push(0); investTaxArr.push(0); investIncArr.push(0);
       }
+
+      packagingArr.push(Math.round(packSaved));
 
       // ── Life phase overlay ──
       const phaseOverlay = lifePhaseCostForYear(yr, lifePhases, yearInflRate * 100, cI * 100);
@@ -722,7 +742,7 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
 
     return {
       nwArr, incArr, expArr, mortArr, cashArr, investArr,
-      person1Arr, person2Arr, phaseArr, deficitArr, cashRunningArr, funArr, interestArr, dividendArr, investTaxArr, investIncArr, bufferArr, stageArr, owedArr, mortStressArr,
+      person1Arr, person2Arr, phaseArr, deficitArr, cashRunningArr, funArr, interestArr, dividendArr, investTaxArr, investIncArr, packagingArr, bufferArr, stageArr, owedArr, mortStressArr,
       sfC1Arr, sfC2Arr, sfSibArr, sfTotalArr, sfChildArr, sfFamilyArr, leaveYrs, person1HelpClearedYr, person2HelpClearedYr,
       rentArr, purchaseYr, purchase,
       super1Arr, super2Arr, superArr, superDrawArr, retiredArr,

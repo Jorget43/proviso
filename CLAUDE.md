@@ -224,7 +224,7 @@ All migrations must be **additive only** — `update.sh` (or Watchtower, if opte
 - **`apps/web/proxy.ts`**: optimistic cookie gate (fast, not the security boundary); `requireSession()` is the real boundary
 - **`apps/web/lib/rbac.ts`**: scopes `actuals:write`, `budget:write`, `users:write`, `child:write`; `authorize(action)` called at the top of all mutating handlers
 - **Roles**: CFO (all scopes), PARTNER (`actuals:write` only), CHILD (`child:write` only — `/child` pocket money page)
-- **60 mutating route handlers** have `authorize()` guards; update the count when adding routes. Passkey management routes (`register-options`, `register-verify`, DELETE `passkey/[id]`) and the device routes (`/api/auth/sessions`, `/api/auth/sessions/[id]`, `/api/auth/me`) use `getSession()` directly (every role manages its own) — they are auth-gated but not RBAC-gated, and always scoped to the caller's userId.
+- **69 mutating route handlers** have `authorize()` guards; update the count when adding routes. Passkey management routes (`register-options`, `register-verify`, DELETE `passkey/[id]`) and the device routes (`/api/auth/sessions`, `/api/auth/sessions/[id]`, `/api/auth/me`) use `getSession()` directly (every role manages its own) — they are auth-gated but not RBAC-gated, and always scoped to the caller's userId.
 
 ## Roadmap
 
@@ -390,6 +390,8 @@ The assumptions watchdog (`/admin/watchdog` for the CFO when `WATCHDOG_ENABLED=t
 - **Medicare levy low-income thresholds for FY2026-27** weren't announced at the time of Phase 20; the FY2025-26 figures are in use. Update when legislated (often retrospectively).
 - Annual indexation: HELP thresholds (1 Jul) and HELP CPI (1 Jun — the most time-sensitive), CCS thresholds and caps (first Monday of July), PPL (minimum wage, 1 Jul), concessional cap (AWOTE steps).
 - Retirement rules (`packages/core/src/retirement.ts`): minimum pension drawdown rates, preservation age (60 for everyone born after 30 June 1964), and the 65 unrestricted-access age. These rarely change, but check them.
+- **Every April — FBT year** (`packages/core/src/packaging.ts`): gross-up rates, the not-for-profit and meal-entertainment caps, the reporting threshold and the car statutory rate (ATO "Fringe benefits tax – rates and thresholds"); the fuel-efficient luxury car tax threshold (each 1 July). **1 April 2027**: the announced electric-car change (cars over $75,000 get only a 25% discount) — check whether it became law and model it instead of treating those cars as not exempt. Bump `PACKAGING_FBT_YEAR`.
+- **Investment income** (`packages/core/src/investmentIncome.ts`): the defaults (yield, franked share, savings rate) are typical figures; the franking rate (30% company tax) rarely changes.
 - Life-stage costs (`packages/core/src/lifeStages.ts`): bring the CPI factor up to date (ABS CPI, June quarter); check for a newer cost-of-children study than NATSEM 2013 and a newer Real Commute Report; update the ASFA 85+ ratio from the latest detailed budgets.
 
 ### Known model simplifications (by design, not bugs)
@@ -400,6 +402,7 @@ The assumptions watchdog (`/admin/watchdog` for the CFO when `WATCHDOG_ENABLED=t
 - Projection shortfalls (Phase 29) are carried as money owed with no interest, and repaid before anything is invested.
 - School fees (Phase 46): two stages per child (Kinder–Year 6, Years 7–12), not any year level; typical fees by school type and location come from the Futurity 2026 totals spread over year levels. One set of fee rules for the household, not per school; sibling discounts apply to tuition only, counting the children at school that year eldest first, whatever school they're at. An entry fee is charged at the first level and again at Year 7 only when secondary is a different kind of school. The old "exits after" setting still applies to the two eldest.
 - One-off costs aren't inflated: the amount is what's paid in that year.
+- Salary packaging (Phase 51): not-for-profit caps and electric-car novated leases only, in tax mode; the packaged amount is assumed to pay costs already in the budget. The reportable amount counts for HELP, but not for the Medicare levy surcharge or the Child Care Subsidy income test. Cars: the statutory formula on the whole year, no pro-rating; the announced April 2027 change (cars over $75,000) is treated as no exemption rather than modelled. FBT figures are for the year ending 31 March 2027 and need re-checking each April.
 - Stamp duty is one percentage of the price (default 4%), not each state's duty scale or first-home-buyer concessions; the app doesn't store the state.
 - `marginalRate()` ignores the LITO taper and the Medicare shade-in band (headline rate only — used for guidance figures).
 - Life course (Phase 40):
@@ -434,14 +437,14 @@ In [`docs/architecture.md`](docs/architecture.md) order. Phase 3 there (the sing
 **Start here next session**, in this order:
 1. **⏰ Remind the owner first — phone test still to do** (deferred 2026-10-08, "soon"). **The Android development build with Phases 34–35** (sync, camera, key backup): it built successfully on EAS on 2026-10-08 (so the key-backup Kotlin module and expo-camera compile); `npm run eas -w @proviso/client -- build:list --limit 1` shows the APK link. Install it and check on the phone: Settings → Recovery phrase → Save to Google Password Manager; Settings → Sync; Join a household (camera scan).
 2. **Run the relay on the NAS** with the owner: `docker compose --profile sync up -d` (image `ghcr.io/jorget43/proviso-relay`, published by CI from master since 2026-10-08), then `tailscale serve --bg --https=8443 http://localhost:8787` (README "Sync relay for the app"). Turn sync on in the app with the `https://<machine>.<tailnet>.ts.net:8443` address, then join from a second phone. Phones need Tailscale running to reach it.
-3. **Owner decisions pending**: none. (Phase 50, interest and dividends: owner OK to merge and push 2026-10-19.)
+3. **Owner decisions pending**: Phase 51 (salary packaging) is built on branch `phase-51-packaging`, waiting for the owner's OK to merge and push.
 4. **Step B of [`docs/plan-modelling-and-ux.md`](docs/plan-modelling-and-ux.md)**:
    - The life-course engine shipped as Phase 40 (merged to master 2026-10-09 with the owner's OK).
    - Phase 41 (birth years, the `child` table) merged to master 2026-10-12 with the owner's OK.
 5. **Step C**: the cash-buffer rule is Phase 43 (merged to master 2026-10-14). Life stages are Phase 44 (merged to master 2026-10-14 with the owner's OK).
 6. **Step D**: scenarios are Phase 45 (merged and pushed 2026-10-18). Next:
    - School fees v2 (plan item 7) is Phase 46 (merged and pushed 2026-10-18).
-   - Step E (uncertainty): 8a, ranges of returns, is Phase 48; Monte Carlo (8b) and the glide path are Phase 49, which replaces 8a's band. Step E is then complete. Step F (income and tax): 5a, interest and dividends, is Phase 50. Next: 6 salary packaging, then 5b business income, then 5c rental.
+   - Step E (uncertainty): 8a, ranges of returns, is Phase 48; Monte Carlo (8b) and the glide path are Phase 49, which replaces 8a's band. Step E is then complete. Step F (income and tax): 5a, interest and dividends, is Phase 50; 6, salary packaging, is Phase 51. Next: 5b business income, then 5c rental.
    - The app's chart component is Phase 47 (merged and pushed 2026-10-18). Still open for the app: editing a saved scenario, the Money in & out and Home charts, and the drawdown strategy choice.
    - Step A (dark mode, editing, chart trim) shipped as Phases 37–39.
    - Also open: the relay enforcing roles, and the iOS build once the Apple account is ready.
@@ -455,7 +458,7 @@ The full list:
 - **Dependency advisories**: GitHub lists some on master, believed to be all in Expo's build and dev-server tools (`braces`, `node-forge`, `uuid` via `xcode`, `decode-uri-component`), several with no fixed version yet. They don't reach the NAS image (CI audits exactly what it ships). Dependabot was preparing a security update for them on 2026-10-06: review it carefully, because Expo pins some of them, and React / React Native / `expo*` move only with the Expo SDK (`proviso-release` skill).
 - **Starter estimates** (`packages/core/src/starter.ts`): re-check the figures yearly with the July recalibration; electricity still uses the AER's 2020 usage benchmarks (no longer updated).
 
-### Where each feature lives (NAS ↔ app), as of Phase 50
+### Where each feature lives (NAS ↔ app), as of Phase 51
 
 | Feature | NAS web app | The app | Notes |
 |---|---|---|---|
@@ -477,6 +480,7 @@ The full list:
 | Children (birth year, month, name; planned babies) | ✓ (What if? → Family) | ✓ edit (Settings); drive school-fee years | NAS `Child` table since Phase 44; with children recorded, school-fee years follow them on both |
 | Costs that change with age (life stages), where you live | ✓ (What if? → Family) | ✓ (Assumptions; What if? leave-home age); milestones | `core/lifeStages.ts`, Phase 44 |
 | Interest and dividends, taxed (franking, who owns them) | ✓ What if? → More assumptions; Money in & out readout | ✓ Assumptions | `core/investmentIncome.ts`, Phase 50 |
+| Salary packaging (charity / hospital caps, electric-car novated lease) | ✓ Budget → Salary packaging cards | ✓ Settings → Salary packaging | `core/packaging.ts`, Phase 51; Home, Budget, Next 2 years and Future all count it |
 | Range of outcomes (Monte Carlo band, chance money lasts) | ✓ Net worth and Retirement charts, headline, takeaways; What if? → Basics: mix, glide path, on/off | ✓ Future headline, net worth and super charts, retirement line; Assumptions | `core/uncertainty.ts`, Phase 49 (replaced Phase 48's ±points band) |
 | Scenarios (save and compare) | ✓ make, edit, rename, delete in What if?; dashed lines on every Future chart; Compare card | Save a What if? draft as one; dashed lines on the net worth chart; show / hide; Compare card; delete | `core/scenarios.ts`, Phase 45; app lines Phase 47. Editing a saved scenario is NAS-only so far |
 | Life phases (calendar rows) | ✓ toggle ("Extra costs by year") | Read only | Kept as custom extras; life stages do the automatic part |
@@ -569,6 +573,45 @@ Ideas that have been evaluated but aren't on the roadmap. Each links to its writ
 - **School fees decided**: the questionnaire's school-cost lines stay in today's budget; the projection models the two eldest children's fees year by year (ending after Year 12) and leaves those lines out (`isModelledSchoolLine`), so nothing is counted twice. The questionnaire switches `schoolFeesOn` on when there are children.
 - Typed routes are off in `apps/client` (the generated file only existed where a dev server ran, never in CI, and misread the monorepo).
 - Verified: 356 tests; the app at 390px (a Melbourne family of four: $2.32M in today's money in 20 years, HELP cleared 2028, school fees end 2039, loan paid off 2042; a $45k car in 2029 gives $2.28M); the NAS Projections and Super pages rendered against a scratch household. The NAS Super "consider a lower target" hint was fixed on the way (it would have subtracted the mortgage twice and suggested $0).
+
+### Phase 51 — Plan step F, part 2: salary packaging (2026-10-19)
+
+Plan item 6. Owner's decisions (2026-10-19): not-for-profit / hospital caps and the electric-car novated lease first (not work items); editors in both the app and the NAS.
+
+- **Sources:**
+  - ATO "Fringe benefits tax – rates and thresholds" (updated 20 May 2026): for the FBT year ending 31 March 2027, a 47% FBT rate, gross-up rates of 2.0802 (Type 1) and 1.8868 (Type 2), and reporting once taxable value is over $2,000. Caps of $30,000 (public benevolent institutions and health promotion charities), $17,000 (hospitals and ambulance) and $5,000 (salary-packaged meal entertainment), all grossed up. Statutory car rate 20%.
+  - "Electric cars exemption" (updated 1 April 2026): eligible cars are exempt but still reportable.
+  - "Electric car discount" (updated 14 May 2026): the announced, not yet law, change from 1 April 2027 for cars over $75,000.
+  - The 2026–27 fuel-efficient luxury car tax threshold: $91,661.
+- **Core** (`packaging.ts`):
+  - `packageYear` gives a person's packaging for a year: what's paid pre-tax and the reportable amount.
+  - Not-for-profit amounts are capped at the larger cap of the kinds held, with meal entertainment on its own cap (`capFor`: $15,900 / $9,010 / $2,650).
+  - A novated lease counts only if `evStatus` is 'exempt'. Its reportable amount is 20% of the car's price × 1.8868.
+  - `netPay(gross, sacrifice, hasHELP, pk)` is tax on pay less sacrifice and packaging, plus the packaged amount back (it pays budgeted costs), less HELP on repayment income: pay plus the reportable amount.
+  - Also `packagingNow` (today's packaging) and `packagingSaving`.
+- **Engine and shared figures:**
+  - The projection's `packaging` input changes each person's pay and HELP while they work, in tax mode. New output `packagingArr`. Investment income is taxed on top of the packaged-down pay.
+  - `computeBudgetSummary({ packaging })` adds it to take-home pay and returns `packagingMonthly`.
+  - The Home overview, NAS Home, Budget, Next 2 years and Future, and the app's Home, Spending, Next 2 years and Future all pass it.
+- **Schema v12** (Drizzle `0011_packaging`, Prisma `0016_packaging`):
+  - The `packagedItem` table: person, kind (text, so unknown kinds are kept and ignored), amount, carPrice, startYear and endYear. `TABLE_SINCE.packagedItem = 12`.
+  - The NAS export maps it.
+  - `packagedItemSchema` validates input.
+- **NAS:** `GET/POST /api/packaging`, `PUT/DELETE /api/packaging/[id]` (`budget:write`; 3 more authorize guards, 69 in total). Budget gains a "Salary packaging" panel (`PackagingPanel`) of cards in tax mode: whose pay, amount a year, the car's price, from / until year, the cap or car status, and an add button per kind.
+- **App:** Settings → Salary packaging (`app/packaging.tsx`: the list and this year's gain) and `app/packaged.tsx` (add or change: whose pay, amount, car price, years, cap and car notes). Writes go through `src/data/packaging.ts`.
+- **Numbers:** they change only for households that add packaging.
+- **Verified:**
+  - 571 tests. Core, hand-worked:
+    - the caps from the grossed-up figures
+    - the car rules
+    - capping, and the reportable amounts (35,000; 22,641.60)
+    - small amounts under the threshold, other people and years, unknown kinds
+    - $80,000 packaging the hospital cap gaining $2,883.19, and only $333.19 with HELP (repayment income +$17,000)
+    - the budget gain, and an electric car lease saving $4,800 a year while it runs
+  - App: adding and removing, a car over the limit not counting, and the checks. NAS: the export mapping.
+  - Headless Chrome:
+    - the scratch NAS (migrated to v12): Budget → hospital card, $20,000 entered, capped, "adds about $293 a month" ($150,000 at 39% × $9,010)
+    - the app at 390px: $9,000 on $120,000 gives "about $240 a month"
 
 ### Phase 50 — Plan step F, part 1: interest and dividends, taxed (2026-10-19)
 

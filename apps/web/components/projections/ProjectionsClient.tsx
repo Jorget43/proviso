@@ -10,6 +10,7 @@ import { asDrawdownStrategy, PRESERVATION_AGE, DEFAULT_HORIZON_AGE, type Drawdow
 import { type FeeSchedule } from '@proviso/core/schoolFees'
 import { LOCATION_OPTIONS, presetScheduleFor, presetTotalFor } from '@proviso/core/educationCosts'
 import { childLabel, sortChildren } from '@proviso/core/people'
+import type { PackagedItemLike } from '@proviso/core/packaging'
 import type { SchoolChoice } from '@proviso/core/schoolFees'
 
 interface FeeRow { id: number; level: string; tuition: number; fixed: number }
@@ -119,6 +120,8 @@ interface ProjectionsClientProps {
   superSettings:        SuperSettingsLike
   partnerEnabled:       boolean
   initialChildren:      ChildRow[]
+  /** Salary packaging items (edited on Budget). */
+  packaging:            PackagedItemLike[]
   initialRegional:      boolean
   /** Where the household lives (a state key), for typical school fees. */
   initialState:         string | null
@@ -187,7 +190,7 @@ export default function ProjectionsClient({
   initialSettings, initialPerson1Phases, initialPerson2Phases, initialOneoffs, initialLifePhases, initialFeeSchedule,
   income, baseline, mortRate, mortPayment, mortEndDate, currentYear,
   person1Name, person2Name, initialRentSettings, initialSnapshots,
-  superSettings, partnerEnabled, initialChildren, initialRegional, initialState, initialScenarios,
+  superSettings, partnerEnabled, initialChildren, initialRegional, initialState, initialScenarios, packaging,
 }: ProjectionsClientProps) {
   const [children,       setChildren]       = useState<ChildRow[]>(initialChildren)
   const [regional,       setRegional]       = useState(initialRegional)
@@ -230,8 +233,8 @@ export default function ProjectionsClient({
     income, settings, person1Phases, person2Phases, oneoffs, lifePhases, sfSchedule,
     rent: rentSt, mortgage: { rate: mortRate, payment: mortPayment }, currentYear,
     life: { partnerEnabled, person1Age: income.person1Age, person2Age: income.person2Age, super: sup },
-    children, regional, state: initialState, ownSchedule,
-  }), [income, settings, person1Phases, person2Phases, oneoffs, lifePhases, sfSchedule, rentSt, mortRate, mortPayment, currentYear, partnerEnabled, sup, children, regional, initialState, ownSchedule])
+    children, regional, state: initialState, ownSchedule, packaging,
+  }), [income, settings, person1Phases, person2Phases, oneoffs, lifePhases, sfSchedule, rentSt, mortRate, mortPayment, currentYear, partnerEnabled, sup, children, regional, initialState, ownSchedule, packaging])
   const inputs = useMemo(() => buildProjectionInputs(baseline, live), [baseline, live])
   // Scenarios run through the same engine, layered on the plan (@proviso/core/scenarios).
   const runs = useMemo(() => runScenarios(baseline, live, scenarios, ownSchedule), [baseline, live, scenarios, ownSchedule])

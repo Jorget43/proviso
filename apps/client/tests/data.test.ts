@@ -5,6 +5,7 @@ import { contentId } from '@proviso/core/ids'
 import type { Db } from '@/data/db'
 import { loadHousehold } from '@/data/household'
 import { importHousehold, exportHousehold, restoreHousehold, eraseHousehold } from '@/data/importExport'
+import { savePackaged, removePackaged } from '@/data/packaging'
 import { savePeople, saveRent, saveChildcare, fillBirthYears, saveChild, removeChild } from '@/data/settings'
 import { encryptBackup, decryptBackup, newHouseholdKey } from '@proviso/core/backup'
 import { parseHouseholdExport } from '@proviso/core/householdExport'
@@ -691,6 +692,24 @@ describe('settings and backups', () => {
     expect(await asks()).toBe(true)
     await saveChild(db, null, { name: '', birthYear: 2019, birthMonth: null }, 2026)
     expect(await asks()).toBe(false)
+  })
+
+  it('salary packaging adds to take-home pay today and in the projection; a car over the limit doesn’t count', async () => {
+    const db = await setUp()   // Alex earns 90,000 full-time, with a HELP debt
+    const before = homeView(await loadHousehold(db), NOW).budget
+    expect(await savePackaged(db, null, { person: 'p1', kind: 'hospital', amount: 20_000, carPrice: null, startYear: 2026, endYear: null }, 2026)).toBeNull()
+    const h = await loadHousehold(db)
+    const after = homeView(h, NOW).budget
+    expect(after.packagingMonthly).toBeGreaterThan(0)
+    expect(after.monthlyIncome - before.monthlyIncome).toBeCloseTo(after.packagingMonthly, 6)
+    expect(futureView(h, NOW, { runs: 0 }).netWorth[3]).toBeGreaterThan(futureView(await (async () => { await removePackaged(db, h.packagedItems[0].id); return loadHousehold(db) })(), NOW, { runs: 0 }).netWorth[3])
+    expect(homeView(await loadHousehold(db), NOW).budget.packagingMonthly).toBe(0)
+    // A car at 95,000 is over the limit: saved, but not counted.
+    expect(await savePackaged(db, null, { person: 'p2', kind: 'evLease', amount: 15_000, carPrice: 95_000, startYear: 2026, endYear: 2029 }, 2026)).toBeNull()
+    expect(homeView(await loadHousehold(db), NOW).budget.packagingMonthly).toBe(0)
+    // Checks.
+    expect(await savePackaged(db, null, { person: 'p1', kind: 'evLease', amount: 10_000, carPrice: null, startYear: 2026, endYear: null }, 2026)).toMatch(/car’s price/)
+    expect(await savePackaged(db, null, { person: 'p1', kind: 'pbi', amount: 5_000, carPrice: null, startYear: 2030, endYear: 2028 }, 2026)).toMatch(/last year/)
   })
 
   it('refuses names that can’t be told apart', async () => {

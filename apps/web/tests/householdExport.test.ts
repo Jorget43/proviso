@@ -59,6 +59,7 @@ function legacy(): LegacyHousehold {
     pocketMoney: [{ id: 1, userId: 3, amount: 10, description: 'Allowance', date: '2026-10-03', category: 'general', createdAt: at }],
     children: [{ id: 1, name: 'Kid', birthYear: 2015, birthMonth: 4, primarySchool: 'government', secondarySchool: 'independent' }, { id: 2, name: null, birthYear: 2028, birthMonth: null, primarySchool: null, secondarySchool: null }],
     scenarios: [{ id: 1, name: 'Retire at 55', colour: 'amber', enabled: false, overrides: '{"super":{"person1RetirementAge":55}}' }],
+    packagedItems: [{ id: 1, person: 'p2', kind: 'evLease', amount: 15000, carPrice: 60000, startYear: 2026, endYear: 2029 }],
   }
 }
 
@@ -107,6 +108,12 @@ describe('mapLegacyHousehold', () => {
   it('carries scenarios with their changes as stored', () => {
     const t = exportOf().household
     expect(t.scenario).toMatchObject([{ name: 'Retire at 55', colour: 'amber', enabled: false, overrides: '{"super":{"person1RetirementAge":55}}', deletedAt: null }])
+  })
+
+  it('carries salary packaging across (schema v12)', () => {
+    expect(exportOf().household.packagedItem).toEqual([expect.objectContaining({
+      person: 'p2', kind: 'evLease', amount: 15000, carPrice: 60000, startYear: 2026, endYear: 2029, deletedAt: null,
+    })])
   })
 
   it('gives the same ids every time it runs', () => {

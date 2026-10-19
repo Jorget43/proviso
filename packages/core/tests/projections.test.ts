@@ -21,7 +21,7 @@ import {
 function expectShape(r: ProjectionResult, years: number) {
   expect(Object.keys(r).sort()).toEqual([
     'bridgeShortYr', 'bufferArr', 'cashArr', 'cashRunningArr', 'deficitArr', 'dividendArr', 'expArr', 'funArr', 'incArr',
-    'interestArr', 'investArr', 'investIncArr', 'investTaxArr', 'leaveYrs', 'mortArr', 'mortStressArr', 'nwArr', 'owedArr', 'person1Arr',
+    'interestArr', 'investArr', 'investIncArr', 'investTaxArr', 'leaveYrs', 'mortArr', 'mortStressArr', 'nwArr', 'owedArr', 'packagingArr', 'person1Arr',
     'person1HelpClearedYr', 'person1RetireYr', 'person2Arr', 'person2HelpClearedYr', 'person2RetireYr',
     'phaseArr', 'purchase', 'purchaseYr', 'rentArr', 'retiredArr', 'sfC1Arr', 'sfC2Arr', 'sfChildArr', 'sfFamilyArr',
     'sfSibArr', 'sfTotalArr', 'shortfallYr', 'stageArr', 'super1Arr', 'super2Arr', 'superArr', 'superDrawArr',
