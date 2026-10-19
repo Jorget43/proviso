@@ -23,8 +23,11 @@ export interface Assumptions {
   sfSib4Pct?:    number
   sfFamilyFee?:  number
   sfEntryFee?:   number
-  /** Points either side of expected returns for the range shown (schema v9); 0 = off. */
-  returnSpread?: number
+  /** Monte Carlo range (schema v10; core/uncertainty.ts): shown or not, % in growth assets, the glide path. */
+  showRange?:      boolean | null
+  growthPct?:      number
+  glidePath?:      boolean
+  glideTargetPct?: number
 }
 
 /** Where the household lives: typical costs differ outside the capital cities. */

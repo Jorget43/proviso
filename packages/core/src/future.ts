@@ -132,8 +132,13 @@ export interface ProjectionSettingsLike {
   sfSib4Pct?:   number
   sfFamilyFee?: number
   sfEntryFee?:  number
-  /** Points either side of the expected returns for the range shown (schema v9; ranges.ts). */
+  /** Points either side of the expected returns for the range shown (schema v9; ranges.ts). Not read since v10. */
   returnSpread?: number
+  /** Monte Carlo range (schema v10; uncertainty.ts): on/off (null: follow returnSpread > 0), the growth mix and the glide path. */
+  showRange?:      boolean | null
+  growthPct?:      number
+  glidePath?:      boolean
+  glideTargetPct?: number
 }
 
 export interface RentSettingsLike {

@@ -88,6 +88,15 @@ export interface ProjectionInputs {
   /** % of the surplus above the buffer spent on fun / lifestyle (default 0); it leaves net worth. Capped at 100 - savingsRate. */
   funPct?:            number;
   investReturn:       number;
+  /**
+   * A return for each projected year instead of `investReturn` (percent, by
+   * year index), from uncertainty.ts: a glide path, or one Monte Carlo run.
+   */
+  investReturnByYear?: number[];
+  /** Super's return for each projected year instead of `superReturn` (decimal, by year index). */
+  superReturnByYear?:  number[];
+  /** Skip the without-school-fees run (its `base` is then the with-fees run). For Monte Carlo. */
+  mainOnly?:           boolean;
 
   projYears:          number;
 
@@ -302,7 +311,7 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
     person1MonthlyNet, person2MonthlyNet,
     person1GrowthRate, person2GrowthRate,
     expInflNear, expInfl, childcareInfl,
-    propGrowth, savingsRate, investReturn,
+    propGrowth, savingsRate, investReturn, investReturnByYear, superReturnByYear,
     projYears,
     mortBalance, mortRate, mortPayment, cashOnHand, propValue, cryptoValue,
     person1Phases, person2Phases, baseMonthlyExpenses, oneoffs,
@@ -518,14 +527,15 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
       let superDraw = 0;
       if (lc) {
         const cap = legislativeCap(yr + 1);   // the financial year starting this July
+        const superRet = superReturnByYear?.[i] ?? lc.superReturn;
         const step = (k: 0 | 1, bal: number, age: number, retired: boolean, sgPay: number, sacrifice: number): number => {
           if (!(retired && age >= PRESERVATION_AGE)) {
             return superAccumulationYear(bal, {
-              investmentReturn: lc.superReturn, fundFeePercent: lc.superFeePct,
+              investmentReturn: superRet, fundFeePercent: lc.superFeePct,
               grossContribution: sgPay * lc.sgRate + sacrifice, cap, salary: sgPay,
             }).balance;
           }
-          const grown   = superPensionGrowth(bal, lc.superReturn, lc.superFeePct);
+          const grown   = superPensionGrowth(bal, superRet, lc.superFeePct);
           const minimum = minimumDrawdownRate(age) * bal;
           let set = minimum;
           if (lc.drawdown === 'fourPercent') {
@@ -645,7 +655,8 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
       const invested        = splittable * sR;
       const fun             = splittable * fR;
       cash    = Math.max(0, cash - invested - fun);
-      invest  = invest * (1 + iR) + invested;
+      const yearReturn = investReturnByYear?.[i] != null ? investReturnByYear[i] / 100 : iR;
+      invest  = invest * (1 + yearReturn) + invested;
 
       const equity = pVal - mb;
       const nw     = equity + cash + invest + crypto - p1HELP - p2HELP - otherDebts - owed;
@@ -690,8 +701,9 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
     };
   }
 
-  const base     = runProjection(false);
   const withFees = schoolFeesOn ? runProjection(true) : null;
+  // Monte Carlo only needs the run that counts, so it skips the other.
+  const base     = inputs.mainOnly && withFees ? withFees : runProjection(false);
 
   return { base, withFees, labels };
 }

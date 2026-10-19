@@ -22,7 +22,7 @@
 import { sqliteTable, text, integer, real } from 'drizzle-orm/sqlite-core'
 
 /** Bumped by every migration. Travels with each sync message and export. */
-export const SCHEMA_VERSION = 9
+export const SCHEMA_VERSION = 10
 
 export type PersonKey = 'p1' | 'p2'
 export const PERSON_KEYS: readonly PersonKey[] = ['p1', 'p2']
@@ -192,6 +192,15 @@ export const projectionSettings = sqliteTable('projectionSettings', {
   // v9: the range of returns shown either side of the plan (ranges.ts), in
   // percentage points; 0 turns the range off.
   returnSpread:         real('returnSpread').notNull().default(2),
+  // v10: Monte Carlo replaces the ±points range (uncertainty.ts), so
+  // returnSpread is no longer read. showRange switches the range on and off;
+  // null (rows from before v10) follows returnSpread > 0. growthPct is the
+  // share in growth assets (how much returns swing); the glide path moves it
+  // to glideTargetPct by the time everyone has retired.
+  showRange:            bool('showRange'),
+  growthPct:            real('growthPct').notNull().default(70),
+  glidePath:            bool('glidePath').notNull().default(false),
+  glideTargetPct:       real('glideTargetPct').notNull().default(50),
 })
 
 export const lifePhase = sqliteTable('lifePhase', {

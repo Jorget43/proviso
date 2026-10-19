@@ -33,8 +33,8 @@ export default function WhatIfSheet() {
   const [group, setGroup] = useState<Group>('basics')
   const [scenarioName, setScenarioName] = useState(`Scenario ${h.scenarios.length + 1}`)
 
-  const plan = useMemo(() => futureView(h, now), [h, now])
-  const tried = useMemo(() => futureView(applyWhatIf(h, w), now), [h, w, now])
+  const plan = useMemo(() => futureView(h, now, { runs: 0 }), [h, now])
+  const tried = useMemo(() => futureView(applyWhatIf(h, w), now, { runs: 0 }), [h, w, now])
   const dirty = hasChanges(h, w)
 
   const setProj = (patch: Partial<WhatIf['projection']>) => setW(x => ({ ...x, projection: { ...x.projection, ...patch } }))

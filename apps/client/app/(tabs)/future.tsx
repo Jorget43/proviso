@@ -3,9 +3,11 @@
 // @proviso/core's, fed by core/future.ts, the same as the NAS's Projections
 // and Super pages.
 
+import { useMemo } from 'react'
 import { Pressable, View } from 'react-native'
 import { router } from 'expo-router'
 import { fmt, fmtK } from '@proviso/core/formatting'
+import { chanceWords } from '@proviso/core/uncertainty'
 import { useHousehold } from '@/data/DataProvider'
 import { futureView, cashflowView, compareView, type CompareRow, type FutureView } from '@/data/views'
 import { removeScenario, showScenario } from '@/data/whatif'
@@ -17,7 +19,8 @@ import { usePalette, space, radius, touch } from '@/ui/theme'
 export default function Future() {
   const { household, change } = useHousehold()
   const p = usePalette()
-  const v = futureView(household, new Date())
+  // A few hundred runs for the range: worked out once per change, not per render.
+  const v = useMemo(() => futureView(household, new Date()), [household])
   const cf = cashflowView(household, new Date())
   const a = v.assumptions
   const compare = compareView(household, new Date())
@@ -30,18 +33,18 @@ export default function Future() {
         <T tone="t2">
           In today’s money ({fmtK(v.endNetWorth)} in {v.labels[v.labels.length - 1]} dollars). You’re at {fmtK(v.netWorthToday)} now.
         </T>
-        {v.range.spread > 0 && (
-          <T tone="t2">Somewhere between {fmtK(v.range.endLowReal)} and {fmtK(v.range.endHighReal)} in today’s money, depending on how investments do.</T>
+        {v.range.on && (
+          <T tone="t2">In 8 of 10 runs, somewhere between {fmtK(v.range.endLowReal)} and {fmtK(v.range.endHighReal)} in today’s money, depending on how investments do.</T>
         )}
         <View style={{ marginTop: space.md }}>
           <ScrubChart title="Net worth by year" labels={v.labels} series={[
             { key: 'plan', label: compare.length ? 'Your plan' : 'Net worth', data: v.netWorth, color: p.green, area: true,
-              band: v.range.spread > 0 ? { low: v.range.netWorthLow, high: v.range.netWorthHigh } : undefined },
+              band: v.range.on ? { low: v.range.netWorthLow, high: v.range.netWorthHigh } : undefined },
             ...compare.filter(r => r.id !== null && r.shown && r.colour).map((r): ChartSeries => ({
               key: r.id!, label: r.name, data: fit(r.netWorth, v.labels.length), color: p[r.colour!], dashed: true, compareTo: v.netWorth,
             })),
           ]} />
-          <T size="caption" tone="t3">In each year’s dollars, without super.{v.range.spread > 0 ? ` Shaded: every year’s returns ${v.range.spread} points lower or higher.` : ''}</T>
+          <T size="caption" tone="t3">In each year’s dollars, without super.{v.range.on ? ` Shaded: the middle 8 in 10 of ${v.range.runs} runs where returns rise and fall from year to year. Estimates, not advice.` : ''}</T>
         </View>
         <T size="small" tone="t2" style={{ marginTop: space.sm }}>Try a pay rise, fewer days at work or buying a home, and see what changes.</T>
         <View style={{ alignItems: 'flex-start' }}>
@@ -124,11 +127,10 @@ export default function Future() {
               ? `Enough for ${fmt(v.retirement.goalMonthly)} a month in retirement, to age ${v.retirement.lastAge}.`
               : `${fmt(v.retirement.goalMonthly)} a month in retirement would run your money out around age ${v.retirement.runsOutAt}.`}
           </T>
-          {v.range.spread > 0 && (
-            <T tone={v.range.runsOutLow === null ? 't2' : 'amber'}>
-              {v.range.runsOutLow === null
-                ? `It still lasts if returns are ${v.range.spread} points lower every year.`
-                : `If returns are ${v.range.spread} points lower every year, money runs short around age ${v.range.runsOutLow}.`}
+          {v.range.on && v.range.chanceLasts !== null && (
+            <T tone={v.range.chanceLasts >= 0.9 ? 't2' : 'amber'}>
+              {`With returns rising and falling, money lasts to age ${v.retirement.lastAge} in ${chanceWords(v.range.chanceLasts)} runs.`}
+              {v.range.runsOutLow !== null ? ` In the worst 1 in 10, it runs short around age ${v.range.runsOutLow}.` : ''}
             </T>
           )}
           {v.retirement.bridgeShortYear !== null && (
@@ -141,7 +143,7 @@ export default function Future() {
                 defaultIndex={v.retirement.firstRetireYear ? v.labels.indexOf(String(v.retirement.firstRetireYear)) : undefined}
                 series={[
                   { key: 'super', label: 'Super', data: v.retirement.superByYear, color: p.teal, area: true,
-                    band: v.range.spread > 0 ? { low: v.range.superLow, high: v.range.superHigh } : undefined },
+                    band: v.range.on ? { low: v.range.superLow, high: v.range.superHigh } : undefined },
                   { key: 'outside', label: 'Savings outside super', data: v.retirement.outsideByYear, color: p.blue, dashed: true },
                 ]} />
               <T size="caption" tone="t3">In each year’s dollars. Opens at the year you first stop work.</T>

@@ -25,7 +25,7 @@ export interface ChartSeries {
   compareTo?: (number | null)[]
   /** How the value reads (default $12k). */
   format?: (v: number) => string
-  /** A shaded range around the line (weaker and stronger returns); the readout gives both ends. */
+  /** A shaded range around the line (the worst and best 1 in 10 runs); the readout gives both ends. */
   band?:   { low: (number | null)[]; high: (number | null)[] }
 }
 

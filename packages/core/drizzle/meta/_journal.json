@@ -64,6 +64,13 @@
       "when": 1792326562772,
       "tag": "0008_return_ranges",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1792408152465,
+      "tag": "0009_monte_carlo",
+      "breakpoints": true
     }
   ]
 }

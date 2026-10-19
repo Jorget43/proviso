@@ -92,6 +92,10 @@ export const projectionSettingsSchema = z
     sfFamilyFee:          num.min(0).max(100_000),
     sfEntryFee:           num.min(0).max(100_000),
     returnSpread:         num.min(0).max(5),
+    showRange:            z.boolean().nullable(),
+    growthPct:            num.min(0).max(100),
+    glidePath:            z.boolean(),
+    glideTargetPct:       num.min(0).max(100),
   })
   .partial()
 

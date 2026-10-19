@@ -1,8 +1,8 @@
 'use client'
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useDeferredValue } from 'react'
 import { fmt, fmtK, possessive } from '@proviso/core/formatting'
-import { type ProjectionResult } from '@proviso/core/projections'
-import { runRange, mainOf, DEFAULT_RETURN_SPREAD } from '@proviso/core/ranges'
+import { runProjections, type ProjectionResult } from '@proviso/core/projections'
+import { runOutlook, planInputs, mixFrom, rangeOn, chanceWords, MIX_CHOICES } from '@proviso/core/uncertainty'
 import { runScenarios, summariseRun, readOverrides, validOverrides, patchOverrides, writeOverrides, countChanges, scenarioColour, type ScenarioOverrides, type OverrideSection, type ScenarioSummary } from '@proviso/core/scenarios'
 import { buildProjectionInputs, type ProjectionBaseline, type SuperSettingsLike } from '@proviso/core/future'
 import { asDrawdownStrategy, PRESERVATION_AGE, DEFAULT_HORIZON_AGE, type DrawdownStrategy } from '@proviso/core/retirement'
@@ -48,6 +48,10 @@ interface ProjSettings {
   sfFamilyFee:   number
   sfEntryFee:    number
   returnSpread:  number
+  showRange?:      boolean | null
+  growthPct?:      number
+  glidePath?:      boolean
+  glideTargetPct?: number
   childLeavesHomeAge: number
   parentalLeaveEnabled: boolean
   schoolFeesOn:  boolean
@@ -228,10 +232,15 @@ export default function ProjectionsClient({
   const runs = useMemo(() => runScenarios(baseline, live, scenarios, ownSchedule), [baseline, live, scenarios, ownSchedule])
   const { person1HELPBalance, person2HELPBalance, netWorthToday } = baseline
 
-  // The plan, and the same plan with returns lower and higher by the spread (@proviso/core/ranges).
-  const spread = settings.returnSpread ?? DEFAULT_RETURN_SPREAD
-  const range  = useMemo(() => runRange(inputs, spread), [inputs, spread])
-  const output = range.mid
+  // The plan (glide path applied when on), then a few hundred runs with
+  // returns rising and falling for the range (@proviso/core/uncertainty).
+  // The runs follow a moment behind, so sliders stay smooth.
+  const mix     = useMemo(() => mixFrom(settings), [settings])
+  const showing = rangeOn(settings)
+  const output  = useMemo(() => runProjections(planInputs(inputs, mix)), [inputs, mix])
+  const lagging = useDeferredValue({ inputs, mix, showing })
+  const outlook = useMemo(() => runOutlook(lagging.inputs, lagging.mix, lagging.showing, currentYear, income.person1Age),
+    [lagging, currentYear, income.person1Age])
   const main   = output.withFees ?? output.base
   const sfOn   = settings.schoolFeesOn
 
@@ -522,14 +531,9 @@ export default function ProjectionsClient({
   const lastRetireYr = Math.max(p1RetireYear, p2RetireYear ?? 0)
   const strategy     = asDrawdownStrategy(sup.drawdownStrategy)
   // The range's edges, on the same basis as what each chart shows.
-  const lowRun  = mainOf(range.low)
-  const highRun = mainOf(range.high)
-  const endLow  = lowRun.nwArr[lowRun.nwArr.length - 1] ?? 0
-  const endHigh = highRun.nwArr[highRun.nwArr.length - 1] ?? 0
-  const nwBand  = range.spread > 0 ? {
-    low:  lowRun.nwArr.map((v, i) => v + (includeSuper && hasSuper ? lowRun.superArr[i] ?? 0 : 0)),
-    high: highRun.nwArr.map((v, i) => v + (includeSuper && hasSuper ? highRun.superArr[i] ?? 0 : 0)),
-  } : null
+  const endLow  = outlook.endNetWorth.low
+  const endHigh = outlook.endNetWorth.high
+  const nwBand  = outlook.on ? (includeSuper && hasSuper ? outlook.netWorthWithSuper : outlook.netWorth) : null
   const retirementTakeaway = (() => {
     const lasts = main.shortfallYr
       ? `Money runs short from ${main.shortfallYr}, when ${partnerEnabled ? `${person1Name} is` : 'you are'} ${ageIn(income.person1Age, main.shortfallYr)}.`
@@ -540,10 +544,9 @@ export default function ProjectionsClient({
     const when = lastRetireYr > currentYear
       ? ` Retiring in ${p1RetireYear}${p2RetireYear ? ` and ${p2RetireYear}` : ''}.`
       : ''
-    const weaker = range.spread > 0
-      ? (lowRun.shortfallYr
-          ? ` With returns ${range.spread} points lower, it runs short in ${lowRun.shortfallYr}.`
-          : ` It still lasts with returns ${range.spread} points lower.`)
+    const weaker = outlook.on && outlook.chanceLasts !== null
+      ? ` With returns rising and falling, it lasts in ${chanceWords(outlook.chanceLasts)} runs`
+        + (outlook.shortAgeLow !== null ? `; in the worst 1 in 10 it runs short around age ${outlook.shortAgeLow}.` : '.')
       : ''
     return `${lasts}${weaker}${bridge}${when} Doesn't count the Age Pension.`
   })()
@@ -575,7 +578,7 @@ export default function ProjectionsClient({
       takeaway: `By ${lastLabel} you're on track to be worth ${fmtK(finalNW)} — ${growth >= 0 ? 'up' : 'down'} ${fmtK(Math.abs(growth))} on today.`
         + (hasSuper ? (includeSuper ? ` With super counted, ${fmtK(finalNW + superAtEnd)}.` : ` Plus ${fmtK(superAtEnd)} in super, which you can't touch until about 60.`) : '')
         + (sfOn && nwFeeCost > 0 ? ` Without school fees it would be about ${fmtK(nwFeeCost)} more.` : '')
-        + (range.spread > 0 ? ` If returns were ${range.spread} points lower or higher every year: ${fmtK(endLow)} to ${fmtK(endHigh)}.` : ''),
+        + (outlook.on ? ` In 8 of 10 runs with returns rising and falling: ${fmtK(endLow)} to ${fmtK(endHigh)}.` : ''),
     },
     {
       key: 'inout', label: 'Money in & out',
@@ -626,8 +629,11 @@ export default function ProjectionsClient({
         <p className="proj-lede">
           In {lastLabel}, you&rsquo;re on track to be worth <strong className={finalNW < 0 ? 'neg' : undefined}>{fmtK(finalNW)}</strong>.
         </p>
-        {range.spread > 0 && (
-          <p className="proj-lede-range">Somewhere between {fmtK(endLow)} and {fmtK(endHigh)}, depending on how investments do.</p>
+        {outlook.on && (
+          <p className="proj-lede-range">
+            In 8 of 10 runs, somewhere between {fmtK(endLow)} and {fmtK(endHigh)}, depending on how investments do.
+            {outlook.chanceLasts !== null && ` Money lasts to the end in ${chanceWords(outlook.chanceLasts)} runs.`}
+          </p>
         )}
         <p className="proj-lede-sub">
           {hasLoan && (clearedIdx >= 0 ? `Home loan paid off in ${mortCleared}. ` : 'Home loan still being paid off. ')}
@@ -708,7 +714,7 @@ export default function ProjectionsClient({
                     person1Name={person1Name} person2Name={person2Name}
                     marks={[p1RetireYear, ...(p2RetireYear ? [p2RetireYear] : [])]}
                     overlays={overlays(x => x.superArr)}
-                    band={range.spread > 0 ? { low: lowRun.superArr, high: highRun.superArr } : null}
+                    band={outlook.on ? outlook.super : null}
                   />
                   <ReadOnlyFence canEdit={canEdit}>
                     <fieldset className="drawdown-choice">
@@ -875,9 +881,9 @@ export default function ProjectionsClient({
                 min={0} max={100 - ed.settings.savingsRate} step={5} value={Math.min(ed.settings.funPct ?? 0, 100 - ed.settings.savingsRate)} cls="purple-t"
                 onChange={v => editSettings({ funPct: v })} />
               <Slider label="Investment growth each year" min={0} max={15} step={0.5} value={ed.settings.investReturn} cls="purple-t" onChange={v => editSettings({ investReturn: v })} />
-              <Slider label="Range shown either side" hint="A shaded band on Net worth and Retirement: every year’s investment and super returns this much lower, and higher."
-                min={0} max={4} step={0.5} value={ed.settings.returnSpread ?? DEFAULT_RETURN_SPREAD} cls="purple-t"
-                fmt={v => (v === 0 ? 'Off' : `± ${v} points`)} onChange={v => editSettings({ returnSpread: v })} />
+              <MixControls
+                growthPct={mixFrom(ed.settings).growthPct} glidePath={mixFrom(ed.settings).glidePath} glideTargetPct={mixFrom(ed.settings).glideTargetPct}
+                showRange={rangeOn(ed.settings)} onChange={editSettings} />
               <details className="wi-more">
                 <summary>More assumptions</summary>
                 <Slider label={`Price rises, ${currentYear}–${String(currentYear + 2).slice(2)}`} min={0} max={10} step={0.5} value={ed.settings.expInflNear} cls="red-t" onChange={v => editSettings({ expInflNear: v })} />
@@ -1342,6 +1348,54 @@ export default function ProjectionsClient({
           What if?
         </button>
       )}
+    </div>
+  )
+}
+
+/**
+ * How investments and super are held, the glide path, and whether the range
+ * of outcomes is shown (@proviso/core/uncertainty).
+ */
+function MixControls({ growthPct, glidePath, glideTargetPct, showRange, onChange }: {
+  growthPct: number; glidePath: boolean; glideTargetPct: number; showRange: boolean
+  onChange: (patch: { growthPct?: number; glidePath?: boolean; glideTargetPct?: number; showRange?: boolean }) => void
+}) {
+  const safer = MIX_CHOICES.filter(m => m.growthPct < growthPct)
+  return (
+    <div className="mix-controls">
+      <div className="wp-field">
+        <span>How investments and super are held</span>
+        <div className="seg" role="radiogroup" aria-label="Investment mix">
+          {MIX_CHOICES.map(m => (
+            <button key={m.growthPct} type="button" role="radio" aria-checked={growthPct === m.growthPct} className={growthPct === m.growthPct ? 'on' : ''}
+              onClick={() => onChange({ growthPct: m.growthPct, ...(glideTargetPct >= m.growthPct ? { glideTargetPct: MIX_CHOICES.find(x => x.growthPct < m.growthPct)?.growthPct ?? 30 } : {}) })}>
+              {m.label}
+            </button>
+          ))}
+        </div>
+        <div className="slider-hint">More in shares and property grows faster on average but rises and falls more from year to year.</div>
+      </div>
+      {safer.length > 0 && (
+        <div className="mix-glide">
+          <label className="mix-check">
+            <input type="checkbox" checked={glidePath} onChange={e => onChange({ glidePath: e.target.checked })} />
+            Move to safer investments by retirement
+          </label>
+          {glidePath && (
+            <div className="seg" role="radiogroup" aria-label="Mix by retirement">
+              {safer.map(m => (
+                <button key={m.growthPct} type="button" role="radio" aria-checked={glideTargetPct === m.growthPct} className={glideTargetPct === m.growthPct ? 'on' : ''}
+                  onClick={() => onChange({ glideTargetPct: m.growthPct })}>{m.label}</button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+      <label className="mix-check">
+        <input type="checkbox" checked={showRange} onChange={e => onChange({ showRange: e.target.checked })} />
+        Show the range of outcomes
+      </label>
+      <div className="slider-hint">The shaded band is the middle 8 in 10 of 500 runs where returns rise and fall at random. Estimates, not advice.</div>
     </div>
   )
 }

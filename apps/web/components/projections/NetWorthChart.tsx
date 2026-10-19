@@ -22,7 +22,7 @@ interface NetWorthChartProps {
   includeSuper?:  boolean
   /** Scenarios shown over the plan (net worth on the same basis as the plan's line). */
   overlays?:      Overlay[]
-  /** The range: net worth with weaker and stronger returns (same basis as the plan's line), shaded between. */
+  /** The range: net worth in the worst and best 1 in 10 runs (same basis as the plan's line), shaded between. */
   band?:          { low: number[]; high: number[] } | null
 }
 
@@ -54,8 +54,8 @@ export default function NetWorthChart({ labels, nwData, nwNoFees, investData, ca
   if (band) {
     // Two edges, the second filled down to the first: the shaded range.
     datasets.push(
-      { label: 'Weaker returns', data: pad(band.low), borderColor: c.a(c.green, 0.35), borderWidth: 1, pointRadius: 0, fill: false, tension: 0.4 },
-      { label: 'Stronger returns', data: pad(band.high), borderColor: c.a(c.green, 0.35), backgroundColor: c.a(c.green, 0.1), borderWidth: 1, pointRadius: 0, fill: '-1', tension: 0.4 },
+      { label: 'Worst 1 in 10', data: pad(band.low), borderColor: c.a(c.green, 0.35), borderWidth: 1, pointRadius: 0, fill: false, tension: 0.4 },
+      { label: 'Best 1 in 10', data: pad(band.high), borderColor: c.a(c.green, 0.35), backgroundColor: c.a(c.green, 0.1), borderWidth: 1, pointRadius: 0, fill: '-1', tension: 0.4 },
     )
   }
 

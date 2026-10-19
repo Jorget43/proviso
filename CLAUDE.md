@@ -412,7 +412,7 @@ The assumptions watchdog (`/admin/watchdog` for the CFO when `WATCHDOG_ENABLED=t
   - Retirement before 60 leaves super in accumulation (taxed at 15%) until 60.
   - Excess minimum drawdowns pile up in cash, like any surplus. Since Phase 43, a safety net with invest + fun at 100% stops that; the share not invested or spent still stays as cash, by design.
   - Cash above the safety net from earlier years isn't swept into investments; only each year's surplus is split (Phase 43).
-- Ranges of returns (Phase 48) move every year's return by the same amount, so they treat bad years as spread evenly and understate the risk of a crash just before or after retiring (sequence risk). Monte Carlo (plan item 8b) is the step that captures it. The range doesn't move property growth, wages or inflation.
+- Monte Carlo (Phase 49) varies investment and super returns only; property growth, wages and inflation stay as set. Investments and super move together each year (one market). The swings come from assumed figures (growth assets 16% a year, defensive 4%, correlation 0.1, growth premium 3.5 points), not market data. The user's set return is the typical (median) year; the mix changes only the swings, except along a glide path, where the expected return moves with the mix. The glide path is one household path, ending when the last adult retires.
 - Scenarios (Phase 45) can't change renting vs owning, today's budget, balances, where you live, the custom fee table or the "extra costs by year" overlays: those are shared with the plan. A scenario's work pattern, one-offs and children are whole lists, so a later change to the plan's list doesn't reach a scenario that has its own.
 
 ### Security hardening still open
@@ -428,20 +428,20 @@ Tracked in [`docs/security-privacy-legal.md`](docs/security-privacy-legal.md) §
 - ~~Small-text desktop layouts on phones~~ — done (v1.12.0), checked at 390px: Own & owe rows restacked, Investments labels/dropdowns fixed, work-pattern wording plain; EOFY, Super and the school-fee controls were already fine. Investment parcel cards rebuilt in Phase 24.
 - ~~Native app: token auth alongside the cookie session~~ — done (Phase 24), see [`docs/app-api.md`](docs/app-api.md). Still open for the app: passkey sign-in (WebAuthn from a native app needs the platform APIs and an associated domain), and CORS if the app is ever a web view on another origin.
 
-### The app — next steps (as of 2026-10-18)
+### The app — next steps (as of 2026-10-19)
 In [`docs/architecture.md`](docs/architecture.md) order. Phase 3 there (the single-device app) is built except for a store build; Phase 4 (sync) is built (Phases 34–35) and needs its first real run on the NAS. Settings passed the owner's phone check on 2026-10-07. The owner is enrolling in the Apple Developer Program.
 
 **Start here next session**, in this order:
 1. **⏰ Remind the owner first — phone test still to do** (deferred 2026-10-08, "soon"). **The Android development build with Phases 34–35** (sync, camera, key backup): it built successfully on EAS on 2026-10-08 (so the key-backup Kotlin module and expo-camera compile); `npm run eas -w @proviso/client -- build:list --limit 1` shows the APK link. Install it and check on the phone: Settings → Recovery phrase → Save to Google Password Manager; Settings → Sync; Join a household (camera scan).
 2. **Run the relay on the NAS** with the owner: `docker compose --profile sync up -d` (image `ghcr.io/jorget43/proviso-relay`, published by CI from master since 2026-10-08), then `tailscale serve --bg --https=8443 http://localhost:8787` (README "Sync relay for the app"). Turn sync on in the app with the `https://<machine>.<tailnet>.ts.net:8443` address, then join from a second phone. Phones need Tailscale running to reach it.
-3. **Owner decisions pending**: none. (Phase 48 ranges of returns: owner OK 2026-10-18, merged and pushed a2b83c7; the NAS image runs Prisma `0013_return_ranges` on its next start.)
+3. **Owner decisions pending**: Phase 49 (Monte Carlo, glide path) is built on branch `phase-49-monte-carlo`, waiting for the owner's OK to merge and push.
 4. **Step B of [`docs/plan-modelling-and-ux.md`](docs/plan-modelling-and-ux.md)**:
    - The life-course engine shipped as Phase 40 (merged to master 2026-10-09 with the owner's OK).
    - Phase 41 (birth years, the `child` table) merged to master 2026-10-12 with the owner's OK.
 5. **Step C**: the cash-buffer rule is Phase 43 (merged to master 2026-10-14). Life stages are Phase 44 (merged to master 2026-10-14 with the owner's OK).
 6. **Step D**: scenarios are Phase 45 (merged and pushed 2026-10-18). Next:
    - School fees v2 (plan item 7) is Phase 46 (merged and pushed 2026-10-18).
-   - Step E (uncertainty): 8a, ranges of returns, is Phase 48. The owner chose bands first, covering super too; Monte Carlo (8b) and the glide path come together next.
+   - Step E (uncertainty): 8a, ranges of returns, is Phase 48; Monte Carlo (8b) and the glide path are Phase 49, which replaces 8a's band. Step E is then complete; next in the plan is step F (income and tax: portfolio yield and franking first).
    - The app's chart component is Phase 47 (merged and pushed 2026-10-18). Still open for the app: editing a saved scenario, the Money in & out and Home charts, and the drawdown strategy choice.
    - Step A (dark mode, editing, chart trim) shipped as Phases 37–39.
    - Also open: the relay enforcing roles, and the iOS build once the Apple account is ready.
@@ -455,7 +455,7 @@ The full list:
 - **Dependency advisories**: GitHub lists some on master, believed to be all in Expo's build and dev-server tools (`braces`, `node-forge`, `uuid` via `xcode`, `decode-uri-component`), several with no fixed version yet. They don't reach the NAS image (CI audits exactly what it ships). Dependabot was preparing a security update for them on 2026-10-06: review it carefully, because Expo pins some of them, and React / React Native / `expo*` move only with the Expo SDK (`proviso-release` skill).
 - **Starter estimates** (`packages/core/src/starter.ts`): re-check the figures yearly with the July recalibration; electricity still uses the AER's 2020 usage benchmarks (no longer updated).
 
-### Where each feature lives (NAS ↔ app), as of Phase 48
+### Where each feature lives (NAS ↔ app), as of Phase 49
 
 | Feature | NAS web app | The app | Notes |
 |---|---|---|---|
@@ -476,7 +476,7 @@ The full list:
 | Birth years (ages move on each year) | Set at onboarding; kept in step | ✓ edit (Settings → People) | `core/people.ts` |
 | Children (birth year, month, name; planned babies) | ✓ (What if? → Family) | ✓ edit (Settings); drive school-fee years | NAS `Child` table since Phase 44; with children recorded, school-fee years follow them on both |
 | Costs that change with age (life stages), where you live | ✓ (What if? → Family) | ✓ (Assumptions; What if? leave-home age); milestones | `core/lifeStages.ts`, Phase 44 |
-| Ranges of returns (shaded band) | ✓ Net worth and Retirement charts, headline, takeaways; What if? → Basics slider | ✓ Future headline, net worth and super charts, retirement line; Assumptions | `core/ranges.ts`, Phase 48 |
+| Range of outcomes (Monte Carlo band, chance money lasts) | ✓ Net worth and Retirement charts, headline, takeaways; What if? → Basics: mix, glide path, on/off | ✓ Future headline, net worth and super charts, retirement line; Assumptions | `core/uncertainty.ts`, Phase 49 (replaced Phase 48's ±points band) |
 | Scenarios (save and compare) | ✓ make, edit, rename, delete in What if?; dashed lines on every Future chart; Compare card | Save a What if? draft as one; dashed lines on the net worth chart; show / hide; Compare card; delete | `core/scenarios.ts`, Phase 45; app lines Phase 47. Editing a saved scenario is NAS-only so far |
 | Life phases (calendar rows) | ✓ toggle ("Extra costs by year") | Read only | Kept as custom extras; life stages do the automatic part |
 | Next 2 years | ✓ | ✓ | `core/cashflow.ts` |
@@ -568,6 +568,36 @@ Ideas that have been evaluated but aren't on the roadmap. Each links to its writ
 - **School fees decided**: the questionnaire's school-cost lines stay in today's budget; the projection models the two eldest children's fees year by year (ending after Year 12) and leaves those lines out (`isModelledSchoolLine`), so nothing is counted twice. The questionnaire switches `schoolFeesOn` on when there are children.
 - Typed routes are off in `apps/client` (the generated file only existed where a dev server ran, never in CI, and misread the monorepo).
 - Verified: 356 tests; the app at 390px (a Melbourne family of four: $2.32M in today's money in 20 years, HELP cleared 2028, school fees end 2039, loan paid off 2042; a $45k car in 2029 gives $2.28M); the NAS Projections and Super pages rendered against a scratch household. The NAS Super "consider a lower target" hint was fixed on the way (it would have subtracted the mortgage twice and suggested $0).
+
+### Phase 49 — Plan step E, part 2: Monte Carlo and the glide path (2026-10-19)
+
+Plan item 8b. Owner's decisions (2026-10-19): Monte Carlo replaces Phase 48's ±points band; the glide path is off by default; households start at a Growth mix (~70% growth assets).
+
+- **Engine** (`projections.ts`): optional `investReturnByYear` (percent) and `superReturnByYear` (decimal) replace the fixed returns year by year. `mainOnly` skips the without-school-fees run. Nothing pinned moves.
+- **Core** (`uncertainty.ts`, replacing `ranges.ts`):
+  - **Swings:** `mixVolatility(growthPct)` combines growth assets (16% a year) and defensive assets (4%), with a correlation of 0.1. That gives about 14 / 11.4 / 8.4% a year at 90 / 70 / 50% growth.
+  - **Glide path:** `mixPath` moves the mix evenly to the target by the year the last adult retires. `planInputs` lowers the expected return by `GROWTH_PREMIUM` (3.5 points per 100% of mix moved) along it.
+  - **The runs:** `runOutlook` runs the plan, then `MC_RUNS` (500) runs with seeded lognormal yearly returns (`drawReturn`), centred so the set return is the median year.
+  - **Outputs:** 10th–90th percentile bands for net worth, net worth with super, and super; `chanceLasts`, the share of runs with no shortfall in retirement or in the bridge years; `shortAgeLow`, the age money runs short in the worst tenth. `chanceWords` turns the chance into words ("about 9 in 10").
+  - About 40 ms for 500 runs over 62 years on a Mac.
+- **Schema v10** (Drizzle `0009_monte_carlo`, Prisma `0014_monte_carlo`):
+  - New: `projectionSettings.showRange` (nullable: null follows `returnSpread > 0`, via `rangeOn`), `growthPct` (70), `glidePath` (false) and `glideTargetPct` (50).
+  - `returnSpread` is no longer read.
+  - Scenarios can change all four.
+- **NAS** (Future):
+  - The headline gives "In 8 of 10 runs, somewhere between…" and "Money lasts to the end in about N in 10 runs".
+  - The Net worth and Retirement bands come from the runs, and the readout labels read "Worst / Best 1 in 10".
+  - What if? → Basics swaps the spread slider for `MixControls`: the mix (Conservative / Balanced / Growth / High growth), the glide path and its target, and "Show the range of outcomes".
+  - The runs use `useDeferredValue`, so the plan line follows sliders immediately and the band a moment later.
+- **App**:
+  - `futureView(h, now, { runs })`: Future memoises it; What if? passes 0.
+  - The headline and caption describe the runs. The retirement card says "money lasts to age N in about N in 10 runs. In the worst 1 in 10, it runs short around age N."
+  - Assumptions gets the mix, the glide path and the range switch.
+- **Numbers:** the plan line doesn't move unless the glide path is switched on. The band now comes from random runs instead of ±2 points, so it is wider over long horizons and can be lopsided (a household that runs short sits near the bottom of it).
+- **Verified:**
+  - 545 tests. New in core: the mix's swings worked by hand, the glide path and its return, seeded normals and lognormal draws (median and spread), the band's width against the lognormal formula, more growth giving a wider band, the chance and shortfall age, sequence risk (the plan lasts but about 1 in 3 runs don't), plain-word chances, and timing. The app: the range from runs, switched off, a glide path lowering the plan, and a pre-v10 row with no range staying off.
+  - Headless Chrome against a scratch NAS (migrated to v10), 1280px dark: the headline ranges for Growth, High growth (wider, chance down) and a glide to Balanced (lower plan, narrower). Also checked: the Retirement band with the new labels, and 390px dark with no sideways scroll.
+  - The app's web build at 390px: the Future headline, band and retirement lines.
 
 ### Phase 48 — Plan step E, part 1: ranges of returns (2026-10-18)
 

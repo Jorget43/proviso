@@ -6,7 +6,7 @@ import { computeHomeOverview, type HomeOverview } from '@proviso/core/overview'
 import { computeBudgetSummary, isManagedChildcare } from '@proviso/core/budgetSummary'
 import { workDaysForYear, runProjections, type PurchasePaid } from '@proviso/core/projections'
 import { projectionBaseline, buildProjectionInputs, feeScheduleFor, retirementIncomeGoal, type ProjectionLive } from '@proviso/core/future'
-import { runRange, mainOf, DEFAULT_RETURN_SPREAD } from '@proviso/core/ranges'
+import { runOutlook, mixFrom, rangeOn, MC_RUNS } from '@proviso/core/uncertainty'
 import { runScenarios, summariseRun, countChanges, validOverrides, readOverrides, type ScenarioColour, type ScenarioSummary } from '@proviso/core/scenarios'
 import { currentAges, childLabel, sortChildren } from '@proviso/core/people'
 import { situationFrom, situationLabels } from '@proviso/core/situation'
@@ -238,18 +238,22 @@ export interface FutureView {
   /** Spent on fun out of what's left over, over the whole projection. */
   funTotal:       number
   /**
-   * The range (core/ranges.ts): the same plan with every year's investment and
-   * super returns `spread` points lower and higher. spread 0 = off.
+   * The range (core/uncertainty.ts): the 10th to 90th percentile of
+   * Monte Carlo runs, where returns swing year to year. Off: `on` is false
+   * and the edges equal the plan.
    */
   range: {
-    spread:       number
+    on:           boolean
+    runs:         number
     endLowReal:   number
     endHighReal:  number
     netWorthLow:  number[]
     netWorthHigh: number[]
     superLow:     number[]
     superHigh:    number[]
-    /** Person 1's age when money runs short with weaker returns; null = it lasts. */
+    /** Share of runs (0–1) where money lasts to the end; null without a life course. */
+    chanceLasts:  number | null
+    /** Person 1's age when money runs short in the worst tenth of runs; null = it lasts there too. */
     runsOutLow:   number | null
   }
   assumptions: { salaryGrowth: number; inflation: number; investReturn: number; savingsRate: number; propGrowth: number; cashBufferMonths: number; funPct: number }
@@ -284,13 +288,17 @@ function planOf(h: HouseholdData, year: number) {
   return { baseline, live, ages, ownSchedule: feeScheduleFor(null, h.schoolFeeLevels) }
 }
 
-export function futureView(h: HouseholdData, now: Date): FutureView {
+/**
+ * Future's figures. `opts.runs` is how many Monte Carlo runs to make for the
+ * range (0 skips it, e.g. for What if?, which only compares plans).
+ */
+export function futureView(h: HouseholdData, now: Date, opts: { runs?: number } = {}): FutureView {
   const year = now.getFullYear()
   const s = h.projection
   const { baseline, live, ages } = planOf(h, year)
-  const range = runRange(buildProjectionInputs(baseline, live), s.returnSpread ?? DEFAULT_RETURN_SPREAD)
-  const out = range.mid
-  const low = mainOf(range.low), high = mainOf(range.high)
+  const runs = opts.runs ?? MC_RUNS
+  const outlook = runOutlook(buildProjectionInputs(baseline, live), mixFrom(s), rangeOn(s) && runs > 0, year, ages.person1Age, runs)
+  const out = outlook.plan
   const run = out.withFees ?? out.base
   const end = run.nwArr[run.nwArr.length - 1] ?? baseline.netWorthToday
   const deflate = Math.pow(1 + s.expInfl / 100, run.nwArr.length)
@@ -353,12 +361,13 @@ export function futureView(h: HouseholdData, now: Date): FutureView {
     },
     funTotal: run.funArr.reduce((t, v) => t + v, 0),
     range: {
-      spread: range.spread,
-      endLowReal: (low.nwArr[low.nwArr.length - 1] ?? 0) / deflate,
-      endHighReal: (high.nwArr[high.nwArr.length - 1] ?? 0) / deflate,
-      netWorthLow: low.nwArr, netWorthHigh: high.nwArr,
-      superLow: low.superArr, superHigh: high.superArr,
-      runsOutLow: low.shortfallYr ? ages.person1Age + (low.shortfallYr - year) : null,
+      on: outlook.on, runs: outlook.runs,
+      endLowReal: outlook.endNetWorth.low / deflate,
+      endHighReal: outlook.endNetWorth.high / deflate,
+      netWorthLow: outlook.netWorth.low, netWorthHigh: outlook.netWorth.high,
+      superLow: outlook.super.low, superHigh: outlook.super.high,
+      chanceLasts: outlook.chanceLasts,
+      runsOutLow: outlook.shortAgeLow,
     },
     assumptions: { salaryGrowth: s.person1Growth, inflation: s.expInfl, investReturn: s.investReturn, savingsRate: s.savingsRate, propGrowth: s.propGrowth,
       cashBufferMonths: s.cashBufferMonths, funPct: Math.min(s.funPct, 100 - s.savingsRate) },

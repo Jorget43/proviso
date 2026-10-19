@@ -1,6 +1,6 @@
 # Plan: modelling depth, scenarios and UX (proposed 2026-10-08)
 
-**Status: agreed 2026-10-08. Step A done (Phases 37–39, see CLAUDE.md). Step B: the life-course engine is Phase 40 (2026-10-09); birth years and the `child` table are Phase 41 (2026-10-12). Step C: the cash-buffer rule (item 9) is Phase 43 and life stages (item 10) are Phase 44 (both 2026-10-14). Step D: scenarios (item 2) are Phase 45, school fees v2 (item 7) is Phase 46, and the app's chart component (item 2) is Phase 47 (all 2026-10-18). Step E: ranges of returns (8a) are Phase 48 (2026-10-18); next, Monte Carlo (8b) with the glide path.**
+**Status: agreed 2026-10-08. Step A done (Phases 37–39, see CLAUDE.md). Step B: the life-course engine is Phase 40 (2026-10-09); birth years and the `child` table are Phase 41 (2026-10-12). Step C: the cash-buffer rule (item 9) is Phase 43 and life stages (item 10) are Phase 44 (both 2026-10-14). Step D: scenarios (item 2) are Phase 45, school fees v2 (item 7) is Phase 46, and the app's chart component (item 2) is Phase 47 (all 2026-10-18). Step E: ranges of returns (8a) are Phase 48 (2026-10-18); Monte Carlo (8b) with the glide path is Phase 49 (2026-10-19), replacing 8a's band.**
 
 **Owner's decisions for step B (2026-10-09):**
 - Spending becomes the retirement goal once everyone has retired.
