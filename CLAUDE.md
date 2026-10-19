@@ -434,7 +434,7 @@ In [`docs/architecture.md`](docs/architecture.md) order. Phase 3 there (the sing
 **Start here next session**, in this order:
 1. **⏰ Remind the owner first — phone test still to do** (deferred 2026-10-08, "soon"). **The Android development build with Phases 34–35** (sync, camera, key backup): it built successfully on EAS on 2026-10-08 (so the key-backup Kotlin module and expo-camera compile); `npm run eas -w @proviso/client -- build:list --limit 1` shows the APK link. Install it and check on the phone: Settings → Recovery phrase → Save to Google Password Manager; Settings → Sync; Join a household (camera scan).
 2. **Run the relay on the NAS** with the owner: `docker compose --profile sync up -d` (image `ghcr.io/jorget43/proviso-relay`, published by CI from master since 2026-10-08), then `tailscale serve --bg --https=8443 http://localhost:8787` (README "Sync relay for the app"). Turn sync on in the app with the `https://<machine>.<tailnet>.ts.net:8443` address, then join from a second phone. Phones need Tailscale running to reach it.
-3. **Owner decisions pending**: Phase 50 (interest and dividends, taxed) is built on branch `phase-50-investment-income`, waiting for the owner's OK to merge and push.
+3. **Owner decisions pending**: none. (Phase 50, interest and dividends: owner OK to merge and push 2026-10-19.)
 4. **Step B of [`docs/plan-modelling-and-ux.md`](docs/plan-modelling-and-ux.md)**:
    - The life-course engine shipped as Phase 40 (merged to master 2026-10-09 with the owner's OK).
    - Phase 41 (birth years, the `child` table) merged to master 2026-10-12 with the owner's OK.
@@ -572,7 +572,7 @@ Ideas that have been evaluated but aren't on the roadmap. Each links to its writ
 
 ### Phase 50 — Plan step F, part 1: interest and dividends, taxed (2026-10-19)
 
-Plan item 5a. Owner's decisions (2026-10-19): dividends as a yield on investments; savings earn about 4% by default; investment income is taxed by default; income is split evenly between partners, with a setting.
+Plan item 5a. Owner's decisions (2026-10-19): dividends as a yield on investments; savings earn about 4% by default; investment income is taxed by default; income is split evenly between partners, with a setting. Merged and pushed with the owner's OK the same day.
 
 - **Core** (`investmentIncome.ts`):
   - **Interest:** cash above the home-loan balance earns `cashRate`. Cash up to the balance is in the offset.
