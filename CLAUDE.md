@@ -434,7 +434,7 @@ In [`docs/architecture.md`](docs/architecture.md) order. Phase 3 there (the sing
 **Start here next session**, in this order:
 1. **⏰ Remind the owner first — phone test still to do** (deferred 2026-10-08, "soon"). **The Android development build with Phases 34–35** (sync, camera, key backup): it built successfully on EAS on 2026-10-08 (so the key-backup Kotlin module and expo-camera compile); `npm run eas -w @proviso/client -- build:list --limit 1` shows the APK link. Install it and check on the phone: Settings → Recovery phrase → Save to Google Password Manager; Settings → Sync; Join a household (camera scan).
 2. **Run the relay on the NAS** with the owner: `docker compose --profile sync up -d` (image `ghcr.io/jorget43/proviso-relay`, published by CI from master since 2026-10-08), then `tailscale serve --bg --https=8443 http://localhost:8787` (README "Sync relay for the app"). Turn sync on in the app with the `https://<machine>.<tailnet>.ts.net:8443` address, then join from a second phone. Phones need Tailscale running to reach it.
-3. **Owner decisions pending**: Phase 49 (Monte Carlo, glide path) is built on branch `phase-49-monte-carlo`, waiting for the owner's OK to merge and push.
+3. **Owner decisions pending**: none. (Phase 49, Monte Carlo and the glide path: owner OK to merge 2026-10-19.)
 4. **Step B of [`docs/plan-modelling-and-ux.md`](docs/plan-modelling-and-ux.md)**:
    - The life-course engine shipped as Phase 40 (merged to master 2026-10-09 with the owner's OK).
    - Phase 41 (birth years, the `child` table) merged to master 2026-10-12 with the owner's OK.
@@ -571,7 +571,7 @@ Ideas that have been evaluated but aren't on the roadmap. Each links to its writ
 
 ### Phase 49 — Plan step E, part 2: Monte Carlo and the glide path (2026-10-19)
 
-Plan item 8b. Owner's decisions (2026-10-19): Monte Carlo replaces Phase 48's ±points band; the glide path is off by default; households start at a Growth mix (~70% growth assets).
+Plan item 8b. Owner's decisions (2026-10-19): Monte Carlo replaces Phase 48's ±points band; the glide path is off by default; households start at a Growth mix (~70% growth assets). Merged with the owner's OK the same day.
 
 - **Engine** (`projections.ts`): optional `investReturnByYear` (percent) and `superReturnByYear` (decimal) replace the fixed returns year by year. `mainOnly` skips the without-school-fees run. Nothing pinned moves.
 - **Core** (`uncertainty.ts`, replacing `ranges.ts`):
