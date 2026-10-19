@@ -437,7 +437,7 @@ In [`docs/architecture.md`](docs/architecture.md) order. Phase 3 there (the sing
 **Start here next session**, in this order:
 1. **⏰ Remind the owner first — phone test still to do** (deferred 2026-10-08, "soon"). **The Android development build with Phases 34–35** (sync, camera, key backup): it built successfully on EAS on 2026-10-08 (so the key-backup Kotlin module and expo-camera compile); `npm run eas -w @proviso/client -- build:list --limit 1` shows the APK link. Install it and check on the phone: Settings → Recovery phrase → Save to Google Password Manager; Settings → Sync; Join a household (camera scan).
 2. **Run the relay on the NAS** with the owner: `docker compose --profile sync up -d` (image `ghcr.io/jorget43/proviso-relay`, published by CI from master since 2026-10-08), then `tailscale serve --bg --https=8443 http://localhost:8787` (README "Sync relay for the app"). Turn sync on in the app with the `https://<machine>.<tailnet>.ts.net:8443` address, then join from a second phone. Phones need Tailscale running to reach it.
-3. **Owner decisions pending**: Phase 51 (salary packaging) is built on branch `phase-51-packaging`, waiting for the owner's OK to merge and push.
+3. **Owner decisions pending**: none. (Phase 51, salary packaging: owner OK to merge and push 2026-10-19.)
 4. **Step B of [`docs/plan-modelling-and-ux.md`](docs/plan-modelling-and-ux.md)**:
    - The life-course engine shipped as Phase 40 (merged to master 2026-10-09 with the owner's OK).
    - Phase 41 (birth years, the `child` table) merged to master 2026-10-12 with the owner's OK.
@@ -576,7 +576,7 @@ Ideas that have been evaluated but aren't on the roadmap. Each links to its writ
 
 ### Phase 51 — Plan step F, part 2: salary packaging (2026-10-19)
 
-Plan item 6. Owner's decisions (2026-10-19): not-for-profit / hospital caps and the electric-car novated lease first (not work items); editors in both the app and the NAS.
+Plan item 6. Owner's decisions (2026-10-19): not-for-profit / hospital caps and the electric-car novated lease first (not work items); editors in both the app and the NAS. Merged and pushed with the owner's OK the same day.
 
 - **Sources:**
   - ATO "Fringe benefits tax – rates and thresholds" (updated 20 May 2026): for the FBT year ending 31 March 2027, a 47% FBT rate, gross-up rates of 2.0802 (Type 1) and 1.8868 (Type 2), and reporting once taxable value is over $2,000. Caps of $30,000 (public benevolent institutions and health promotion charities), $17,000 (hospitals and ambulance) and $5,000 (salary-packaged meal entertainment), all grossed up. Statutory car rate 20%.
