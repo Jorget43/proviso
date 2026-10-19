@@ -27,6 +27,7 @@ import type { HouseholdSuperInputs, ProjectionContext } from './super'
 import { asDrawdownStrategy, yearsToAge, DEFAULT_HORIZON_AGE } from './retirement'
 import { schoolChildren, type ChildLike } from './people'
 import { DEFAULT_LEAVE_HOME_AGE } from './lifeStages'
+import { DEFAULT_DIVIDEND_YIELD, DEFAULT_FRANKED_PCT, DEFAULT_CASH_RATE, DEFAULT_PERSON1_SHARE } from './investmentIncome'
 
 /** The budget's home-loan repayment line(s). */
 export const isMortgageLine = (e: { cat: string; name: string }) => e.cat === 'Home' && /mortgage/i.test(e.name)
@@ -139,6 +140,11 @@ export interface ProjectionSettingsLike {
   growthPct?:      number
   glidePath?:      boolean
   glideTargetPct?: number
+  /** Income from savings and investments (schema v11; investmentIncome.ts). */
+  dividendYield?:      number
+  frankedPct?:         number
+  cashRate?:           number
+  person1InvestShare?: number
 }
 
 export interface RentSettingsLike {
@@ -281,6 +287,10 @@ export function buildProjectionInputs(b: ProjectionBaseline, l: ProjectionLive):
     depositFromCash: l.rent.depositFromCash, depositFromInvestments: l.rent.depositFromInvestments,
     newMortgageRate: l.rent.newMortgageRate, newMortgageTermYrs: l.rent.newMortgageTermYrs,
     stampDutyPct: l.rent.stampDutyPct ?? 0,
+    investIncome: {
+      dividendYield: s.dividendYield ?? DEFAULT_DIVIDEND_YIELD, frankedPct: s.frankedPct ?? DEFAULT_FRANKED_PCT,
+      cashRate: s.cashRate ?? DEFAULT_CASH_RATE, person1Share: s.person1InvestShare ?? DEFAULT_PERSON1_SHARE,
+    },
     // Costs that follow ages need the people's ages, so only with a life course.
     lifeStages: life && sup && s.lifeStagesOn !== false ? {
       childBirthYears: (l.children ?? []).map(c => c.birthYear),

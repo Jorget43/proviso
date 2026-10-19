@@ -13,6 +13,7 @@ import { useHousehold } from '@/data/DataProvider'
 import { saveAssumptions, saveRegional } from '@/data/future'
 import { DEFAULT_LEAVE_HOME_AGE, MAX_LEAVE_HOME_AGE } from '@proviso/core/lifeStages'
 import { MIX_CHOICES, mixFrom, rangeOn } from '@proviso/core/uncertainty'
+import { DEFAULT_CASH_RATE, DEFAULT_DIVIDEND_YIELD, DEFAULT_FRANKED_PCT, DEFAULT_PERSON1_SHARE } from '@proviso/core/investmentIncome'
 import { Button, Choice, Field, NumberField, Sheet, T, parseAmount } from '@/ui/kit'
 import { space } from '@/ui/theme'
 
@@ -37,6 +38,8 @@ export default function AssumptionsSheet() {
     save: String(s.savingsRate), buffer: String(s.cashBufferMonths), fun: String(s.funPct), prop: String(s.propGrowth), age: String(s.horizonAge), monthly: String(Math.round(goal / 12)),
     fees: s.schoolFeesOn,
     stages: s.lifeStagesOn, leave: String(s.childLeavesHomeAge), regional: h.settings.regional,
+    cashRate: String(s.cashRate ?? DEFAULT_CASH_RATE), yield: String(s.dividendYield ?? DEFAULT_DIVIDEND_YIELD),
+    franked: String(s.frankedPct ?? DEFAULT_FRANKED_PCT), share: String(s.person1InvestShare ?? DEFAULT_PERSON1_SHARE),
     range: rangeOn(s), growth: String(mixFrom(s).growthPct), glide: mixFrom(s).glidePath, target: String(mixFrom(s).glideTargetPct),
     sib2: String(s.sfSib2Pct), sib3: String(s.sfSib3Pct), sib4: String(s.sfSib4Pct), family: String(s.sfFamilyFee), entry: String(s.sfEntryFee),
   })
@@ -57,6 +60,9 @@ export default function AssumptionsSheet() {
     if (!(fun >= 0 && fun + pct[4] <= 100)) { setError('Investing and fun together can’t be more than 100%.'); return }
     const leave = n(f.leave)
     if (!Number.isInteger(leave) || leave < DEFAULT_LEAVE_HOME_AGE || leave > MAX_LEAVE_HOME_AGE) { setError(`Children leave home between ${DEFAULT_LEAVE_HOME_AGE} and ${MAX_LEAVE_HOME_AGE}.`); return }
+    const income = { cashRate: n(f.cashRate), dividendYield: n(f.yield), frankedPct: n(f.franked), person1InvestShare: n(f.share) }
+    if (!(income.cashRate >= 0 && income.cashRate <= 15 && income.dividendYield >= 0 && income.dividendYield <= 15)) { setError('Interest and dividends are 0 to 15%.'); return }
+    if (!(income.frankedPct >= 0 && income.frankedPct <= 100 && income.person1InvestShare >= 0 && income.person1InvestShare <= 100)) { setError('Franking and the share in each name are 0 to 100%.'); return }
     const rules = [n(f.sib2), n(f.sib3), n(f.sib4)]
     if (rules.some(x => !(x >= 0 && x <= 100))) { setError('Sibling discounts are 0 to 100%.'); return }
     if (!(n(f.family) >= 0 && n(f.entry) >= 0)) { setError('Check the school fees.'); return }
@@ -64,6 +70,7 @@ export default function AssumptionsSheet() {
     await change(db => saveAssumptions(db, {
       person1Growth: pct[0], person2Growth: pct[1], expInfl: pct[2], investReturn: pct[3], savingsRate: pct[4], propGrowth: pct[5],
       cashBufferMonths: buffer, funPct: fun, lifeStagesOn: f.stages, childLeavesHomeAge: leave, horizonAge: age, schoolFeesOn: f.fees,
+      ...income,
       showRange: f.range, growthPct: n(f.growth), glidePath: f.glide, glideTargetPct: n(f.target),
       sfSib2Pct: rules[0], sfSib3Pct: rules[1], sfSib4Pct: rules[2], sfFamilyFee: n(f.family), sfEntryFee: n(f.entry),
     }, Math.round(n(f.monthly) * 12)))
@@ -84,9 +91,23 @@ export default function AssumptionsSheet() {
       <Field label="Prices rise" hint="Inflation: how fast your costs grow each year.">
         <NumberField unit="%" label="Prices rise, percent a year" value={f.infl} onChange={set('infl')} />
       </Field>
-      <Field label="Investments return" hint="After fees, before tax.">
+      <Field label="Investments return" hint="The total, dividends included. After fees, before tax.">
         <NumberField unit="%" label="Investment return, percent a year" value={f.ret} onChange={set('ret')} />
       </Field>
+      <Field label="Of that, paid out as dividends" hint="Reinvested, but taxed each year; the tax is paid from cash.">
+        <NumberField unit="%" label="Dividends paid out, percent a year" value={f.yield} onChange={set('yield')} />
+      </Field>
+      <Field label="Dividends with franking credits" hint="Australian shares usually pay franked dividends: the company tax already paid comes off yours.">
+        <NumberField unit="%" label="Share of dividends franked, percent" value={f.franked} onChange={set('franked')} />
+      </Field>
+      <Field label="Savings account interest" hint="On cash above the home loan. Cash in an offset saves loan interest instead. Taxed.">
+        <NumberField unit="%" label="Savings interest, percent a year" value={f.cashRate} onChange={set('cashRate')} />
+      </Field>
+      {h.settings.partnerEnabled && (
+        <Field label={`Investments in ${possessive(h.settings.person1Name)} name`} hint={`The rest in ${possessive(h.settings.person2Name)}. Income in the lower earner’s name is taxed less.`}>
+          <NumberField unit="%" label={`Share of investments in ${possessive(h.settings.person1Name)} name, percent`} value={f.share} onChange={set('share')} />
+        </Field>
+      )}
       <Field label="How your investments and super are held" hint="More in shares and property grows faster on average but rises and falls more from year to year. Most super funds’ default is Growth.">
         <Choice wrap label="Investment mix" options={MIX_CHOICES.map(m => ({ key: String(m.growthPct), label: m.label }))} value={f.growth} onChange={set('growth')} />
       </Field>

@@ -39,7 +39,8 @@ function sampleExport(): HouseholdExport {
     childcareInfl: 6, propGrowth: 3.5, savingsRate: 10, investReturn: 3.5, projYears: 20, schoolFeesOn: false, sfC1Start: 2032, sfC1ExitIdx: 13,
     sfC2Start: 2035, sfC2ExitIdx: 13, sfInfl: 5, sfPresetKey: null, parentalLeaveEnabled: false, horizonAge: 95, cashBufferMonths: 0, funPct: 0, lifeStagesOn: true, childLeavesHomeAge: 18,
     sfSib2Pct: 15, sfSib3Pct: 15, sfSib4Pct: 15, sfFamilyFee: 350, sfEntryFee: 0, returnSpread: 2,
-    showRange: null, growthPct: 70, glidePath: false, glideTargetPct: 50 })
+    showRange: null, growthPct: 70, glidePath: false, glideTargetPct: 50,
+    dividendYield: 3, frankedPct: 50, cashRate: 4, person1InvestShare: 50 })
   h.rentSettings.push({ id: SETTINGS_ID.rent, deletedAt: null, enabled: true, monthlyRent: 2400, annualIncreaseRate: 5, purchasePlanEnabled: false,
     targetPurchaseYear: 2031, targetPropertyValue: 800000, depositPct: 20, depositFromCash: 0, depositFromInvestments: 0, newMortgageRate: 6, newMortgageTermYrs: 30, stampDutyPct: 4 })
   return {
@@ -356,6 +357,23 @@ describe('future', () => {
     expect(off.range.endLowReal).toBeCloseTo(off.endNetWorthReal)
   })
 
+  it('savings earn interest and investment income is taxed, from the saved settings', async () => {
+    const db = await setUp()
+    const h = await loadHousehold(db)
+    const at = async () => futureView(await loadHousehold(db), NOW, { runs: 0 }).netWorth[10]
+    // This household's cash is all in its home-loan offset, so the savings rate doesn't touch it.
+    const withInterest = await at()
+    await saveSettings(db, 'projectionSettings', { cashRate: 0 })
+    expect(await at()).toBe(withInterest)
+    // Higher dividends mean more tax each year on reinvested income: less cash.
+    const low = await at()
+    await saveSettings(db, 'projectionSettings', { dividendYield: 6, frankedPct: 0 })
+    expect(await at()).toBeLessThan(low)
+    // Assumptions saves them.
+    await saveAssumptions(db, { ...h.projection, cashRate: 2.5, dividendYield: 4, frankedPct: 80, person1InvestShare: 30 }, 60_000)
+    expect((await loadHousehold(db)).projection).toMatchObject({ cashRate: 2.5, dividendYield: 4, frankedPct: 80, person1InvestShare: 30 })
+  })
+
   it('a glide path to safer investments lowers the plan’s growth; a row from before v10 with no range stays off', async () => {
     const db = await setUp()
     const h = await loadHousehold(db)
@@ -463,7 +481,8 @@ describe('what if', () => {
     expect(futureView(applyWhatIf(h, w), NOW).endNetWorth).toBe(futureView(h, NOW).endNetWorth)
     w.projection = { ...w.projection, savingsRate: 90 }
     expect(hasChanges(h, w)).toBe(true)
-    expect(futureView(applyWhatIf(h, w), NOW).endNetWorth).not.toBe(futureView(h, NOW).endNetWorth)
+    // Mid-way: by the end this household lives on super with nothing left outside it either way.
+    expect(futureView(applyWhatIf(h, w), NOW, { runs: 0 }).netWorth[20]).not.toBe(futureView(h, NOW, { runs: 0 }).netWorth[20])
     expect((await loadHousehold(db)).projection.savingsRate).toBe(h.projection.savingsRate)
   })
 
@@ -631,6 +650,9 @@ describe('settings and backups', () => {
 
   it('costs follow the children’s ages: leaving home, a planned baby, regional (Phase 44)', async () => {
     const db = await setUp()
+    // Life stages alone: with interest on its cash this household ends with
+    // nothing outside super either way, which would hide the differences.
+    await saveSettings(db, 'projectionSettings', { cashRate: 0, dividendYield: 0 })
     const end = async () => futureView(await loadHousehold(db), NOW).endNetWorth
     const noKids = await end()
     // A 16-year-old today: leaves home in 2028 (18).

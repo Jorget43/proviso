@@ -96,6 +96,10 @@ export const projectionSettingsSchema = z
     growthPct:            num.min(0).max(100),
     glidePath:            z.boolean(),
     glideTargetPct:       num.min(0).max(100),
+    dividendYield:        num.min(0).max(15),
+    frankedPct:           num.min(0).max(100),
+    cashRate:             num.min(0).max(15),
+    person1InvestShare:   num.min(0).max(100),
   })
   .partial()
 

@@ -404,7 +404,7 @@ The assumptions watchdog (`/admin/watchdog` for the CFO when `WATCHDOG_ENABLED=t
 - `marginalRate()` ignores the LITO taper and the Medicare shade-in band (headline rate only — used for guidance figures).
 - Life course (Phase 40):
   - No Age Pension yet.
-  - Investments outside super grow untaxed.
+  - Investment income (Phase 50): only the dividend yield and interest are taxed; growth isn't, and selling investments (including for a deposit or a shortfall) has no capital gains tax apart from the purchase haircut. Investment income doesn't count towards HELP, the Medicare levy surcharge or the Child Care Subsidy income test. Interest is on start-of-year cash above the loan. Franking assumes 30% company tax. One ownership split covers all investments.
   - Super withdrawals are tax-free (true at 60+).
   - Ages are whole years "this year", from birth years since Phase 41 (no birth month for adults).
   - The minimum drawdown uses the start-of-year balance.
@@ -434,14 +434,14 @@ In [`docs/architecture.md`](docs/architecture.md) order. Phase 3 there (the sing
 **Start here next session**, in this order:
 1. **⏰ Remind the owner first — phone test still to do** (deferred 2026-10-08, "soon"). **The Android development build with Phases 34–35** (sync, camera, key backup): it built successfully on EAS on 2026-10-08 (so the key-backup Kotlin module and expo-camera compile); `npm run eas -w @proviso/client -- build:list --limit 1` shows the APK link. Install it and check on the phone: Settings → Recovery phrase → Save to Google Password Manager; Settings → Sync; Join a household (camera scan).
 2. **Run the relay on the NAS** with the owner: `docker compose --profile sync up -d` (image `ghcr.io/jorget43/proviso-relay`, published by CI from master since 2026-10-08), then `tailscale serve --bg --https=8443 http://localhost:8787` (README "Sync relay for the app"). Turn sync on in the app with the `https://<machine>.<tailnet>.ts.net:8443` address, then join from a second phone. Phones need Tailscale running to reach it.
-3. **Owner decisions pending**: none. (Phase 49, Monte Carlo and the glide path: owner OK to merge 2026-10-19.)
+3. **Owner decisions pending**: Phase 50 (interest and dividends, taxed) is built on branch `phase-50-investment-income`, waiting for the owner's OK to merge and push.
 4. **Step B of [`docs/plan-modelling-and-ux.md`](docs/plan-modelling-and-ux.md)**:
    - The life-course engine shipped as Phase 40 (merged to master 2026-10-09 with the owner's OK).
    - Phase 41 (birth years, the `child` table) merged to master 2026-10-12 with the owner's OK.
 5. **Step C**: the cash-buffer rule is Phase 43 (merged to master 2026-10-14). Life stages are Phase 44 (merged to master 2026-10-14 with the owner's OK).
 6. **Step D**: scenarios are Phase 45 (merged and pushed 2026-10-18). Next:
    - School fees v2 (plan item 7) is Phase 46 (merged and pushed 2026-10-18).
-   - Step E (uncertainty): 8a, ranges of returns, is Phase 48; Monte Carlo (8b) and the glide path are Phase 49, which replaces 8a's band. Step E is then complete; next in the plan is step F (income and tax: portfolio yield and franking first).
+   - Step E (uncertainty): 8a, ranges of returns, is Phase 48; Monte Carlo (8b) and the glide path are Phase 49, which replaces 8a's band. Step E is then complete. Step F (income and tax): 5a, interest and dividends, is Phase 50. Next: 6 salary packaging, then 5b business income, then 5c rental.
    - The app's chart component is Phase 47 (merged and pushed 2026-10-18). Still open for the app: editing a saved scenario, the Money in & out and Home charts, and the drawdown strategy choice.
    - Step A (dark mode, editing, chart trim) shipped as Phases 37–39.
    - Also open: the relay enforcing roles, and the iOS build once the Apple account is ready.
@@ -455,7 +455,7 @@ The full list:
 - **Dependency advisories**: GitHub lists some on master, believed to be all in Expo's build and dev-server tools (`braces`, `node-forge`, `uuid` via `xcode`, `decode-uri-component`), several with no fixed version yet. They don't reach the NAS image (CI audits exactly what it ships). Dependabot was preparing a security update for them on 2026-10-06: review it carefully, because Expo pins some of them, and React / React Native / `expo*` move only with the Expo SDK (`proviso-release` skill).
 - **Starter estimates** (`packages/core/src/starter.ts`): re-check the figures yearly with the July recalibration; electricity still uses the AER's 2020 usage benchmarks (no longer updated).
 
-### Where each feature lives (NAS ↔ app), as of Phase 49
+### Where each feature lives (NAS ↔ app), as of Phase 50
 
 | Feature | NAS web app | The app | Notes |
 |---|---|---|---|
@@ -476,6 +476,7 @@ The full list:
 | Birth years (ages move on each year) | Set at onboarding; kept in step | ✓ edit (Settings → People) | `core/people.ts` |
 | Children (birth year, month, name; planned babies) | ✓ (What if? → Family) | ✓ edit (Settings); drive school-fee years | NAS `Child` table since Phase 44; with children recorded, school-fee years follow them on both |
 | Costs that change with age (life stages), where you live | ✓ (What if? → Family) | ✓ (Assumptions; What if? leave-home age); milestones | `core/lifeStages.ts`, Phase 44 |
+| Interest and dividends, taxed (franking, who owns them) | ✓ What if? → More assumptions; Money in & out readout | ✓ Assumptions | `core/investmentIncome.ts`, Phase 50 |
 | Range of outcomes (Monte Carlo band, chance money lasts) | ✓ Net worth and Retirement charts, headline, takeaways; What if? → Basics: mix, glide path, on/off | ✓ Future headline, net worth and super charts, retirement line; Assumptions | `core/uncertainty.ts`, Phase 49 (replaced Phase 48's ±points band) |
 | Scenarios (save and compare) | ✓ make, edit, rename, delete in What if?; dashed lines on every Future chart; Compare card | Save a What if? draft as one; dashed lines on the net worth chart; show / hide; Compare card; delete | `core/scenarios.ts`, Phase 45; app lines Phase 47. Editing a saved scenario is NAS-only so far |
 | Life phases (calendar rows) | ✓ toggle ("Extra costs by year") | Read only | Kept as custom extras; life stages do the automatic part |
@@ -568,6 +569,34 @@ Ideas that have been evaluated but aren't on the roadmap. Each links to its writ
 - **School fees decided**: the questionnaire's school-cost lines stay in today's budget; the projection models the two eldest children's fees year by year (ending after Year 12) and leaves those lines out (`isModelledSchoolLine`), so nothing is counted twice. The questionnaire switches `schoolFeesOn` on when there are children.
 - Typed routes are off in `apps/client` (the generated file only existed where a dev server ran, never in CI, and misread the monorepo).
 - Verified: 356 tests; the app at 390px (a Melbourne family of four: $2.32M in today's money in 20 years, HELP cleared 2028, school fees end 2039, loan paid off 2042; a $45k car in 2029 gives $2.28M); the NAS Projections and Super pages rendered against a scratch household. The NAS Super "consider a lower target" hint was fixed on the way (it would have subtracted the mortgage twice and suggested $0).
+
+### Phase 50 — Plan step F, part 1: interest and dividends, taxed (2026-10-19)
+
+Plan item 5a. Owner's decisions (2026-10-19): dividends as a yield on investments; savings earn about 4% by default; investment income is taxed by default; income is split evenly between partners, with a setting.
+
+- **Core** (`investmentIncome.ts`):
+  - **Interest:** cash above the home-loan balance earns `cashRate`. Cash up to the balance is in the offset.
+  - **Dividends:** `dividendYield` of investments is part of `investReturn`. It's reinvested, so the balance grows as before; only the tax comes out of cash.
+  - **Franking:** `frankingCredit` assumes 30% company tax. The dividend is grossed up; credits beyond the tax are refunded.
+  - **Tax:** `taxOnTop(base, extra, credits)` is each person's extra tax on top of their other taxable income. `grossFromNet` (bisection) gives that income for take-home-pay households. `investIncomeYear` splits the income by `person1Share` (all Person 1's without a partner).
+- **Engine** (`projections.ts`):
+  - The optional `investIncome` is computed on start-of-year balances before the monthly loop. Interest less tax joins the year's money in.
+  - New outputs: `interestArr`, `dividendArr`, `investTaxArr`, `investIncArr`.
+  - Without the input, nothing pinned moves.
+- **Schema v11** (Drizzle `0010_investment_income`, Prisma `0015_investment_income`): `projectionSettings.dividendYield` (3), `frankedPct` (50), `cashRate` (4), `person1InvestShare` (50). Scenarios can change them. `buildProjectionInputs` always passes them.
+- **NAS:**
+  - What if? → More assumptions gains sliders for savings account interest, dividends paid out, dividends with franking credits, and "Investments in X's name" (with a partner).
+  - "Investment growth each year" now says it's the total, dividends included.
+  - Money in & out: `moneyIn()` adds `investIncArr`, and the readout gains "Of the money in: interest, less tax on investment income".
+- **App:** Assumptions gets the same four fields.
+- **Numbers change** (owner's OK): every household.
+  - Cash above the loan earns 4% less tax, which is a big lift for households that keep most of what's left over as cash. A test couple's plan rose from $4.50M to $9.14M.
+  - Dividends are taxed each year. Low earners and retirees can get franking refunds.
+  - Next 2 years (`cashflow.ts`) doesn't include interest yet.
+- **Verified:**
+  - 559 tests. New in core: franking credits; tax on interest and franked dividends at $0, $100k and $200k of other income (hand-worked); the refund; gross from net; interest only above the loan; the split and the lower earner; no partner; and in the engine, interest less tax reaching cash and dividends taxed but reinvested.
+  - App: the settings saved, the offset case, and higher dividends meaning less cash.
+  - Prisma migration on the scratch NAS (v10 → v11). Headless Chrome at 1280px: the new readout row and sliders, no page errors.
 
 ### Phase 49 — Plan step E, part 2: Monte Carlo and the glide path (2026-10-19)
 

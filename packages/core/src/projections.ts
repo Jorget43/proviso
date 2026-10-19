@@ -5,6 +5,7 @@
 // Two runs: withFees (if schoolFeesOn) and base (always)
 
 import { calcAfterTax, calcHELPRepayment } from './tax';
+import { investIncomeYear, grossFromNet, type InvestIncomeSettings } from './investmentIncome';
 import { simulateMortgageYear, computeMonthlyRepayment } from './mortgage';
 import { schoolFeesYear, LEGACY_FEE_RULES, SF_BASE as SF_DEFAULT, type FeeSchedule, type SchoolKid, type SchoolFeeRules } from './schoolFees';
 import { lifePhaseCostForYear } from './lifephases';
@@ -97,6 +98,11 @@ export interface ProjectionInputs {
   superReturnByYear?:  number[];
   /** Skip the without-school-fees run (its `base` is then the with-fees run). For Monte Carlo. */
   mainOnly?:           boolean;
+  /**
+   * Interest on cash and dividends on investments, taxed (investmentIncome.ts).
+   * Without it, cash earns nothing and investments grow untaxed (as before Phase 50).
+   */
+  investIncome?:       InvestIncomeSettings;
 
   projYears:          number;
 
@@ -193,6 +199,11 @@ export interface ProjectionResult {
   stageArr:       number[];
   /** Spent on fun / lifestyle out of the surplus above the cash buffer (not in expArr). */
   funArr:         number[];
+  /** Investment income each year (zeros without `investIncome`): interest on cash, dividends, tax on both after franking credits (negative: a refund), and what reached cash (interest less tax). */
+  interestArr:    number[];
+  dividendArr:    number[];
+  investTaxArr:   number[];
+  investIncArr:   number[];
   /** The cash buffer aimed for at the end of each year (0 without one). */
   bufferArr:      number[];
   /** Shortfalls not covered by cash or investments, carried as money owed (in net worth). */
@@ -399,6 +410,10 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
     const deficitArr:     number[] = [];
     const cashRunningArr: number[] = [];
     const funArr:         number[] = [];
+    const interestArr:    number[] = [];
+    const dividendArr:    number[] = [];
+    const investTaxArr:   number[] = [];
+    const investIncArr:   number[] = [];
     const stageArr:       number[] = [];
     // Prices relative to today, for amounts given in today's dollars.
     let priceIdx  = 1;
@@ -567,11 +582,27 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
       sf.perChild.forEach((v, i) => sfChildArr[i].push(Math.round(v)));
       sfFamilyArr.push(Math.round(sf.family));
 
+      // ── Investment income ── on start-of-year balances, taxed on top of
+      // each person's other taxable income (investmentIncome.ts).
+      let investCash = 0;
+      if (inputs.investIncome) {
+        const p1Taxable = p1Retired ? 0 : taxMode ? p1DaysGross - p1Sacrifice : grossFromNet(p1Annual);
+        const p2Taxable = p2Retired ? 0 : isLeave ? (isFirstLeave ? pplGross : 0)
+          : taxMode ? p2DaysGross - p2Sacrifice : grossFromNet(p2Annual);
+        const partner = lc ? lc.partnerEnabled : (person2FTE > 0 || person2MonthlyNet > 0);
+        const yi = investIncomeYear(inputs.investIncome, { cash, loan: mb, invest }, [p1Taxable, p2Taxable], partner);
+        investCash = yi.cash;
+        interestArr.push(Math.round(yi.interest)); dividendArr.push(Math.round(yi.dividends));
+        investTaxArr.push(Math.round(yi.tax));     investIncArr.push(Math.round(yi.cash));
+      } else {
+        interestArr.push(0); dividendArr.push(0); investTaxArr.push(0); investIncArr.push(0);
+      }
+
       // ── Life phase overlay ──
       const phaseOverlay = lifePhaseCostForYear(yr, lifePhases, yearInflRate * 100, cI * 100);
 
       // ── Monthly cashflow loop (mortgage with live offset) ──
-      const annualInc  = p2Annual + p1Annual;
+      const annualInc  = p2Annual + p1Annual + investCash;
       // Rent is separate from expBase and grows at rentIncreaseRate. Mortgage
       // repayments are NOT in here: simulateMortgageYear pays them out of cash
       // at the actual (un-inflated) amount and stops once the loan is cleared,
@@ -691,7 +722,7 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
 
     return {
       nwArr, incArr, expArr, mortArr, cashArr, investArr,
-      person1Arr, person2Arr, phaseArr, deficitArr, cashRunningArr, funArr, bufferArr, stageArr, owedArr, mortStressArr,
+      person1Arr, person2Arr, phaseArr, deficitArr, cashRunningArr, funArr, interestArr, dividendArr, investTaxArr, investIncArr, bufferArr, stageArr, owedArr, mortStressArr,
       sfC1Arr, sfC2Arr, sfSibArr, sfTotalArr, sfChildArr, sfFamilyArr, leaveYrs, person1HelpClearedYr, person2HelpClearedYr,
       rentArr, purchaseYr, purchase,
       super1Arr, super2Arr, superArr, superDrawArr, retiredArr,

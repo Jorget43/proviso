@@ -28,6 +28,11 @@ export interface Assumptions {
   growthPct?:      number
   glidePath?:      boolean
   glideTargetPct?: number
+  /** Income from savings and investments (schema v11; core/investmentIncome.ts). */
+  cashRate?:           number
+  dividendYield?:      number
+  frankedPct?:         number
+  person1InvestShare?: number
 }
 
 /** Where the household lives: typical costs differ outside the capital cities. */

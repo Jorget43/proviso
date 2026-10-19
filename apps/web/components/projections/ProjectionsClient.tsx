@@ -3,6 +3,7 @@ import { useState, useMemo, useCallback, useDeferredValue } from 'react'
 import { fmt, fmtK, possessive } from '@proviso/core/formatting'
 import { runProjections, type ProjectionResult } from '@proviso/core/projections'
 import { runOutlook, planInputs, mixFrom, rangeOn, chanceWords, MIX_CHOICES } from '@proviso/core/uncertainty'
+import { DEFAULT_CASH_RATE, DEFAULT_DIVIDEND_YIELD, DEFAULT_FRANKED_PCT, DEFAULT_PERSON1_SHARE } from '@proviso/core/investmentIncome'
 import { runScenarios, summariseRun, readOverrides, validOverrides, patchOverrides, writeOverrides, countChanges, scenarioColour, type ScenarioOverrides, type OverrideSection, type ScenarioSummary } from '@proviso/core/scenarios'
 import { buildProjectionInputs, type ProjectionBaseline, type SuperSettingsLike } from '@proviso/core/future'
 import { asDrawdownStrategy, PRESERVATION_AGE, DEFAULT_HORIZON_AGE, type DrawdownStrategy } from '@proviso/core/retirement'
@@ -52,6 +53,10 @@ interface ProjSettings {
   growthPct?:      number
   glidePath?:      boolean
   glideTargetPct?: number
+  dividendYield?:      number
+  frankedPct?:         number
+  cashRate?:           number
+  person1InvestShare?: number
   childLeavesHomeAge: number
   parentalLeaveEnabled: boolean
   schoolFeesOn:  boolean
@@ -697,7 +702,7 @@ export default function ProjectionsClient({
                   labels={output.labels} person1Data={main.person1Arr} person2Data={main.person2Arr}
                   person1Name={person1Name} person2Name={person2Name} showPerson2={partnerEnabled}
                   leaveYrs={main.leaveYrs} spendData={main.expArr} sfTotalData={sfOn ? main.sfTotalArr : main.sfTotalArr.map(() => 0)}
-                  phaseData={main.phaseArr} cashData={main.cashRunningArr} superData={main.superDrawArr}
+                  phaseData={main.phaseArr} cashData={main.cashRunningArr} superData={main.superDrawArr} investData={main.investIncArr}
                   overlays={overlays(x => x.expArr, x => [{ label: 'Left over (or short)', data: leftOver(x), compareTo: leftOver(main), format: signed }])}
                 />
               )}
@@ -880,7 +885,7 @@ export default function ProjectionsClient({
               <Slider label="Leftover money you spend on fun" hint="Holidays, treats, upgrades. It’s spent, so it doesn’t add to what you own."
                 min={0} max={100 - ed.settings.savingsRate} step={5} value={Math.min(ed.settings.funPct ?? 0, 100 - ed.settings.savingsRate)} cls="purple-t"
                 onChange={v => editSettings({ funPct: v })} />
-              <Slider label="Investment growth each year" min={0} max={15} step={0.5} value={ed.settings.investReturn} cls="purple-t" onChange={v => editSettings({ investReturn: v })} />
+              <Slider label="Investment growth each year" hint="The total, dividends included, before tax." min={0} max={15} step={0.5} value={ed.settings.investReturn} cls="purple-t" onChange={v => editSettings({ investReturn: v })} />
               <MixControls
                 growthPct={mixFrom(ed.settings).growthPct} glidePath={mixFrom(ed.settings).glidePath} glideTargetPct={mixFrom(ed.settings).glideTargetPct}
                 showRange={rangeOn(ed.settings)} onChange={editSettings} />
@@ -890,6 +895,16 @@ export default function ProjectionsClient({
                 <Slider label="Price rises after that" min={0} max={8} step={0.5} value={ed.settings.expInfl} cls="red-t" onChange={v => editSettings({ expInfl: v })} />
                 <Slider label="Childcare price rises" min={0} max={15} step={0.5} value={ed.settings.childcareInfl} cls="pink-t" onChange={v => editSettings({ childcareInfl: v })} />
                 <Slider label="Property value growth" min={0} max={12} step={0.5} value={ed.settings.propGrowth} cls="amber-t" onChange={v => editSettings({ propGrowth: v })} />
+                <Slider label="Savings account interest" hint="On cash above the home loan (cash in an offset saves loan interest instead). Taxed."
+                  min={0} max={8} step={0.25} value={ed.settings.cashRate ?? DEFAULT_CASH_RATE} cls="blue-t" onChange={v => editSettings({ cashRate: v })} />
+                <Slider label="Dividends paid out" hint="Part of the investment growth above, paid as dividends and reinvested. The tax on them is paid from cash."
+                  min={0} max={8} step={0.25} value={ed.settings.dividendYield ?? DEFAULT_DIVIDEND_YIELD} cls="purple-t" onChange={v => editSettings({ dividendYield: v })} />
+                <Slider label="Dividends with franking credits" hint="Australian shares usually pay franked dividends: company tax already paid comes off yours."
+                  min={0} max={100} step={10} value={ed.settings.frankedPct ?? DEFAULT_FRANKED_PCT} cls="purple-t" onChange={v => editSettings({ frankedPct: v })} />
+                {partnerEnabled && (
+                  <Slider label={`Investments in ${possessive(person1Name)} name`} hint={`The rest in ${possessive(person2Name)}. Income in the lower earner’s name is taxed less.`}
+                    min={0} max={100} step={10} value={ed.settings.person1InvestShare ?? DEFAULT_PERSON1_SHARE} cls="blue-t" onChange={v => editSettings({ person1InvestShare: v })} />
+                )}
               </details>
             </Panel>
           </div>

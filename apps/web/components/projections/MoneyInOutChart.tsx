@@ -26,24 +26,27 @@ interface Props {
   cashData:     number[]
   /** Taken out of super to live on, stacked on the pay bars (retirement). */
   superData?:   number[]
+  /** Interest less tax on savings and investment income (can be negative: tax on reinvested dividends). */
+  investData?:  number[]
   /** Scenarios' spending, as lines over the plan's, with what's left over in the readout. */
   overlays?:    Overlay[]
 }
 
 export const signed = (v: number) => (v > 0 ? '+' : '') + fmtK(v)
 
-/** Money in each year: take-home pay plus anything taken from super to live on. */
-export function moneyIn(r: { person1Arr: number[]; person2Arr: number[]; superDrawArr?: number[] }, showPerson2: boolean): number[] {
-  return r.person1Arr.map((v, i) => v + (showPerson2 ? r.person2Arr[i] ?? 0 : 0) + (r.superDrawArr?.[i] ?? 0))
+/** Money in each year: take-home pay, anything taken from super to live on, and interest less tax on investment income. */
+export function moneyIn(r: { person1Arr: number[]; person2Arr: number[]; superDrawArr?: number[]; investIncArr?: number[] }, showPerson2: boolean): number[] {
+  return r.person1Arr.map((v, i) => v + (showPerson2 ? r.person2Arr[i] ?? 0 : 0) + (r.superDrawArr?.[i] ?? 0) + (r.investIncArr?.[i] ?? 0))
 }
 
 export default function MoneyInOutChart({
-  labels, person1Data, person2Data, person1Name, person2Name, showPerson2, leaveYrs, spendData, sfTotalData, phaseData, cashData, superData, overlays,
+  labels, person1Data, person2Data, person1Name, person2Name, showPerson2, leaveYrs, spendData, sfTotalData, phaseData, cashData, superData, investData, overlays,
 }: Props) {
   const c = useChartColors()
   const leave = new Set(leaveYrs)
   const fromSuper = superData?.some(v => v > 0) ? superData : null
-  const income = moneyIn({ person1Arr: person1Data, person2Arr: person2Data, superDrawArr: fromSuper ?? undefined }, showPerson2)
+  const income = moneyIn({ person1Arr: person1Data, person2Arr: person2Data, superDrawArr: fromSuper ?? undefined, investIncArr: investData }, showPerson2)
+  const fromInvest = investData?.some(v => v !== 0) ? investData : null
   const gap = income.map((v, i) => v - (spendData[i] ?? 0))
   // Readout-only series: listed with the year's values, not drawn.
   // On their own hidden scale, so they don't stretch the chart.
@@ -57,6 +60,7 @@ export default function MoneyInOutChart({
       backgroundColor: labels.map(y => (leave.has(Number(y)) ? c.a(c.pink, 0.7) : c.a(c.green, 0.7))) }] : []),
     ...(fromSuper ? [{ type: 'bar' as const, label: 'From super', data: fromSuper, backgroundColor: c.a(c.teal, 0.7), stack: 'in', borderRadius: 3, order: 2 }] : []),
     { ...readOnly, label: 'Left over (or short)', data: gap, borderColor: c.t2, format: signed },
+    ...(fromInvest ? [{ ...readOnly, label: 'Of the money in: interest, less tax on investment income', data: fromInvest, borderColor: c.purple, format: signed }] : []),
     { ...readOnly, label: 'Of the spending: school fees', data: sfTotalData, borderColor: c.amber },
     { ...readOnly, label: 'Of the spending: life stages', data: phaseData, borderColor: c.teal },
     { ...readOnly, label: 'Cash at the end of the year', data: cashData, borderColor: c.blue },

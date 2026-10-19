@@ -135,6 +135,10 @@ model ProjectionSettings {
   growthPct            Float   @default(70)   // % in growth assets: how much returns swing
   glidePath            Boolean @default(false) // move growthPct to glideTargetPct by retirement
   glideTargetPct       Float   @default(50)
+  dividendYield        Float   @default(3)    // % of investments paid as dividends (part of investReturn; schema v11)
+  frankedPct           Float   @default(50)   // % of dividends franked
+  cashRate             Float   @default(4)    // % a year on cash above the home loan
+  person1InvestShare   Float   @default(50)   // % of investment income in Person 1's name
 }
 
 model LifePhase {
