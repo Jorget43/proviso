@@ -45,6 +45,14 @@ export function superAccessible(age: number, retired: boolean): boolean {
 export type DrawdownStrategy = 'need' | 'fourPercent' | 'percentOfBalance' | 'minimum'
 export const DRAWDOWN_STRATEGIES: DrawdownStrategy[] = ['need', 'fourPercent', 'percentOfBalance', 'minimum']
 
+/** How each strategy reads in the NAS's and the app's choosers. */
+export const DRAWDOWN_CHOICES: { key: DrawdownStrategy; label: string; hint: string }[] = [
+  { key: 'need',             label: 'Spend what you need', hint: 'Cash and savings outside super pay first, then super. Super always pays at least the legal minimum.' },
+  { key: 'fourPercent',      label: '4% rule',             hint: 'Super pays 4% of its balance in your first year of retirement, then the same amount plus price rises.' },
+  { key: 'percentOfBalance', label: 'A set % each year',   hint: 'Super pays a fixed share of whatever is there. The amount changes, but it never runs out.' },
+  { key: 'minimum',          label: 'Legal minimum',       hint: 'Super pays only the minimum the law requires: 4% a year under 65, rising with age.' },
+]
+
 /** Unknown values (from a newer device) fall back to the default. */
 export function asDrawdownStrategy(v: string | null | undefined): DrawdownStrategy {
   return (DRAWDOWN_STRATEGIES as string[]).includes(v ?? '') ? v as DrawdownStrategy : 'need'

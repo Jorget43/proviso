@@ -5,12 +5,14 @@
 // nothing is written until you keep the draft (through mutate.ts).
 
 import { newId } from '@proviso/core/ids'
-import { nextScenarioColour, writeOverrides, type ScenarioOverrides } from '@proviso/core/scenarios'
+import { nextScenarioColour, readOverrides, validOverrides, writeOverrides, type ScenarioOverrides } from '@proviso/core/scenarios'
+import { sortChildren } from '@proviso/core/people'
 import type { Db } from './db'
 import type { HouseholdData } from './household'
 import { insertRow, updateRow, deleteRow, saveSettings } from './mutate'
 
 type WorkPhase = HouseholdData['workPhases'][number]
+type Scenario  = HouseholdData['scenarios'][number]
 
 export interface WhatIf {
   projection: HouseholdData['projection']
@@ -20,6 +22,30 @@ export interface WhatIf {
 
 export function startWhatIf(h: HouseholdData): WhatIf {
   return { projection: { ...h.projection }, rent: { ...h.rent }, workPhases: h.workPhases.map(w => ({ ...w })) }
+}
+
+/**
+ * The household with a saved scenario's changes on top, as rows (the same
+ * layering as core's applyScenario). What if? starts from this to edit the
+ * scenario, and previews with it, so changes What if? can't edit yet (super,
+ * one-offs, children) still count.
+ */
+export function withScenario(h: HouseholdData, scenario: Scenario): HouseholdData {
+  const o = validOverrides(readOverrides(scenario.overrides))
+  const phasesFor = (person: 'p1' | 'p2', list: ScenarioOverrides['person1Phases']) =>
+    list ? list.map(p => ({ id: newId(), deletedAt: null, person, year: p.year, days: p.days }))
+      : h.workPhases.filter(p => p.person === person)
+  return {
+    ...h,
+    projection: { ...h.projection, ...o.settings },
+    rent: { ...h.rent, ...o.rent },
+    superSettings: { ...h.superSettings, ...o.super, drawdownStrategy: o.super?.drawdownStrategy ?? h.superSettings.drawdownStrategy },
+    workPhases: [...phasesFor('p1', o.person1Phases), ...phasesFor('p2', o.person2Phases)],
+    oneOffs: o.oneoffs ? o.oneoffs.map(x => ({ id: newId(), deletedAt: null, ...x })) : h.oneOffs,
+    children: o.children
+      ? sortChildren(o.children.map(c => ({ id: newId(), deletedAt: null, primarySchool: null, secondarySchool: null, ...c })))
+      : h.children,
+  }
 }
 
 /** The household as it would be with the draft kept. */
@@ -95,6 +121,41 @@ export async function saveAsScenario(db: Db, h: HouseholdData, w: WhatIf, name: 
     enabled: true,
     overrides: writeOverrides(overridesFromWhatIf(h, w) as Record<string, unknown>),
   })
+}
+
+/**
+ * Saves an edited scenario. `start` is the draft as it opened (the plan with
+ * the scenario on top), `w` as it is now. Only what was edited is rewritten:
+ * an edited setting is stored if it differs from the plan and dropped if it's
+ * back to the plan's value; untouched ones, sections What if? can't edit, and
+ * keys from newer app versions stay as they were.
+ */
+export async function updateScenario(db: Db, h: HouseholdData, scenario: Scenario, start: WhatIf, w: WhatIf, name: string): Promise<void> {
+  const raw = readOverrides(scenario.overrides)
+  const next: Record<string, unknown> = { ...raw }
+  const section = <T extends object>(key: 'settings' | 'rent', plan: T, before: T, after: T) => {
+    const stored = raw[key] && typeof raw[key] === 'object' && !Array.isArray(raw[key]) ? raw[key] as Record<string, unknown> : {}
+    const out: Record<string, unknown> = { ...stored }
+    for (const k of Object.keys(after) as (keyof T & string)[]) {
+      if (k === 'id' || k === 'deletedAt' || k === 'enabled' || after[k] === before[k]) continue
+      if (after[k] === plan[k]) delete out[k]
+      else out[k] = after[k]
+    }
+    if (Object.keys(out).length) next[key] = out
+    else delete next[key]
+  }
+  section('settings', h.projection, start.projection, w.projection)
+  section('rent', h.rent, start.rent, w.rent)
+  for (const person of ['p1', 'p2'] as const) {
+    const mine = (list: WorkPhase[]) => list.filter(p => p.person === person)
+    const c = workChanges(mine(start.workPhases), mine(w.workPhases))
+    if (c.added.length + c.updated.length + c.removed.length === 0) continue
+    const key = person === 'p1' ? 'person1Phases' : 'person2Phases'
+    const vsPlan = workChanges(mine(h.workPhases), mine(w.workPhases))
+    if (vsPlan.added.length + vsPlan.updated.length + vsPlan.removed.length === 0) delete next[key]
+    else next[key] = mine(w.workPhases).sort((a, b) => a.year - b.year).map(p => ({ year: p.year, days: p.days }))
+  }
+  await updateRow(db, 'scenario', scenario.id, { name: name.trim() || scenario.name, overrides: writeOverrides(next) })
 }
 
 export const removeScenario = (db: Db, id: string) => deleteRow(db, 'scenario', id)

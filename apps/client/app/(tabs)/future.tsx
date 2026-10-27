@@ -3,16 +3,19 @@
 // @proviso/core's, fed by core/future.ts, the same as the NAS's Projections
 // and Super pages.
 
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { Pressable, View } from 'react-native'
 import { router } from 'expo-router'
 import { fmt, fmtK } from '@proviso/core/formatting'
 import { chanceWords } from '@proviso/core/uncertainty'
+import { DRAWDOWN_CHOICES, type DrawdownStrategy } from '@proviso/core/retirement'
+import { MORTGAGE_STRESS_PCT } from '@proviso/core/yearByYear'
 import { useHousehold } from '@/data/DataProvider'
 import { futureView, cashflowView, compareView, type CompareRow, type FutureView } from '@/data/views'
 import { removeScenario, showScenario } from '@/data/whatif'
+import { saveDrawdown } from '@/data/future'
 import { confirmAction } from '@/ui/confirm'
-import { Button, Card, H2, Screen, T } from '@/ui/kit'
+import { Button, Card, Choice, Field, H2, Screen, Stepper, T } from '@/ui/kit'
 import { ScrubChart, type ChartSeries } from '@/ui/ScrubChart'
 import { usePalette, space, radius, touch } from '@/ui/theme'
 
@@ -58,6 +61,8 @@ export default function Future() {
           onRemove={row => confirmAction(`Delete “${row.name}”?`, 'Your plan isn’t affected.', 'Delete',
             () => { void change(db => removeScenario(db, row.id!)) })} />
       )}
+
+      <YearByYear v={v} compare={compare} names={[household.settings.person1Name, household.settings.person2Name]} />
 
       <Pressable accessibilityRole="button" accessibilityHint="Cash in the bank month by month" onPress={() => router.push('/cashflow')}
         style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
@@ -137,6 +142,8 @@ export default function Future() {
             <T tone="amber">Savings outside super run out in {v.retirement.bridgeShortYear}, before super can be reached at 60.</T>
           )}
           <T size="small" tone="t2">In today’s money. Counts super and your savings outside it; doesn’t count the Age Pension.</T>
+          <Drawdown strategy={v.drawdown.strategy} pct={v.drawdown.pct}
+            onChange={(strategy, pct) => { void change(db => saveDrawdown(db, strategy, pct)) }} />
           {v.retirement.superByYear.some(x => x > 0) && (
             <View style={{ marginTop: space.sm }}>
               <ScrubChart title="Super and savings by year" labels={v.labels} height={160}
@@ -188,10 +195,108 @@ export default function Future() {
   )
 }
 
-/** The plan and each saved scenario, side by side. */
 /** A scenario's values fitted to the plan's years (it may look further ahead, or not as far). */
 const fit = (data: number[], length: number): (number | null)[] => Array.from({ length }, (_, i) => data[i] ?? null)
 
+const signed = (n: number) => `${n > 0 ? '+' : n < 0 ? '−' : ''}${fmtK(Math.abs(n))}`
+const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? '' : 's'}`
+
+type YearChart = 'inout' | 'home'
+
+/** Money in & out and the home loan, year by year: the NAS's charts of the same names. */
+function YearByYear({ v, compare, names }: { v: FutureView; compare: CompareRow[]; names: [string, string] }) {
+  const p = usePalette()
+  const [which, setWhich] = useState<YearChart>('inout')
+  const io = v.inOut
+  const home = v.home
+  const chart = home ? which : 'inout'
+  const scenarios = compare.filter(r => r.id !== null && r.shown && r.colour)
+  const some = (xs: number[]) => xs.some(x => x !== 0)
+
+  const inOutText = (() => {
+    if (io.workingYears === 0) return 'You live on super and savings in every year shown.'
+    const last = io.workingYears - 1
+    const pay = (i: number) => io.pay1[i] + io.pay2[i]
+    const range = `Take-home pay goes from ${fmtK(pay(0))} to ${fmtK(pay(last))} a year${io.retiredFrom ? ` by ${v.labels[last]}` : ''}.`
+    const lean = io.leanest!
+    const body = io.tightYears.length === 0
+      ? ` Your income covers your spending in every working year; the leanest is ${lean.year}, with ${fmtK(lean.leftOver)} to spare.`
+      : ` You’d spend more than you earn in ${plural(io.tightYears.length, 'working year')}, starting ${io.tightYears[0]}; the tightest is ${lean.year}, ${fmtK(-lean.leftOver)} short.`
+    const retired = io.retiredFrom && io.retiredFrom !== v.labels[0] ? ` From ${io.retiredFrom} you live on super and savings.` : ''
+    const leave = io.leaveYears.length ? ` ${names[1]} is on parental leave in ${io.leaveYears.join(', ')}.` : ''
+    return range + body + retired + leave
+  })()
+
+  const homeText = home && (
+    (home.paidOff ? `Your home loan is paid off in ${home.paidOff}.` : `Your home loan isn’t paid off by ${v.labels[v.labels.length - 1]}.`)
+    + (home.stressYears.length === 0
+      ? ` Repayments stay under ${MORTGAGE_STRESS_PCT}% of your income, a comfortable level.`
+      : ` Repayments take more than ${MORTGAGE_STRESS_PCT}% of your income in ${plural(home.stressYears.length, 'year')}, peaking at ${home.peak.pct.toFixed(0)}% in ${home.peak.year}.`))
+
+  return (
+    <View style={{ gap: space.sm }}>
+      <H2>Year by year</H2>
+      <Card>
+        {home && (
+          <Choice label="Chart" options={[{ key: 'inout', label: 'Money in & out' }, { key: 'home', label: 'Home loan' }]}
+            value={chart} onChange={k => setWhich(k as YearChart)} />
+        )}
+        {chart === 'inout' ? (
+          <>
+            <T tone="t2">{inOutText}</T>
+            <ScrubChart title="Money in and out by year" labels={v.labels} defaultIndex={0} series={[
+              { key: 'in', label: 'Money in', data: io.moneyIn, color: p.green, area: true },
+              { key: 'out', label: 'Spending', data: io.spending, color: p.red },
+              ...scenarios.map((r): ChartSeries => ({
+                key: r.id!, label: `${r.name}: spending`, data: fit(r.spending, v.labels.length), color: p[r.colour!], dashed: true, compareTo: io.spending,
+              })),
+              { key: 'left', label: 'Left over', data: io.leftOver, color: p.t2, readout: true, format: signed },
+              ...scenarios.map((r): ChartSeries => ({
+                key: `${r.id}-left`, label: `${r.name}: left over`, data: fit(r.leftOver, v.labels.length), color: p[r.colour!], readout: true, format: signed, compareTo: io.leftOver,
+              })),
+              { key: 'p1', label: `Pay: ${names[0]}`, data: io.pay1, color: p.blue, readout: true },
+              ...(some(io.pay2) ? [{ key: 'p2', label: `Pay: ${names[1]}`, data: io.pay2, color: p.blue, readout: true }] : []),
+              ...(some(io.fromSuper) ? [{ key: 'super', label: 'From super', data: io.fromSuper, color: p.teal, readout: true }] : []),
+              ...(some(io.investIncome) ? [{ key: 'inv', label: 'Interest, less tax on investment income', data: io.investIncome, color: p.purple, readout: true, format: signed }] : []),
+              { key: 'fees', label: 'Of the spending: school fees', data: io.schoolFees, color: p.amber, readout: true },
+              { key: 'cash', label: 'Cash at the end of the year', data: io.cash, color: p.blue, readout: true },
+            ]} />
+            <T size="caption" tone="t3">In each year’s dollars. Money in is take-home pay{some(io.fromSuper) ? ', money taken from super in retirement' : ''} and interest; spending includes home loan repayments.</T>
+          </>
+        ) : home && (
+          <>
+            <T tone="t2">{homeText}</T>
+            <ScrubChart title="Home loan left by year" labels={v.labels} defaultIndex={0} series={[
+              { key: 'loan', label: 'Loan left', data: home.loan, color: p.red, area: true },
+              ...scenarios.map((r): ChartSeries => ({
+                key: r.id!, label: r.name, data: fit(r.loan, v.labels.length), color: p[r.colour!], dashed: true, compareTo: home.loan,
+              })),
+              { key: 'stress', label: 'Repayments', data: home.stressPct, color: p.amber, readout: true, format: x => `${x.toFixed(0)}% of income` },
+              ...(some(home.rent) ? [{ key: 'rent', label: 'Rent paid', data: home.rent, color: p.blue, readout: true }] : []),
+            ]} />
+            <T size="caption" tone="t3">In each year’s dollars. Repayments as a share of household income before tax; above {MORTGAGE_STRESS_PCT}% is usually called mortgage stress.</T>
+          </>
+        )}
+      </Card>
+    </View>
+  )
+}
+
+/** How super pays for retirement: the plan's choice, saved as soon as it's picked. */
+function Drawdown({ strategy, pct, onChange }: { strategy: DrawdownStrategy; pct: number; onChange: (s: DrawdownStrategy, pct?: number) => void }) {
+  return (
+    <View style={{ gap: space.sm, marginTop: space.sm }}>
+      <Field label="How you’d pay for retirement" hint={DRAWDOWN_CHOICES.find(c => c.key === strategy)!.hint}>
+        <Choice label="How you’d pay for retirement" wrap options={DRAWDOWN_CHOICES} value={strategy} onChange={k => onChange(k as DrawdownStrategy)} />
+      </Field>
+      {strategy === 'percentOfBalance' && (
+        <Stepper label="Share of super taken each year" min={2} max={10} step={0.5} value={pct} onChange={x => onChange(strategy, x)} format={x => `${x}%`} />
+      )}
+    </View>
+  )
+}
+
+/** The plan and each saved scenario, side by side. */
 function Compare({ rows, onRemove, onShow }: { rows: CompareRow[]; onRemove: (row: CompareRow) => void; onShow: (row: CompareRow) => void }) {
   const p = usePalette()
   const plan = rows[0]
@@ -223,7 +328,9 @@ function Compare({ rows, onRemove, onShow }: { rows: CompareRow[]; onRemove: (ro
               </T>
               {r.id !== null && (
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>
-                  <Button kind="quiet" title={r.shown ? 'Hide from chart' : 'Show on chart'} onPress={() => onShow(r)} />
+                  <Button kind="quiet" title="Change" accessibilityHint={`Opens What if? on ${r.name}`}
+                    onPress={() => router.push({ pathname: '/whatif', params: { scenario: r.id! } })} />
+                  <Button kind="quiet" title={r.shown ? 'Hide from charts' : 'Show on charts'} onPress={() => onShow(r)} />
                   <Button kind="danger" title="Delete" onPress={() => onRemove(r)} />
                 </View>
               )}
@@ -231,7 +338,7 @@ function Compare({ rows, onRemove, onShow }: { rows: CompareRow[]; onRemove: (ro
           )
         })}
       </Card>
-      <T size="small" tone="t2">Net worth in today’s money, without super. Make another in What if? → Save as a scenario.</T>
+      <T size="small" tone="t2">Net worth in today’s money, without super. Change one here, or make another in What if? → Save as a scenario.</T>
     </View>
   )
 }

@@ -1,18 +1,21 @@
 // What if?: try changes to the long-term plan and watch the result above the
 // controls change as you go. Nothing is saved until "Keep these changes", or
 // "Save as a scenario", which leaves the plan alone and adds the draft to
-// Future's Compare card. The NAS's Projections page has the same controls.
+// Future's Compare card. Opened from a scenario (Compare → Change), it edits
+// that scenario instead and the plan stays put. The NAS's Projections page has
+// the same controls.
 
 import type { PurchasePaid } from '@proviso/core/projections'
 import { useMemo, useState } from 'react'
 import { View } from 'react-native'
-import { router, Stack } from 'expo-router'
+import { router, Stack, useLocalSearchParams } from 'expo-router'
 import { fmt, fmtK, possessive } from '@proviso/core/formatting'
 import { useHousehold } from '@/data/DataProvider'
 import { futureView } from '@/data/views'
-import { addWorkChange, applyWhatIf, hasChanges, keepWhatIf, saveAsScenario, startWhatIf, type WhatIf } from '@/data/whatif'
+import { addWorkChange, applyWhatIf, hasChanges, keepWhatIf, saveAsScenario, startWhatIf, updateScenario, withScenario, type WhatIf } from '@/data/whatif'
 import { Button, Card, Choice, Field, H2, NumberField, Sheet, Stepper, T, TextField, parseAmount } from '@/ui/kit'
 import { ScrubChart } from '@/ui/ScrubChart'
+import { readOverrides, validOverrides } from '@proviso/core/scenarios'
 import { DEFAULT_LEAVE_HOME_AGE, MAX_LEAVE_HOME_AGE } from '@proviso/core/lifeStages'
 import { usePalette, space } from '@/ui/theme'
 
@@ -29,13 +32,19 @@ export default function WhatIfSheet() {
   const p = usePalette()
   const now = useMemo(() => new Date(), [])
   const year = now.getFullYear()
-  const [w, setW] = useState<WhatIf>(() => startWhatIf(h))
+  const { scenario: scenarioId } = useLocalSearchParams<{ scenario?: string }>()
+  // Fixed when the screen opens; a scenario deleted meanwhile (another device) means the plan.
+  const [editing] = useState(() => h.scenarios.find(x => x.id === scenarioId) ?? null)
+  const base = useMemo(() => (editing ? withScenario(h, editing) : h), [h, editing])
+  const [start] = useState<WhatIf>(() => startWhatIf(base))
+  const [w, setW] = useState<WhatIf>(start)
   const [group, setGroup] = useState<Group>('basics')
-  const [scenarioName, setScenarioName] = useState(`Scenario ${h.scenarios.length + 1}`)
+  const [scenarioName, setScenarioName] = useState(editing?.name ?? `Scenario ${h.scenarios.length + 1}`)
 
   const plan = useMemo(() => futureView(h, now, { runs: 0 }), [h, now])
-  const tried = useMemo(() => futureView(applyWhatIf(h, w), now, { runs: 0 }), [h, w, now])
-  const dirty = hasChanges(h, w)
+  const tried = useMemo(() => futureView(applyWhatIf(base, w), now, { runs: 0 }), [base, w, now])
+  // Editing a scenario, the comparison with the plan always shows; it's what the scenario is for.
+  const dirty = editing !== null || hasChanges(h, w)
 
   const setProj = (patch: Partial<WhatIf['projection']>) => setW(x => ({ ...x, projection: { ...x.projection, ...patch } }))
   const setRent = (patch: Partial<WhatIf['rent']>) => setW(x => ({ ...x, rent: { ...x.rent, ...patch } }))
@@ -63,14 +72,19 @@ export default function WhatIfSheet() {
     router.back()
   }
 
+  async function saveEdits() {
+    await change(db => updateScenario(db, h, editing!, start, w, scenarioName))
+    router.back()
+  }
+
   return (
     <View style={{ flex: 1, backgroundColor: p.bg }}>
-      <Stack.Screen options={{ title: 'What if?' }} />
+      <Stack.Screen options={{ title: editing ? `Change “${editing.name}”` : 'What if?' }} />
 
       {/* The result stays in view while the controls below scroll. */}
       <View style={{ backgroundColor: p.surface, borderBottomWidth: 1, borderBottomColor: p.border }}>
         <View style={{ padding: space.lg, paddingBottom: space.md, gap: space.xs, maxWidth: 560, width: '100%', alignSelf: 'center' }}>
-          <T size="small" tone="t2">Net worth in {tried.years} years, in today’s money</T>
+          <T size="small" tone="t2">{editing ? `${editing.name}: net worth` : 'Net worth'} in {tried.years} years, in today’s money</T>
           <View style={{ flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap', columnGap: space.md }}>
             <T size="title" weight="700">{fmtK(tried.endNetWorthReal)}</T>
             {dirty && (
@@ -82,7 +96,7 @@ export default function WhatIfSheet() {
             )}
           </View>
           <ScrubChart title="Net worth by year, with these changes and in your plan" labels={tried.labels} height={96} compact series={[
-            { key: 'tried', label: 'With these changes', data: tried.netWorth, color: p.green, area: true,
+            { key: 'tried', label: editing ? editing.name : 'With these changes', data: tried.netWorth, color: p.green, area: true,
               compareTo: dirty ? tried.labels.map((_, i) => plan.netWorth[i] ?? null) : undefined },
             ...(dirty ? [{ key: 'plan', label: 'Your plan', data: tried.labels.map((_, i) => plan.netWorth[i] ?? null), color: p.t3, dashed: true }] : []),
           ]} />
@@ -96,7 +110,7 @@ export default function WhatIfSheet() {
       </View>
 
       <Sheet>
-        <T tone="t2">Nothing changes until you keep it.</T>
+        <T tone="t2">{editing ? 'Changes go into this scenario when you save. Your plan stays as it is.' : 'Nothing changes until you keep it.'}</T>
         <Choice label="Show settings for" options={groups} value={group} onChange={k => setGroup(k as Group)} />
 
         {group === 'basics' && (
@@ -140,25 +154,49 @@ export default function WhatIfSheet() {
 
         {group === 'home' && h.rent.enabled && <BuyPlan r={r} setRent={setRent} year={year} paid={tried.purchase} />}
 
-        {dirty && (
-          <Card>
-            <T weight="600">Or save it to compare</T>
-            <T size="small" tone="t2">Your plan stays as it is. Future shows this side by side with it.</T>
-            <TextField label="Scenario name" value={scenarioName} onChange={setScenarioName} placeholder="For example, Retire at 58" />
-            <View style={{ alignItems: 'flex-start' }}>
-              <Button kind="quiet" title="Save as a scenario" onPress={saveScenario} />
+        {editing ? (
+          <>
+            <Card>
+              <TextField label="Scenario name" value={scenarioName} onChange={setScenarioName} placeholder={editing.name} />
+              {hasHiddenChanges(editing.overrides) && (
+                <T size="small" tone="t2">This scenario also changes retirement, one-off costs or children (set on the home server). They’re counted above and stay as they are.</T>
+              )}
+            </Card>
+            <View style={{ gap: space.sm }}>
+              <Button title="Save changes" onPress={saveEdits} />
+              <Button kind="quiet" title="Undo my edits" onPress={() => setW(start)} />
+              <Button kind="quiet" title="Close without saving" onPress={() => router.back()} />
             </View>
-          </Card>
-        )}
+          </>
+        ) : (
+          <>
+            {dirty && (
+              <Card>
+                <T weight="600">Or save it to compare</T>
+                <T size="small" tone="t2">Your plan stays as it is. Future shows this side by side with it.</T>
+                <TextField label="Scenario name" value={scenarioName} onChange={setScenarioName} placeholder="For example, Retire at 58" />
+                <View style={{ alignItems: 'flex-start' }}>
+                  <Button kind="quiet" title="Save as a scenario" onPress={saveScenario} />
+                </View>
+              </Card>
+            )}
 
-        <View style={{ gap: space.sm }}>
-          <Button title="Keep these changes" disabled={!dirty} onPress={keep} />
-          {dirty && <Button kind="quiet" title="Start over" onPress={() => setW(startWhatIf(h))} />}
-          <Button kind="quiet" title={dirty ? 'Close without keeping' : 'Close'} onPress={() => router.back()} />
-        </View>
+            <View style={{ gap: space.sm }}>
+              <Button title="Keep these changes" disabled={!dirty} onPress={keep} />
+              {dirty && <Button kind="quiet" title="Start over" onPress={() => setW(startWhatIf(h))} />}
+              <Button kind="quiet" title={dirty ? 'Close without keeping' : 'Close'} onPress={() => router.back()} />
+            </View>
+          </>
+        )}
       </Sheet>
     </View>
   )
+}
+
+/** Whether a scenario holds changes this screen doesn't show (made on the NAS). */
+function hasHiddenChanges(overrides: string): boolean {
+  const o = validOverrides(readOverrides(overrides))
+  return o.super !== undefined || o.oneoffs !== undefined || o.children !== undefined
 }
 
 function WorkChanges({ person, name, w, setW, year, leave }: {

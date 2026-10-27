@@ -1,6 +1,7 @@
 // Changes made from the Future screen: the projection's assumptions, the
 // retirement income goal, and one-off costs. All through mutate.ts.
 
+import type { DrawdownStrategy } from '@proviso/core/retirement'
 import type { Db } from './db'
 import { insertRow, updateRow, deleteRow, saveSettings } from './mutate'
 
@@ -43,6 +44,10 @@ export async function saveAssumptions(db: Db, a: Assumptions, retirementIncome: 
   await saveSettings(db, 'projectionSettings', { ...a, expInflNear: a.expInfl })
   await saveSettings(db, 'superSettings', { desiredRetirementIncome: retirementIncome })
 }
+
+/** How super pays for retirement; `pct` is the share taken each year under 'percentOfBalance'. */
+export const saveDrawdown = (db: Db, strategy: DrawdownStrategy, pct?: number) =>
+  saveSettings(db, 'superSettings', pct === undefined ? { drawdownStrategy: strategy } : { drawdownStrategy: strategy, drawdownPct: pct })
 
 export interface OneOffDraft { name: string; amt: number; year: number }
 

@@ -14,8 +14,8 @@ import { homeView, spendingView, wealthView, futureView, cashflowView, compareVi
 import { saveCost, removeCost, kindOf, type CostDraft } from '@/data/costs'
 import { startHousehold, savePay } from '@/data/setup'
 import { saveAsset, removeAsset, saveDebt, saveLoan, saveSuper } from '@/data/wealth'
-import { saveAssumptions, saveOneOff, removeOneOff, saveRegional } from '@/data/future'
-import { startWhatIf, applyWhatIf, hasChanges, addWorkChange, keepWhatIf, saveAsScenario, overridesFromWhatIf, removeScenario } from '@/data/whatif'
+import { saveAssumptions, saveOneOff, removeOneOff, saveRegional, saveDrawdown } from '@/data/future'
+import { startWhatIf, applyWhatIf, hasChanges, addWorkChange, keepWhatIf, saveAsScenario, overridesFromWhatIf, removeScenario, withScenario, updateScenario } from '@/data/whatif'
 import { estimateLivingCosts, buildStarterHousehold, type StarterAnswers } from '@proviso/core/starter'
 
 import type { DatabaseSync } from 'node:sqlite'
@@ -567,6 +567,87 @@ describe('what if', () => {
     expect(two.scenarios.map(x => [x.name, x.colour])).toEqual([['Sam part-time', 'blue'], ['Scenario 2', 'amber']])
     await removeScenario(db, two.scenarios[0].id)
     expect((await loadHousehold(db)).scenarios.map(x => x.name)).toEqual(['Scenario 2'])
+  })
+
+  it('edits a saved scenario: the draft opens with its changes, and only edits are written back', async () => {
+    const db = await setUp()
+    const h = await loadHousehold(db)
+    // Stored by the NAS or a newer version: a known setting, a key this version doesn't know,
+    // a retirement change and a one-off (sections What if? can't edit), and a work pattern.
+    await insertRow(db, 'scenario', { name: 'Retire early', colour: 'blue', enabled: true, overrides: JSON.stringify({
+      settings: { savingsRate: 80, fromTheFuture: 1 },
+      super: { person1RetirementAge: 58 },
+      oneoffs: [{ name: 'Car', amt: 40_000, year: 2030 }],
+      person1Phases: [{ year: 2026, days: 5 }, { year: 2030, days: 3 }],
+      somethingNew: { a: 1 },
+    }) })
+    const before = await loadHousehold(db)
+    const sc = before.scenarios[0]
+
+    // The draft starts from the plan with the scenario on top; its preview matches Compare.
+    const base = withScenario(before, sc)
+    const start = startWhatIf(base)
+    expect(start.projection.savingsRate).toBe(80)
+    expect(base.superSettings.person1RetirementAge).toBe(58)
+    expect(base.oneOffs.map(o => o.name)).toEqual(['Car'])
+    expect(start.workPhases.filter(p => p.person === 'p1').map(p => [p.year, p.days])).toEqual([[2026, 5], [2030, 3]])
+    expect(futureView(applyWhatIf(base, start), NOW, { runs: 0 }).endNetWorth).toBeCloseTo(compareView(before, NOW)[1].summary.endNetWorth)
+
+    // Saving untouched keeps everything as it was (apart from the name).
+    await updateScenario(db, before, sc, start, start, 'Retire at 58')
+    const same = (await loadHousehold(db)).scenarios[0]
+    expect(same.name).toBe('Retire at 58')
+    expect(JSON.parse(same.overrides)).toEqual(JSON.parse(sc.overrides))
+
+    // Savings back to the plan's figure, a new pay rise, and Sam (not in the scenario) part-time.
+    let w = { ...start, projection: { ...start.projection, savingsRate: h.projection.savingsRate, person1Growth: 6 } }
+    w = addWorkChange(w, 'p2', 2026)
+    await updateScenario(db, before, same, start, w, '')
+    const after = await loadHousehold(db)
+    const o = JSON.parse(after.scenarios[0].overrides)
+    expect(after.scenarios[0].name).toBe('Retire at 58')             // a blank name keeps the old one
+    expect(o.settings).toEqual({ fromTheFuture: 1, person1Growth: 6 }) // savingsRate dropped: it's the plan's again
+    expect(o.super).toEqual({ person1RetirementAge: 58 })
+    expect(o.oneoffs).toEqual([{ name: 'Car', amt: 40_000, year: 2030 }])
+    expect(o.person1Phases).toEqual([{ year: 2026, days: 5 }, { year: 2030, days: 3 }])
+    expect(o.person2Phases).toEqual([{ year: 2026, days: 5 }, { year: 2027, days: 5 }])
+    expect(o.somethingNew).toEqual({ a: 1 })
+    // The plan is untouched.
+    expect(after.projection).toEqual(before.projection)
+    expect(after.workPhases).toHaveLength(before.workPhases.length)
+
+    // Undoing a section's last change removes the section.
+    const again = withScenario(after, after.scenarios[0])
+    const s2 = startWhatIf(again)
+    const back = { ...s2, workPhases: s2.workPhases.filter(p => p.person !== 'p2').concat(h.workPhases.filter(p => p.person === 'p2')) }
+    await updateScenario(db, after, after.scenarios[0], s2, back, 'Retire at 58')
+    expect(JSON.parse((await loadHousehold(db)).scenarios[0].overrides).person2Phases).toBeUndefined()
+  })
+
+  it('money in & out and the home loan add up, and the drawdown choice is saved', async () => {
+    const db = await setUp()
+    let h = await loadHousehold(db)
+    let v = futureView(h, NOW, { runs: 0 })
+    v.inOut.leftOver.forEach((x, i) => expect(x).toBeCloseTo(v.inOut.moneyIn[i] - v.inOut.spending[i]))
+    v.inOut.moneyIn.forEach((x, i) => expect(x).toBeCloseTo(v.inOut.pay1[i] + v.inOut.pay2[i] + v.inOut.fromSuper[i] + v.inOut.investIncome[i]))
+    expect(v.inOut.workingYears).toBe(v.labels.indexOf(v.inOut.retiredFrom!))
+    expect(v.inOut.tightYears.every(y => v.labels.indexOf(y) < v.inOut.workingYears)).toBe(true)
+    expect(v.home).toBeNull()                                      // renting, no plan to buy
+
+    await saveSettings(db, 'rentSettings', { purchasePlanEnabled: true, targetPurchaseYear: 2030, targetPropertyValue: 800_000, depositFromCash: 60_000 })
+    h = await loadHousehold(db)
+    v = futureView(h, NOW, { runs: 0 })
+    const buy = v.labels.indexOf('2030')
+    expect(v.home!.loan.slice(0, buy).every(x => x === 0)).toBe(true)
+    expect(v.home!.loan[buy]).toBeGreaterThan(0)
+    // Paid off after it started, not in the years before the purchase.
+    expect(Number(v.home!.paidOff)).toBeGreaterThan(2030)
+
+    expect(v.drawdown).toEqual({ strategy: 'need', pct: 5 })
+    await saveDrawdown(db, 'percentOfBalance', 6.5)
+    const d = futureView(await loadHousehold(db), NOW, { runs: 0 })
+    expect(d.drawdown).toEqual({ strategy: 'percentOfBalance', pct: 6.5 })
+    expect(d.endNetWorth).not.toBe(v.endNetWorth)
   })
 
   it('with no work phases, a change starts from full-time now', () => {

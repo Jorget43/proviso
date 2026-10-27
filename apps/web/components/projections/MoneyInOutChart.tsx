@@ -10,6 +10,7 @@ import { crosshair, SCRUB_BASE, kTicks } from '@/lib/chartPlugins'
 import { useChartColors, axisTicks } from '@/lib/chartTheme'
 import ScrubChart from '@/components/ui/ScrubChart'
 import { overlayDatasets, type Overlay } from '@/lib/scenarioOverlay'
+import { moneyIn } from '@proviso/core/yearByYear'
 ChartJS.register(BarElement, LineElement, PointElement, LinearScale, CategoryScale)
 
 interface Props {
@@ -33,11 +34,6 @@ interface Props {
 }
 
 export const signed = (v: number) => (v > 0 ? '+' : '') + fmtK(v)
-
-/** Money in each year: take-home pay, anything taken from super to live on, and interest less tax on investment income. */
-export function moneyIn(r: { person1Arr: number[]; person2Arr: number[]; superDrawArr?: number[]; investIncArr?: number[] }, showPerson2: boolean): number[] {
-  return r.person1Arr.map((v, i) => v + (showPerson2 ? r.person2Arr[i] ?? 0 : 0) + (r.superDrawArr?.[i] ?? 0) + (r.investIncArr?.[i] ?? 0))
-}
 
 export default function MoneyInOutChart({
   labels, person1Data, person2Data, person1Name, person2Name, showPerson2, leaveYrs, spendData, sfTotalData, phaseData, cashData, superData, investData, overlays,

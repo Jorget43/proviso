@@ -6,7 +6,7 @@ import { runOutlook, planInputs, mixFrom, rangeOn, chanceWords, MIX_CHOICES } fr
 import { DEFAULT_CASH_RATE, DEFAULT_DIVIDEND_YIELD, DEFAULT_FRANKED_PCT, DEFAULT_PERSON1_SHARE } from '@proviso/core/investmentIncome'
 import { runScenarios, summariseRun, readOverrides, validOverrides, patchOverrides, writeOverrides, countChanges, scenarioColour, type ScenarioOverrides, type OverrideSection, type ScenarioSummary } from '@proviso/core/scenarios'
 import { buildProjectionInputs, type ProjectionBaseline, type SuperSettingsLike } from '@proviso/core/future'
-import { asDrawdownStrategy, PRESERVATION_AGE, DEFAULT_HORIZON_AGE, type DrawdownStrategy } from '@proviso/core/retirement'
+import { asDrawdownStrategy, DRAWDOWN_CHOICES, PRESERVATION_AGE, DEFAULT_HORIZON_AGE } from '@proviso/core/retirement'
 import { type FeeSchedule } from '@proviso/core/schoolFees'
 import { LOCATION_OPTIONS, presetScheduleFor, presetTotalFor } from '@proviso/core/educationCosts'
 import { childLabel, sortChildren } from '@proviso/core/people'
@@ -17,7 +17,8 @@ interface FeeRow { id: number; level: string; tuition: number; fixed: number }
 import Panel from '@/components/ui/Panel'
 import ReadOnlyFence from '@/components/ui/ReadOnlyFence'
 import NetWorthChart      from './NetWorthChart'
-import MoneyInOutChart, { moneyIn, signed } from './MoneyInOutChart'
+import MoneyInOutChart, { signed } from './MoneyInOutChart'
+import { leftOver as leftOverOf, workingYears, tightWorkingYears, stressYears, MORTGAGE_STRESS_PCT } from '@proviso/core/yearByYear'
 import HomeChart          from './HomeChart'
 import RetirementChart    from './RetirementChart'
 import SchoolFeeChart     from './SchoolFeeChart'
@@ -136,13 +137,6 @@ const GROUPS: { key: Group; label: string }[] = [
   { key: 'family', label: 'Family' },
   { key: 'home',   label: 'Home' },
   { key: 'plans',  label: 'Plans' },
-]
-
-const DRAWDOWN_CHOICES: { key: DrawdownStrategy; label: string; hint: string }[] = [
-  { key: 'need',             label: 'Spend what you need', hint: 'Cash and savings outside super pay first, then super. Super always pays at least the legal minimum.' },
-  { key: 'fourPercent',      label: '4% rule',             hint: 'Super pays 4% of its balance in your first year of retirement, then the same amount plus price rises.' },
-  { key: 'percentOfBalance', label: 'A set % each year',   hint: 'Super pays a fixed share of whatever is there. The amount changes, but it never runs out.' },
-  { key: 'minimum',          label: 'Legal minimum',       hint: 'Super pays only the minimum the law requires: 4% a year under 65, rising with age.' },
 ]
 
 const SCHOOL_LABEL: Record<SchoolChoice, string> = {
@@ -521,9 +515,9 @@ export default function ProjectionsClient({
   // Tight years are counted while someone still works: once everyone has
   // retired, living off super and savings is the plan, not a shortfall.
   const retiredIdx  = main.retiredArr.indexOf(true)
-  const workingEnd  = retiredIdx >= 0 ? retiredIdx : main.deficitArr.length
-  const deficitIdx  = main.deficitArr.slice(0, workingEnd).flatMap((v, i) => (v < 0 ? [i] : []))
-  const stressIdx   = main.mortStressArr.flatMap((v, i) => (v > 30 ? [i] : []))
+  const workingEnd  = workingYears(main)
+  const deficitIdx  = tightWorkingYears(main)
+  const stressIdx   = stressYears(main)
   const peakStress  = Math.max(0, ...main.mortStressArr)
   const hhIncome    = main.person1Arr.map((v, i) => v + (main.person2Arr[i] ?? 0))
   const plural      = (n: number, w: string) => `${n} ${w}${n === 1 ? '' : 's'}`
@@ -564,7 +558,7 @@ export default function ProjectionsClient({
   const resultOf  = (r: (typeof runs)[number]) => r.output.withFees ?? r.output.base
   const overlays  = (pick: (x: ProjectionResult) => number[], readouts?: (x: ProjectionResult) => Overlay['readouts']): Overlay[] =>
     shownRuns.map(r => ({ label: r.scenario.name, colour: r.colour, data: pick(resultOf(r)), readouts: readouts?.(resultOf(r)) }))
-  const leftOver  = (x: ProjectionResult) => moneyIn(x, partnerEnabled).map((v, i) => v - (x.expArr[i] ?? 0))
+  const leftOver  = (x: ProjectionResult) => leftOverOf(x, partnerEnabled)
   const feesInAny = sfOn || shownRuns.some(r => r.live.settings.schoolFeesOn)
 
   // The Compare card: the plan, then every scenario.
@@ -608,8 +602,8 @@ export default function ProjectionsClient({
       key: 'home' as const, label: 'Home',
       takeaway: (clearedIdx >= 0 ? `Your home loan is paid off in ${mortCleared}.` : `Your home loan isn't paid off by ${lastLabel}.`)
         + (stressIdx.length === 0
-          ? ' Repayments stay under 30% of your income, a comfortable level.'
-          : ` Repayments take more than 30% of your income in ${plural(stressIdx.length, 'year')}, peaking at ${peakStress.toFixed(0)}% in ${output.labels[main.mortStressArr.indexOf(peakStress)]}.`),
+          ? ` Repayments stay under ${MORTGAGE_STRESS_PCT}% of your income, a comfortable level.`
+          : ` Repayments take more than ${MORTGAGE_STRESS_PCT}% of your income in ${plural(stressIdx.length, 'year')}, peaking at ${peakStress.toFixed(0)}% in ${output.labels[main.mortStressArr.indexOf(peakStress)]}.`),
     }] : []),
     ...(feesInAny ? [{
       key: 'fees' as const, label: 'School fees',

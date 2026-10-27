@@ -27,6 +27,8 @@ export interface ChartSeries {
   format?: (v: number) => string
   /** A shaded range around the line (the worst and best 1 in 10 runs); the readout gives both ends. */
   band?:   { low: (number | null)[]; high: (number | null)[] }
+  /** Listed in the readout with each year's value, but not drawn (and not part of the scale). */
+  readout?: boolean
 }
 
 interface Props {
@@ -54,8 +56,9 @@ export function ScrubChart({ labels, series, height = 180, defaultIndex, title, 
   const idx = Math.max(0, Math.min(n - 1, picked ?? defaultIndex ?? n - 1))
 
   const plot: Plot = { width, height, ...MARGIN }
-  const shown = series.filter(s => !hidden.has(s.key))
-  const scale = useMemo(() => scaleFor((shown.length ? shown : series).flatMap(s => [s.data, ...(s.band ? [s.band.low, s.band.high] : [])])), [shown, series])
+  const drawn = series.filter(s => !s.readout)
+  const shown = drawn.filter(s => !hidden.has(s.key))
+  const scale = useMemo(() => scaleFor((shown.length ? shown : drawn).flatMap(s => [s.data, ...(s.band ? [s.band.low, s.band.high] : [])])), [shown, drawn])
 
   // Where a touch started, to tell a sideways scrub from an up-and-down scroll.
   const start = useRef({ x: 0, y: 0 })
@@ -98,12 +101,9 @@ export function ScrubChart({ labels, series, height = 180, defaultIndex, title, 
             const base = s.compareTo?.[idx]
             const diff = v != null && base != null ? v - base : null
             const off = hidden.has(s.key)
-            return (
-              <Pressable key={s.key} onPress={() => toggle(s.key)} accessibilityRole="button" accessibilityState={{ selected: !off }}
-                accessibilityHint={off ? `Shows ${s.label}` : `Hides ${s.label}`}
-                style={{ flexDirection: 'row', alignItems: 'center', gap: space.xs, minHeight: 32, paddingHorizontal: space.sm, paddingVertical: 4,
-                  borderRadius: radius.pill, borderWidth: 1, borderColor: p.border, backgroundColor: p.surface, opacity: off ? 0.45 : 1 }}>
-                <View style={{ width: 14, borderTopWidth: 2.5, borderStyle: s.dashed ? 'dashed' : 'solid', borderColor: s.color }} />
+            const body = (
+              <>
+                {!s.readout && <View style={{ width: 14, borderTopWidth: 2.5, borderStyle: s.dashed ? 'dashed' : 'solid', borderColor: s.color }} />}
                 <T size="small" tone="t2" style={{ textDecorationLine: off ? 'line-through' : 'none' }}>{s.label}</T>
                 <T size="small" weight="600">{v == null ? '—' : fmt(s, v)}</T>
                 {s.band && s.band.low[idx] != null && s.band.high[idx] != null && (
@@ -112,6 +112,16 @@ export function ScrubChart({ labels, series, height = 180, defaultIndex, title, 
                 {diff !== null && (
                   <T size="caption" tone="t3">{Math.abs(diff) < 1 ? 'same as plan' : `${diff > 0 ? '+' : '−'}${fmt(s, Math.abs(diff)).replace(/^[+−-]/, '')} vs plan`}</T>
                 )}
+              </>
+            )
+            const chip = { flexDirection: 'row' as const, alignItems: 'center' as const, gap: space.xs, minHeight: 32, paddingHorizontal: space.sm, paddingVertical: 4, borderRadius: radius.pill }
+            // Readout-only figures aren't lines, so there's nothing to hide.
+            if (s.readout) return <View key={s.key} style={chip}>{body}</View>
+            return (
+              <Pressable key={s.key} onPress={() => toggle(s.key)} accessibilityRole="button" accessibilityState={{ selected: !off }}
+                accessibilityHint={off ? `Shows ${s.label}` : `Hides ${s.label}`}
+                style={{ ...chip, borderWidth: 1, borderColor: p.border, backgroundColor: p.surface, opacity: off ? 0.45 : 1 }}>
+                {body}
               </Pressable>
             )
           })}
@@ -120,7 +130,7 @@ export function ScrubChart({ labels, series, height = 180, defaultIndex, title, 
 
       <View style={{ height }}
         accessible accessibilityRole="adjustable" accessibilityLabel={title}
-        accessibilityValue={{ text: `${labels[idx]}: ${shown.map(s => `${s.label} ${s.data[idx] == null ? 'none' : fmt(s, s.data[idx]!)}`).join(', ')}` }}
+        accessibilityValue={{ text: `${labels[idx]}: ${[...shown, ...series.filter(s => s.readout)].map(s => `${s.label} ${s.data[idx] == null ? 'none' : fmt(s, s.data[idx]!)}`).join(', ')}` }}
         accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
         onAccessibilityAction={e => setPicked(Math.max(0, Math.min(n - 1, idx + (e.nativeEvent.actionName === 'increment' ? 1 : -1))))}>
         {width > 0 && (

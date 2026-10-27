@@ -17,6 +17,8 @@ import { findHelpDebt } from '@proviso/core/members'
 import { calcHELPRepayment } from '@proviso/core/tax'
 import { CATS, CAT_COLORS } from '@proviso/core/constants'
 import { computeCashflow, type Cashflow } from '@proviso/core/cashflow'
+import { moneyIn, leftOver, workingYears, tightWorkingYears, stressYears } from '@proviso/core/yearByYear'
+import { asDrawdownStrategy, type DrawdownStrategy } from '@proviso/core/retirement'
 import type { HouseholdRow } from '@proviso/core/schema'
 import type { HouseholdData } from './household'
 
@@ -222,6 +224,42 @@ export interface FutureView {
   borrowing:      { from: string; owedAtEnd: number } | null
   milestones:     FutureMilestone[]
   schoolFees:     { on: boolean; total: number }
+  /** Money in & out each year, that year's dollars (the NAS's chart of the same name). */
+  inOut: {
+    moneyIn:      number[]
+    spending:     number[]
+    /** Money in less spending (negative = short). */
+    leftOver:     number[]
+    /** Take-home pay, each person (person 2's is zeros without a partner). */
+    pay1:         number[]
+    pay2:         number[]
+    fromSuper:    number[]
+    /** Interest less tax on investment income (can be negative). */
+    investIncome: number[]
+    schoolFees:   number[]
+    cash:         number[]
+    /** Years at least one person still works (from the first). */
+    workingYears: number
+    /** Working years when more goes out than comes in. */
+    tightYears:   string[]
+    /** The leanest working year and what's left over in it; null with no working years. */
+    leanest:      { year: string; leftOver: number } | null
+    /** The first year everyone has retired; null if that's not within the years shown. */
+    retiredFrom:  string | null
+    leaveYears:   number[]
+  }
+  /** The home loan year by year; null without a loan now or planned. */
+  home: {
+    loan:        number[]
+    /** Repayments as a % of household income before tax. */
+    stressPct:   number[]
+    rent:        number[]
+    paidOff:     string | null
+    stressYears: string[]
+    peak:        { year: string; pct: number }
+  } | null
+  /** How super pays for retirement (the plan's setting). */
+  drawdown:       { strategy: DrawdownStrategy; pct: number }
   retirement: {
     people: { name: string; age: number; year: number; balanceToday: number }[]
     /** Monthly income the goal asks for, today's dollars. */
@@ -349,6 +387,37 @@ export function futureView(h: HouseholdData, now: Date, opts: { runs?: number } 
     })(),
     milestones,
     purchase: run.purchase,
+    inOut: (() => {
+      const working = workingYears(run)
+      const left = leftOver(run, h.settings.partnerEnabled)
+      const lean = left.slice(0, working).reduce<number | null>((w, v, i) => (w === null || v < left[w] ? i : w), null)
+      const retired = run.retiredArr.indexOf(true)
+      return {
+        moneyIn: moneyIn(run, h.settings.partnerEnabled), spending: run.expArr, leftOver: left,
+        pay1: run.person1Arr, pay2: h.settings.partnerEnabled ? run.person2Arr : run.person2Arr.map(() => 0),
+        fromSuper: run.superDrawArr, investIncome: run.investIncArr,
+        schoolFees: s.schoolFeesOn ? run.sfTotalArr : run.sfTotalArr.map(() => 0),
+        cash: run.cashRunningArr,
+        workingYears: working,
+        tightYears: tightWorkingYears(run).map(i => out.labels[i]),
+        leanest: lean === null ? null : { year: out.labels[lean], leftOver: left[lean] },
+        retiredFrom: retired >= 0 ? out.labels[retired] : null,
+        leaveYears: h.settings.partnerEnabled ? run.leaveYrs : [],
+      }
+    })(),
+    home: !run.mortArr.some(v => v > 0) && !run.mortStressArr.some(v => v > 0) ? null : (() => {
+      const peak = Math.max(0, ...run.mortStressArr)
+      // A renter's loan is 0 until they buy: paid off means cleared after it started.
+      const started = run.mortArr.findIndex(v => v > 0)
+      const cleared = started < 0 ? -1 : run.mortArr.findIndex((v, j) => j > started && v <= 0)
+      return {
+        loan: run.mortArr, stressPct: run.mortStressArr, rent: run.rentArr,
+        paidOff: cleared >= 0 ? out.labels[cleared] : null,
+        stressYears: stressYears(run).map(i => out.labels[i]),
+        peak: { year: out.labels[run.mortStressArr.indexOf(peak)], pct: peak },
+      }
+    })(),
+    drawdown: { strategy: asDrawdownStrategy(h.superSettings.drawdownStrategy), pct: h.superSettings.drawdownPct },
     schoolFees: { on: s.schoolFeesOn, total: s.schoolFeesOn ? run.sfTotalArr.reduce((t, v) => t + v, 0) : 0 },
     retirement: {
       people: people.map(x => {
@@ -415,6 +484,10 @@ export interface CompareRow {
   shown:   boolean
   /** Net worth at the end of each year, that year's dollars, for the chart. */
   netWorth: number[]
+  /** Spending, what's left over and the home loan each year, for the Money in & out and Home charts. */
+  spending: number[]
+  leftOver: number[]
+  loan:     number[]
 }
 
 /** The plan and each saved scenario, side by side (empty when there are none). */
@@ -424,8 +497,10 @@ export function compareView(h: HouseholdData, now: Date): CompareRow[] {
   const { baseline, live, ownSchedule } = planOf(h, year)
   const row = (id: string | null, name: string, colour: ScenarioColour | null, l: ProjectionLive, output: ReturnType<typeof runProjections>, changes: number): CompareRow => {
     const summary = summariseRun(output, l)
-    const nw = (output.withFees ?? output.base).nwArr
-    return { id, name, colour, summary, endReal: summary.endNetWorth / Math.pow(1 + l.settings.expInfl / 100, nw.length), changes, shown: true, netWorth: nw }
+    const r = output.withFees ?? output.base
+    const nw = r.nwArr
+    return { id, name, colour, summary, endReal: summary.endNetWorth / Math.pow(1 + l.settings.expInfl / 100, nw.length), changes, shown: true, netWorth: nw,
+      spending: r.expArr, leftOver: leftOver(r, h.settings.partnerEnabled), loan: r.mortArr }
   }
   return [
     row(null, 'Your plan', null, live, runProjections(buildProjectionInputs(baseline, live)), 0),

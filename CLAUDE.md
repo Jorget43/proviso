@@ -431,7 +431,7 @@ Tracked in [`docs/security-privacy-legal.md`](docs/security-privacy-legal.md) §
 - ~~Small-text desktop layouts on phones~~ — done (v1.12.0), checked at 390px: Own & owe rows restacked, Investments labels/dropdowns fixed, work-pattern wording plain; EOFY, Super and the school-fee controls were already fine. Investment parcel cards rebuilt in Phase 24.
 - ~~Native app: token auth alongside the cookie session~~ — done (Phase 24), see [`docs/app-api.md`](docs/app-api.md). Still open for the app: passkey sign-in (WebAuthn from a native app needs the platform APIs and an associated domain), and CORS if the app is ever a web view on another origin.
 
-### The app — next steps (as of 2026-10-19)
+### The app — next steps (as of 2026-10-27)
 In [`docs/architecture.md`](docs/architecture.md) order. Phase 3 there (the single-device app) is built except for a store build; Phase 4 (sync) is built (Phases 34–35) and needs its first real run on the NAS. Settings passed the owner's phone check on 2026-10-07. The owner is enrolling in the Apple Developer Program.
 
 **Start here next session**, in this order:
@@ -445,7 +445,7 @@ In [`docs/architecture.md`](docs/architecture.md) order. Phase 3 there (the sing
 6. **Step D**: scenarios are Phase 45 (merged and pushed 2026-10-18). Next:
    - School fees v2 (plan item 7) is Phase 46 (merged and pushed 2026-10-18).
    - Step E (uncertainty): 8a, ranges of returns, is Phase 48; Monte Carlo (8b) and the glide path are Phase 49, which replaces 8a's band. Step E is then complete. Step F (income and tax): 5a, interest and dividends, is Phase 50; 6, salary packaging, is Phase 51. Next: 5b business income, then 5c rental.
-   - The app's chart component is Phase 47 (merged and pushed 2026-10-18). Still open for the app: editing a saved scenario, the Money in & out and Home charts, and the drawdown strategy choice.
+   - The app's chart component is Phase 47 (merged and pushed 2026-10-18). Editing a saved scenario, the Money in & out and Home charts, and the drawdown strategy choice are Phase 52 (2026-10-27, waiting for the owner's OK).
    - Step A (dark mode, editing, chart trim) shipped as Phases 37–39.
    - Also open: the relay enforcing roles, and the iOS build once the Apple account is ready.
 
@@ -458,7 +458,7 @@ The full list:
 - **Dependency advisories**: GitHub lists some on master, believed to be all in Expo's build and dev-server tools (`braces`, `node-forge`, `uuid` via `xcode`, `decode-uri-component`, and an old `zod` 3 inside `@expo/cli`), several with no fixed version yet. They don't reach the NAS image (CI audits exactly what it ships). Dependabot was preparing a security update for them on 2026-10-06: review it carefully, because Expo pins some of them, and React / React Native / `expo*` move only with the Expo SDK (`proviso-release` skill). 2026-10-27: Dependabot's grouped update (next 16.3.8 → 16.4.2, zod 4.6.7, chart.js 4.6.1, vitest / vite patches) merged and tagged `v1.14.0`; it fixed two critical Next advisories in the NAS image (RCE via SVG image optimisation and `use cache`) and zod's oversized-collection advisory. The nonce CSP was checked on Next 16.4 (every script carries the nonce).
 - **Starter estimates** (`packages/core/src/starter.ts`): re-check the figures yearly with the July recalibration; electricity still uses the AER's 2020 usage benchmarks (no longer updated).
 
-### Where each feature lives (NAS ↔ app), as of Phase 51
+### Where each feature lives (NAS ↔ app), as of Phase 52
 
 | Feature | NAS web app | The app | Notes |
 |---|---|---|---|
@@ -471,8 +471,8 @@ The full list:
 | Super: balances, retirement ages | ✓ | ✓ | |
 | Super: extra contributions, carry-forward | ✓ | — | Extra contributions feed the projection as salary sacrifice since Phase 40 |
 | Investments (parcels, CGT) | ✓ | — | |
-| Future: net worth, money in & out | ✓ charts | Net worth chart (scrubbed), short years, milestones | Same engine. The app has no Money in & out or Home chart yet; the component is there (Phase 47) |
-| Future: Retirement (chart, drawdown strategy) | ✓ | Summary and a super / savings chart | Phase 47; the app still lacks the drawdown strategy choice |
+| Future: net worth, money in & out, home loan | ✓ charts | Net worth chart (scrubbed), short years, milestones; Year by year: Money in & out and Home loan charts (Phase 52) | Same engine; `core/yearByYear.ts` counts tight and stress years for both. The app draws money in as one line (the NAS stacks pay by person) |
+| Future: Retirement (chart, drawdown strategy) | ✓ | Summary, a super / savings chart, the drawdown strategy (Phase 52) | Choices and wording from `core/retirement.ts` `DRAWDOWN_CHOICES` |
 | Future: look-ahead age, work changes, rent-then-buy | ✓ | ✓ (What if?) | Buying: deposit + stamp duty, paid from savings then investments, any rest on the loan (`buyHome`) |
 | Future: safety net, invest share, fun share | ✓ (What if? → Basics) | ✓ (What if?, Assumptions) | Phase 43; both off by default |
 | Future: school fees | ✓ chart stacked by child; each child's primary and secondary school; fee rules (What if? → Plans) | Total; each child's schools (Settings → People → child); fee rules (Assumptions) | `core/schoolFees.ts` v2, Phase 46. The custom fee table is NAS-only (the app keeps a NAS choice of it) |
@@ -482,7 +482,7 @@ The full list:
 | Interest and dividends, taxed (franking, who owns them) | ✓ What if? → More assumptions; Money in & out readout | ✓ Assumptions | `core/investmentIncome.ts`, Phase 50 |
 | Salary packaging (charity / hospital caps, electric-car novated lease) | ✓ Budget → Salary packaging cards | ✓ Settings → Salary packaging | `core/packaging.ts`, Phase 51; Home, Budget, Next 2 years and Future all count it |
 | Range of outcomes (Monte Carlo band, chance money lasts) | ✓ Net worth and Retirement charts, headline, takeaways; What if? → Basics: mix, glide path, on/off | ✓ Future headline, net worth and super charts, retirement line; Assumptions | `core/uncertainty.ts`, Phase 49 (replaced Phase 48's ±points band) |
-| Scenarios (save and compare) | ✓ make, edit, rename, delete in What if?; dashed lines on every Future chart; Compare card | Save a What if? draft as one; dashed lines on the net worth chart; show / hide; Compare card; delete | `core/scenarios.ts`, Phase 45; app lines Phase 47. Editing a saved scenario is NAS-only so far |
+| Scenarios (save and compare) | ✓ make, edit, rename, delete in What if?; dashed lines on every Future chart; Compare card | Save a What if? draft as one; change one (Compare → Change opens What if? on it, Phase 52); dashed lines on the net worth, Money in & out and Home loan charts; show / hide; Compare card; delete | `core/scenarios.ts`, Phase 45; app lines Phase 47. The app edits a scenario's settings, rent and work patterns; its retirement, one-off and children changes are NAS-only (kept as they are) |
 | Life phases (calendar rows) | ✓ toggle ("Extra costs by year") | Read only | Kept as custom extras; life stages do the automatic part |
 | Next 2 years | ✓ | ✓ | `core/cashflow.ts` |
 | Parental-leave switch | ✓ | Read only | |
@@ -573,6 +573,31 @@ Ideas that have been evaluated but aren't on the roadmap. Each links to its writ
 - **School fees decided**: the questionnaire's school-cost lines stay in today's budget; the projection models the two eldest children's fees year by year (ending after Year 12) and leaves those lines out (`isModelledSchoolLine`), so nothing is counted twice. The questionnaire switches `schoolFeesOn` on when there are children.
 - Typed routes are off in `apps/client` (the generated file only existed where a dev server ran, never in CI, and misread the monorepo).
 - Verified: 356 tests; the app at 390px (a Melbourne family of four: $2.32M in today's money in 20 years, HELP cleared 2028, school fees end 2039, loan paid off 2042; a $45k car in 2029 gives $2.28M); the NAS Projections and Super pages rendered against a scratch household. The NAS Super "consider a lower target" hint was fixed on the way (it would have subtracted the mortgage twice and suggested $0).
+
+### Phase 52 — The app: editing scenarios, Money in & out and Home charts, the drawdown choice (2026-10-27)
+
+The three app gaps left by Phases 45 and 47. Nothing in the NAS changes apart from where two helpers live. No numbers move.
+
+- **Core:**
+  - `yearByYear.ts` holds `moneyIn` and `leftOver`, plus `workingYears`, `tightWorkingYears` and `stressYears`, with `MORTGAGE_STRESS_PCT` (30). Before, these lived in the NAS's `MoneyInOutChart` / `ProjectionsClient`.
+  - `retirement.ts` `DRAWDOWN_CHOICES` (labels and hints) moved out of `ProjectionsClient`.
+  - The NAS imports both. Its rendered text is unchanged.
+- **App, Future → Year by year:** a Money in & out / Home loan switch. The loan switch shows only with a loan now or planned.
+  - Money in & out: money in (pay, super drawn, interest less tax) as a shaded line and spending as a line. The readout lists what's left over, each person's pay, from super, investment income, school fees and cash. The takeaway is the NAS's sentence.
+  - Home loan: the loan left, with repayments as a % of income and rent in the readout, and the paid-off / over-30% takeaway. A renter's loan counts as paid off only after it starts.
+  - Shown scenarios add dashed spending and loan lines, plus their left-over figure.
+  - `ScrubChart` gained `readout` series: listed with each year's value but not drawn, not scaled and not hideable, like the NAS's hidden readout axis.
+  - `futureView` gained `inOut`, `home` and `drawdown`; `CompareRow` gained `spending`, `leftOver` and `loan`.
+- **App, the drawdown strategy:** Future → Retirement gets "How you’d pay for retirement" with the four choices and their hints, plus the share for "A set % each year". It's saved on the plan straight away (`saveDrawdown`).
+- **App, editing a scenario:** Compare → **Change** opens What if? on that scenario.
+  - `withScenario` layers every section, including retirement, one-offs and children, so the preview matches Compare.
+  - `updateScenario` rewrites only what was edited. An edited setting is stored if it differs from the plan, and dropped if it's back to the plan's value. A work pattern is stored whole once edited, and removed when it matches the plan again.
+  - Untouched settings, sections the app can't edit, and keys from newer versions stay as they were. A note says when the scenario holds changes the screen doesn't show.
+  - Edit mode has a name field, Save changes, Undo my edits and Close without saving.
+- **Verified:**
+  - 582 tests. New in core: money in and left over hand-worked, no partner, working and tight years, the stress line, and the choices in strategy order.
+  - New in the app: editing (the preview matches Compare, an untouched save leaves the JSON identical, back-to-plan drops a key, unknown keys and NAS sections survive, undoing a work change removes it), the in & out sums, a renter's purchase loan, and the drawdown saved and changing the projection.
+  - The app's web build in headless Chrome, with a made-up couple with a loan and a "Retire at 58" scenario: 390px light and dark, and 1280px light and dark. Checked: both charts with scenario lines, the drawdown choice and stepper, and Change → Save changes. No page errors, no sideways scroll.
 
 ### Phase 51 — Plan step F, part 2: salary packaging (2026-10-19)
 

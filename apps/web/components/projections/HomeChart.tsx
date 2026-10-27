@@ -9,6 +9,7 @@ import { crosshair, SCRUB_BASE, kTicks } from '@/lib/chartPlugins'
 import { useChartColors, axisTicks } from '@/lib/chartTheme'
 import ScrubChart from '@/components/ui/ScrubChart'
 import { overlayDatasets, type Overlay } from '@/lib/scenarioOverlay'
+import { MORTGAGE_STRESS_PCT } from '@proviso/core/yearByYear'
 ChartJS.register(LineElement, PointElement, LinearScale, CategoryScale, Filler)
 
 interface Props {
@@ -28,7 +29,7 @@ export default function HomeChart({ labels, mortData, stressData, rentData, endD
   const readOnly = { borderWidth: 0, pointRadius: 0, pointHoverRadius: 0, showLine: false, fill: false, yAxisID: 'readout' }
   const datasets = [
     { label: 'Home loan left', data: mortData, borderColor: c.red, backgroundColor: c.a(c.red, 0.07), fill: true, tension: 0.4, borderWidth: 2,
-      pointRadius: stressData.map(s => (s > 30 ? 3.5 : 0)), pointBackgroundColor: c.amber, pointBorderColor: c.amber, pointHoverRadius: 4 },
+      pointRadius: stressData.map(s => (s > MORTGAGE_STRESS_PCT ? 3.5 : 0)), pointBackgroundColor: c.amber, pointBorderColor: c.amber, pointHoverRadius: 4 },
     { ...readOnly, label: 'Repayments', data: stressData, borderColor: c.amber, format: pct },
     { ...readOnly, label: 'Rent paid', data: rentData, borderColor: c.blue },
   ]
@@ -46,7 +47,7 @@ export default function HomeChart({ labels, mortData, stressData, rentData, endD
         }} />
       </ScrubChart>
       <p className="proj-note mt1">
-        Amber dots: years when repayments take more than 30% of household income before tax.{endDate ? ` Your loan is set to end ${endDate}.` : ''}
+        Amber dots: years when repayments take more than {MORTGAGE_STRESS_PCT}% of household income before tax.{endDate ? ` Your loan is set to end ${endDate}.` : ''}
       </p>
     </>
   )
