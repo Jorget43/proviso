@@ -142,6 +142,8 @@ export interface ProjectionSettingsLike {
   growthPct?:      number
   glidePath?:      boolean
   glideTargetPct?: number
+  /** Super's own mix (schema v14); null: the same as growthPct. */
+  superGrowthPct?: number | null
   /** Income from savings and investments (schema v11; investmentIncome.ts). */
   dividendYield?:      number
   frankedPct?:         number

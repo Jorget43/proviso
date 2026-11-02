@@ -1,12 +1,12 @@
 import { describe, it, expect } from 'vitest'
 import {
-  mixVolatility, mixPath, planInputs, yearsToLastRetirement, normals, drawReturn, runOutlook, chanceWords, mainOf,
+  mixFrom, superGrowthOf, mixVolatility, mixPath, planInputs, yearsToLastRetirement, normals, drawReturn, runOutlook, chanceWords, mainOf,
   GROWTH_PREMIUM, DEFAULT_GROWTH_PCT, DEFAULT_GLIDE_TARGET_PCT, type MixSettings,
 } from '../src/uncertainty'
 import type { LifeCourse } from '../src/projections'
 import { makeProjectionInputs, FX_YEAR } from './fixtures/projections'
 
-const flat: MixSettings = { growthPct: 70, glidePath: false, glideTargetPct: 50 }
+const flat: MixSettings = { growthPct: 70, superGrowthPct: null, glidePath: false, glideTargetPct: 50 }
 const glide: MixSettings = { ...flat, glidePath: true }
 
 // The fixture has every dial at 0 and nothing new invested (savings rate 0),
@@ -52,6 +52,35 @@ describe('the investment mix', () => {
     expect(p.superReturnByYear![4]).toBeCloseTo(0.053, 10)
     // Off: the inputs are untouched, so the plan doesn't move.
     expect(planInputs(simple, flat)).toBe(simple)
+  })
+})
+
+describe('super held differently from the investments (v14)', () => {
+  it('reads a missing super mix as the same as the investments', () => {
+    expect(mixFrom({ growthPct: 90 })).toMatchObject({ growthPct: 90, superGrowthPct: null })
+    expect(superGrowthOf(mixFrom({ growthPct: 90 }))).toBe(90)
+    expect(superGrowthOf(mixFrom({ growthPct: 90, superGrowthPct: 50 }))).toBe(50)
+  })
+
+  it('glides each pot from its own start, and leaves one already safer than the target alone', () => {
+    // Investments 90 → 50 over 4 years; super starts at 50, already at the target.
+    const m: MixSettings = { growthPct: 90, superGrowthPct: 50, glidePath: true, glideTargetPct: 50 }
+    expect(mixPath(m, 5, 4)).toEqual([80, 70, 60, 50, 50])
+    expect(mixPath(m, 5, 4, superGrowthOf(m))).toEqual([50, 50, 50, 50, 50])
+    // So super's expected return doesn't move, while the investments' falls 1.4 points.
+    const p = planInputs({ ...simple, lifeCourse }, m)
+    expect(p.superReturnByYear![4]).toBeCloseTo(0.06, 10)
+    expect(p.investReturnByYear![4]).toBeCloseTo(5 - 1.4, 10)
+  })
+
+  it('a safer super mix narrows the super band and leaves the investment band as it was', () => {
+    // Still working throughout (30 now, retiring at 60), so super never pays for anything.
+    const inputs = { ...simple, projYears: 20, lifeCourse: { ...lifeCourse, person1Age: 30 } }
+    const same = runOutlook(inputs, { ...flat, growthPct: 90 }, true, FX_YEAR, 30, 300)
+    const safer = runOutlook(inputs, { ...flat, growthPct: 90, superGrowthPct: 30 }, true, FX_YEAR, 30, 300)
+    const w = (b: { low: number[]; high: number[] }) => b.high[19] - b.low[19]
+    expect(w(safer.super)).toBeLessThan(w(same.super) / 2)
+    expect(safer.netWorth).toEqual(same.netWorth)
   })
 })
 

@@ -96,6 +96,7 @@ export const projectionSettingsSchema = z
     growthPct:            num.min(0).max(100),
     glidePath:            z.boolean(),
     glideTargetPct:       num.min(0).max(100),
+    superGrowthPct:       num.min(0).max(100).nullable(),
     dividendYield:        num.min(0).max(15),
     frankedPct:           num.min(0).max(100),
     cashRate:             num.min(0).max(15),
@@ -106,8 +107,9 @@ export const projectionSettingsSchema = z
 // Person1Phase / Person2Phase share the same shape.
 export const phaseSchema = z
   .object({
-    year: int,
-    days: int,
+    year:  int,
+    days:  int.min(0).max(5),
+    month: int.min(1).max(12),
   })
   .partial()
 
@@ -137,6 +139,7 @@ export const oneOffSchema = z
     name: z.string().min(1),
     amt:  num,
     year: int,
+    kind: z.enum(['cost', 'gift', 'sale', 'borrow']),
   })
   .partial()
 
@@ -158,7 +161,7 @@ export const packagedItemSchema = z
 export const incomeSourceSchema = z
   .object({
     person:    z.enum(['p1', 'p2']),
-    kind:      z.enum(['business']),
+    kind:      z.enum(['business', 'bonus']),
     name:      z.string().trim().max(60).nullable(),
     amount:    num.min(0).max(5_000_000),
     growthPct: num.min(-10).max(20),

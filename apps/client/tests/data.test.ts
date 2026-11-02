@@ -41,7 +41,7 @@ function sampleExport(): HouseholdExport {
     childcareInfl: 6, propGrowth: 3.5, savingsRate: 10, investReturn: 3.5, projYears: 20, schoolFeesOn: false, sfC1Start: 2032, sfC1ExitIdx: 13,
     sfC2Start: 2035, sfC2ExitIdx: 13, sfInfl: 5, sfPresetKey: null, parentalLeaveEnabled: false, horizonAge: 95, cashBufferMonths: 0, funPct: 0, lifeStagesOn: true, childLeavesHomeAge: 18,
     sfSib2Pct: 15, sfSib3Pct: 15, sfSib4Pct: 15, sfFamilyFee: 350, sfEntryFee: 0, returnSpread: 2,
-    showRange: null, growthPct: 70, glidePath: false, glideTargetPct: 50,
+    showRange: null, growthPct: 70, glidePath: false, glideTargetPct: 50, superGrowthPct: null,
     dividendYield: 3, frankedPct: 50, cashRate: 4, person1InvestShare: 50 })
   h.rentSettings.push({ id: SETTINGS_ID.rent, deletedAt: null, enabled: true, monthlyRent: 2400, annualIncreaseRate: 5, purchasePlanEnabled: false,
     targetPurchaseYear: 2031, targetPropertyValue: 800000, depositPct: 20, depositFromCash: 0, depositFromInvestments: 0, newMortgageRate: 6, newMortgageTermYrs: 30, stampDutyPct: 4 })

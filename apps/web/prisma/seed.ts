@@ -124,23 +124,8 @@ async function main() {
   }
 
   // ── Life phases ───────────────────────────────────────────────────────────
-  const lpCount = await prisma.lifePhase.count();
-  if (lpCount === 0) {
-    const cy = new Date().getFullYear();
-    await prisma.lifePhase.createMany({
-      data: [
-        { name: 'Child 1 — newborn consumables',              type: 'recurring', monthlyAmt:  500, startYear: cy,     endYear: cy + 2,  cat: 'Children',  enabled: false, sortOrder: 0 },
-        { name: 'Daycare — Child 1',                          type: 'recurring', monthlyAmt:  900, startYear: cy + 1, endYear: cy + 4,  cat: 'Children',  enabled: false, sortOrder: 1 },
-        { name: 'Child 2 — newborn consumables',              type: 'recurring', monthlyAmt:  500, startYear: cy + 3, endYear: cy + 5,  cat: 'Children',  enabled: false, sortOrder: 2 },
-        { name: 'Daycare — Child 2',                          type: 'recurring', monthlyAmt:  900, startYear: cy + 4, endYear: cy + 7,  cat: 'Children',  enabled: false, sortOrder: 3 },
-        { name: 'Grocery uplift — family of 4',               type: 'recurring', monthlyAmt:  300, startYear: cy + 3, endYear: cy + 30, cat: 'Food',      enabled: false, sortOrder: 4 },
-        { name: 'Utilities uplift — larger household',        type: 'recurring', monthlyAmt:  100, startYear: cy + 3, endYear: cy + 30, cat: 'Utilities', enabled: false, sortOrder: 5 },
-        { name: 'Kids clothing & activities',                 type: 'recurring', monthlyAmt:  300, startYear: cy + 3, endYear: cy + 18, cat: 'Children',  enabled: false, sortOrder: 6 },
-        { name: 'Holiday uplift — family of 4',               type: 'recurring', monthlyAmt:  250, startYear: cy + 3, endYear: cy + 30, cat: 'Travel',    enabled: false, sortOrder: 7 },
-        { name: 'Health insurance step-up',                   type: 'recurring', monthlyAmt:  150, startYear: cy + 5, endYear: cy + 30, cat: 'Insurance', enabled: false, sortOrder: 8 },
-      ],
-    });
-  }
+  // None to start: children's costs, childcare and school fees are modelled
+  // (life stages); "extra costs by year" is for anything else the household adds.
 
   // ── Rent settings ─────────────────────────────────────────────────────────
   await prisma.rentSettings.upsert({

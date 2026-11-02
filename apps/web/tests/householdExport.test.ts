@@ -24,11 +24,11 @@ function legacy(): LegacyHousehold {
     childcare: { id: 1, enabled: true, costPerDay: 140, daysPerWeek: 3, numChildren: 1 },
     income: { id: 1, taxMode: true, person1FTE: 100000, person2FTE: 80000, person1HasHELP: true, person2HasHELP: false,
       person1MonthlyNet: 0, person2MonthlyNet: 0, person1Age: 35, person2Age: 34, person1BirthYear: 1991, person2BirthYear: null },
-    person1Phases: [{ id: 1, year: 2026, days: 5 }],
-    person2Phases: [{ id: 1, year: 2026, days: 3 }],
+    person1Phases: [{ id: 1, year: 2026, days: 5, month: 1 }],
+    person2Phases: [{ id: 1, year: 2026, days: 3, month: 7 }],
     projection: null,
     lifePhases: [],
-    oneOffs: [{ id: 1, name: 'Holiday', amt: 8000, year: 2027 }],
+    oneOffs: [{ id: 1, name: 'Holiday', amt: 8000, year: 2027, kind: 'cost' }],
     transactions: [
       { id: 10, dateStr: '01/09/2026', ym: '2026-09', desc: 'TEST GROCER', amt: -45.2, cat: 'Groceries', originalCat: 'Groceries', catSource: 'system', lumpy: false, importedAt: at },
       { id: 11, dateStr: '02/09/2026', ym: '2026-09', desc: 'TEST CHARITY', amt: -50, cat: 'Gifts', originalCat: 'Other', catSource: 'custom', lumpy: false, importedAt: at },
@@ -145,7 +145,7 @@ describe('mapLegacyHousehold', () => {
   it('turns names into p1 / p2 (ignoring case) and merges the two work-pattern tables', () => {
     const exp = exportOf()
     expect(exp.household.investmentParcel[0].person).toBe('p2')
-    expect(exp.household.workPhase.map(w => [w.person, w.days])).toEqual([['p1', 5], ['p2', 3]])
+    expect(exp.household.workPhase.map(w => [w.person, w.days, w.month])).toEqual([['p1', 5, 1], ['p2', 3, 7]])
     expect(exp.household.superHistory.find(h => h.person === 'p2')?.concessionalUtilised).toBe(12000)
   })
 

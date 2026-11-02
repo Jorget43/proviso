@@ -103,8 +103,10 @@ function pickValid(shape: Record<string, z.ZodType>, raw: unknown): Raw | undefi
   return Object.keys(out).length ? out : undefined
 }
 
-const phase   = z.object({ year: z.number().int().min(1900).max(2200), days: z.number().int().min(0).max(5) })
-const oneOff  = z.object({ name: z.string(), amt: z.number().finite(), year: z.number().int().min(1900).max(2200) })
+const phase   = z.object({ year: z.number().int().min(1900).max(2200), days: z.number().int().min(0).max(5),
+  month: z.number().int().min(1).max(12).optional().catch(undefined) })
+const oneOff  = z.object({ name: z.string(), amt: z.number().finite(), year: z.number().int().min(1900).max(2200),
+  kind: z.string().max(20).optional().catch(undefined) })
 const school  = z.enum(['government', 'catholic', 'independent', 'custom', 'none']).nullable().catch(null)
 const childOf = z.object({ name: z.string().nullable().catch(null), birthYear: z.number().int().min(1900).max(2200), birthMonth: z.number().int().min(1).max(12).nullable().catch(null),
   primarySchool: school.optional(), secondarySchool: school.optional() })

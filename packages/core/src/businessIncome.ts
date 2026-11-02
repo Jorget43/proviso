@@ -15,12 +15,17 @@
 // Not modelled: GST, PAYG instalments (tax is taken in the year earned),
 // personal services income rules, the small business income tax offset,
 // and deductible personal super contributions.
+//
+// v14 adds 'bonus': a bonus or commission from the person's job. It's taxed
+// and counts for HELP the same way, and the employer pays compulsory super
+// on it (bonuses and commissions are ordinary time earnings). It doesn't
+// change with the days a week worked.
 
 import { taxOnTop } from './investmentIncome'
 import { calcHELPRepayment } from './tax'
 
-export type IncomeKind = 'business'
-export const INCOME_KINDS: readonly IncomeKind[] = ['business']
+export type IncomeKind = 'business' | 'bonus'
+export const INCOME_KINDS: readonly IncomeKind[] = ['business', 'bonus']
 
 /** Profit growth a year when none is set: about wage growth. */
 export const DEFAULT_BUSINESS_GROWTH = 3
@@ -41,12 +46,14 @@ export interface IncomeSourceLike {
 const isKind = (k: string): k is IncomeKind => (INCOME_KINDS as readonly string[]).includes(k)
 
 /**
- * One person's business profit in `year`, grown from `baseYear` (this year).
- * `working` is false once they've retired: items with no end year stop then.
+ * One person's business profit (and bonuses) in `year`, grown from
+ * `baseYear` (this year). `working` is false once they've retired: items
+ * with no end year stop then. `kinds` narrows it, e.g. to bonuses only.
  */
-export function businessProfit(items: IncomeSourceLike[], person: 'p1' | 'p2', year: number, baseYear: number, working: boolean): number {
+export function businessProfit(items: IncomeSourceLike[], person: 'p1' | 'p2', year: number, baseYear: number, working: boolean,
+  kinds: readonly IncomeKind[] = INCOME_KINDS): number {
   return items
-    .filter(s => s.person === person && isKind(s.kind) && s.startYear <= year
+    .filter(s => s.person === person && isKind(s.kind) && kinds.includes(s.kind) && s.startYear <= year
       && (s.endYear === null ? working : year <= s.endYear))
     .reduce((t, s) => t + Math.max(0, s.amount) * Math.pow(1 + (s.growthPct || 0) / 100, Math.max(0, year - baseYear)), 0)
 }

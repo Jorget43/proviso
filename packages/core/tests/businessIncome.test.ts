@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { businessProfit, businessYear, DEFAULT_BUSINESS_GROWTH, type IncomeSourceLike } from '../src/businessIncome'
 import { computeBudgetSummary, type BudgetInputs } from '../src/budgetSummary'
 import { moneyIn } from '../src/yearByYear'
-import { runProjections } from '../src/projections'
+import { runProjections, type LifeCourse } from '../src/projections'
 import { makeProjectionInputs, FX_YEAR } from './fixtures/projections'
 
 // FY2026-27 rates: 15% from $18,200, 30% from $45,000, 37% from $135,000,
@@ -141,3 +141,31 @@ describe('in the projection', () => {
     expect(on.businessArr[0]).toBe(6_800)
   })
 })
+
+describe('bonuses (v14)', () => {
+  const lc: LifeCourse = {
+    partnerEnabled: false, person1Age: 40, person2Age: 40, person1RetirementAge: 67, person2RetirementAge: 67,
+    person1Super: 0, person2Super: 0, person1ExtraSuper: 0, person2ExtraSuper: 0,
+    sgRate: 0.12, superReturn: 0, superFeePct: 0, retirementSpending: 40_000, drawdown: 'need', drawdownPct: 6,
+  }
+  const base = makeProjectionInputs({ mortBalance: 0, mortPayment: 0, projYears: 2, lifeCourse: lc })
+  const asBusiness = runProjections({ ...base, business: [item({ amount: 10_000, startYear: FX_YEAR })] }).base
+  const asBonus = runProjections({ ...base, business: [item({ kind: 'bonus', amount: 10_000, startYear: FX_YEAR })] }).base
+
+  it('are taxed like business profit: $10,000 on $120,000 pay leaves 6,800', () => {
+    expect(asBonus.businessArr[0]).toBe(6_800)
+    expect(asBonus.incArr[0]).toBe(asBusiness.incArr[0])
+  })
+
+  it('attract compulsory super: 12% of $10,000, less 15% contributions tax = 1,020 more a year', () => {
+    expect(asBonus.superArr[0] - asBusiness.superArr[0]).toBe(1_020)
+    expect(asBonus.superArr[1] - asBusiness.superArr[1]).toBe(2_040)
+  })
+
+  it('are counted by businessProfit only when asked for', () => {
+    const items = [item({ amount: 5_000 }), item({ kind: 'bonus', amount: 3_000 })]
+    expect(businessProfit(items, 'p1', 2027, 2027, true)).toBe(8_000)
+    expect(businessProfit(items, 'p1', 2027, 2027, true, ['bonus'])).toBe(3_000)
+  })
+})
+

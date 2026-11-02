@@ -33,7 +33,7 @@ export function startWhatIf(h: HouseholdData): WhatIf {
 export function withScenario(h: HouseholdData, scenario: Scenario): HouseholdData {
   const o = validOverrides(readOverrides(scenario.overrides))
   const phasesFor = (person: 'p1' | 'p2', list: ScenarioOverrides['person1Phases']) =>
-    list ? list.map(p => ({ id: newId(), deletedAt: null, person, year: p.year, days: p.days }))
+    list ? list.map(p => ({ id: newId(), deletedAt: null, person, year: p.year, days: p.days, month: p.month ?? 1 }))
       : h.workPhases.filter(p => p.person === person)
   return {
     ...h,
@@ -41,7 +41,7 @@ export function withScenario(h: HouseholdData, scenario: Scenario): HouseholdDat
     rent: { ...h.rent, ...o.rent },
     superSettings: { ...h.superSettings, ...o.super, drawdownStrategy: o.super?.drawdownStrategy ?? h.superSettings.drawdownStrategy },
     workPhases: [...phasesFor('p1', o.person1Phases), ...phasesFor('p2', o.person2Phases)],
-    oneOffs: o.oneoffs ? o.oneoffs.map(x => ({ id: newId(), deletedAt: null, ...x })) : h.oneOffs,
+    oneOffs: o.oneoffs ? o.oneoffs.map(x => ({ id: newId(), deletedAt: null, ...x, kind: x.kind ?? 'cost' })) : h.oneOffs,
     children: o.children
       ? sortChildren(o.children.map(c => ({ id: newId(), deletedAt: null, primarySchool: null, secondarySchool: null, ...c })))
       : h.children,
@@ -83,7 +83,7 @@ export function hasChanges(h: HouseholdData, w: WhatIf): boolean {
  * first records that, so the change doesn't reach back to earlier years.
  */
 export function addWorkChange(w: WhatIf, person: 'p1' | 'p2', currentYear: number): WhatIf {
-  const phase = (year: number, days: number): WorkPhase => ({ id: newId(), deletedAt: null, person, year, days })
+  const phase = (year: number, days: number): WorkPhase => ({ id: newId(), deletedAt: null, person, year, days, month: 1 })
   const mine = w.workPhases.filter(p => p.person === person).sort((a, b) => a.year - b.year)
   const last = mine[mine.length - 1]
   const added = last

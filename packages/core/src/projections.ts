@@ -21,12 +21,25 @@ import { lifeStageYear, LATE_RETIREMENT_AGE, LATE_RETIREMENT_FACTOR, type LifeSt
 export interface WorkPhase {
   year: number;
   days: number; // 0 = parental leave, 1-5 = days/week
+  /** The month it starts, 1–12 (v14); January when missing. */
+  month?: number;
 }
+
+/**
+ * What a one-off is (v14): paid out ('cost'), or money coming in: 'gift'
+ * (an inheritance or gift, not taxed), 'sale' (selling something; no
+ * capital gains tax is modelled) or 'borrow' (drawing on the home loan:
+ * cash in, the same added to the loan). Unknown kinds count as costs.
+ */
+export type OneOffKind = 'cost' | 'gift' | 'sale' | 'borrow'
+export const MONEY_IN_KINDS: readonly OneOffKind[] = ['gift', 'sale', 'borrow']
+export const isMoneyIn = (o: { kind?: string | null }): boolean => (MONEY_IN_KINDS as readonly string[]).includes(o.kind ?? 'cost')
 
 export interface OneOff {
   name: string;
   amt:  number;
   year: number;
+  kind?: OneOffKind | string;
 }
 
 /**
@@ -219,6 +232,8 @@ export interface ProjectionResult {
   bufferArr:      number[];
   /** Shortfalls not covered by cash or investments, carried as money owed (in net worth). */
   owedArr:        number[];
+  /** One-offs bringing money in that year (gifts, sales, borrowing). */
+  oneoffInArr:    number[];
   mortStressArr:  number[];
   sfC1Arr:        number[];
   sfC2Arr:        number[];
@@ -304,25 +319,50 @@ export interface ProjectionOutput {
   labels:    string[];           // calendar year strings e.g. ['2027', '2028', ...]
 }
 
+// Months counted from year 0, so a phase's start compares with any month.
+const startOf = (p: WorkPhase) => p.year * 12 + (Math.min(12, Math.max(1, p.month ?? 1)) - 1);
+
 function getSortedPhases(phases: WorkPhase[]): WorkPhase[] {
-  return [...phases].sort((a, b) => a.year - b.year);
+  return [...phases].sort((a, b) => startOf(a) - startOf(b));
 }
 
-function getPhaseForYear(yr: number, sortedPhases: WorkPhase[]): WorkPhase {
+/** The phase in force in a month (0-based from year 0): the latest started by then, else the first. */
+function phaseAt(k: number, sortedPhases: WorkPhase[]): WorkPhase {
   let p = sortedPhases[0];
   for (const x of sortedPhases) {
-    if (x.year <= yr) p = x;
+    if (startOf(x) <= k) p = x;
   }
   return p;
 }
 
-// Days/week worked in `year`: the latest phase starting on or before it (a
-// phase stays in force until the next one), defaulting to full-time when no
-// phases exist. Shared by the Budget/Cashflow/Debts pages so the "current"
-// income they show matches the projection's year-by-year income.
-export function workDaysForYear(phases: WorkPhase[], year: number): number {
+// Days/week worked in a month of `year` (January unless given): the latest
+// phase started by then (a phase stays in force until the next one),
+// defaulting to full-time when no phases exist. Shared by the
+// Budget/Cashflow/Debts pages so the "current" income they show matches the
+// projection's year-by-year income.
+export function workDaysForYear(phases: WorkPhase[], year: number, month = 1): number {
   if (phases.length === 0) return 5
-  return getPhaseForYear(year, getSortedPhases(phases)).days
+  return phaseAt(year * 12 + month - 1, getSortedPhases(phases)).days
+}
+
+export interface WorkYear {
+  /** Days a week, averaged over the year's months (a change in July counts for half). */
+  days:        number;
+  /** Months at 0 days: parental leave for the partner, otherwise not working. */
+  offMonths:   number;
+  /** A stretch at 0 days starts this year (Parental Leave Pay is paid then). */
+  leaveStarts: boolean;
+}
+
+/** A year of work, month by month, from phases already sorted by start. */
+export function workYear(sortedPhases: WorkPhase[], yr: number): WorkYear {
+  let total = 0, off = 0;
+  for (let m = 0; m < 12; m++) {
+    const d = phaseAt(yr * 12 + m, sortedPhases).days;
+    total += d;
+    if (d === 0) off++;
+  }
+  return { days: total / 12, offMonths: off, leaveStarts: sortedPhases.some(p => p.days === 0 && p.year === yr) };
 }
 
 
@@ -350,7 +390,6 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
   const labels      = Array.from({ length: projYears }, (_, i) => String(cy + i + 1));
   const sorted      = getSortedPhases(person2Phases.length > 0 ? person2Phases : [{ year: cy, days: 5 }]);
   const sortedPerson1 = getSortedPhases(person1Phases.length > 0 ? person1Phases : [{ year: cy, days: 5 }]);
-  const leaveSt     = new Set(sorted.filter(p => p.days === 0).map(p => p.year));
 
   const jG  = person1GrowthRate / 100;
   const gG  = person2GrowthRate / 100;
@@ -433,6 +472,7 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
     let priceIdx  = 1;
     const bufferArr:      number[] = [];
     const owedArr:        number[] = [];
+    const oneoffInArr:    number[] = [];
     const mortStressArr:  number[] = [];
     const sfC1Arr:        number[] = [];
     const sfC2Arr:        number[] = [];
@@ -492,10 +532,15 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
       }
 
       // ── Income ──
-      const phase        = getPhaseForYear(yr, sorted);
-      const p1Phase      = getPhaseForYear(yr, sortedPerson1);
-      const isLeave      = !p2Retired && phase.days === 0;
-      const isFirstLeave = isLeave && leaveSt.has(yr);
+      // Work changes can start in any month: each person's days are the
+      // year's average. The partner's months at 0 days are parental leave;
+      // Parental Leave Pay comes in the year the leave starts.
+      const p2Work       = workYear(sorted, yr);
+      const p1Work       = workYear(sortedPerson1, yr);
+      const isLeave      = !p2Retired && p2Work.offMonths > 0;
+      const isFirstLeave = isLeave && p2Work.leaveStarts;
+      const allLeave     = isLeave && p2Work.offMonths === 12;
+      const pplThisYr    = isFirstLeave ? pplGross : 0;
 
       // HELP balances are indexed on 1 June; expense inflation stands in for CPI.
       p1HELP *= (1 + yearInflRate);
@@ -503,7 +548,7 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
 
       // Salary sacrifice comes out of pre-tax pay. HELP repayment income
       // still counts it (reportable super contributions), so HELP uses gross.
-      const p1Days      = p1Retired ? 0 : p1Phase.days;
+      const p1Days      = p1Retired ? 0 : p1Work.days;
       const p1GrossYr   = p1GrossBase * Math.pow(1 + jG, i + 1);
       const p1DaysGross = p1GrossYr * (p1Days / 5);
       const p1Sacrifice = lc && p1Days > 0 ? Math.min(Math.max(0, lc.person1ExtraSuper), p1DaysGross) : 0;
@@ -528,31 +573,35 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
         if (p1HELP < 1 && person1HelpClearedYr === null) { p1HELP = 0; person1HelpClearedYr = yr; }
       }
 
-      const p2DaysGross = p2Retired || isLeave ? 0 : p2GrossBase * Math.pow(1 + gG, i + 1) * (phase.days / 5);
+      const p2DaysGross = p2Retired ? 0 : p2GrossBase * Math.pow(1 + gG, i + 1) * (p2Work.days / 5);
       const p2Sacrifice = lc && p2DaysGross > 0 ? Math.min(Math.max(0, lc.person2ExtraSuper), p2DaysGross) : 0;
       let p2Annual: number;
       let pk2Pretax = 0;
       let pk2Reportable = 0;
       if (p2Retired) {
         p2Annual = 0;
-      } else if (isLeave) {
-        // PPL is paid once per birth (the first leave year) and is taxable.
-        p2Annual = isFirstLeave ? calcAfterTax(pplGross) : 0;
+      } else if (allLeave) {
+        // PPL is paid once per birth (the year the leave starts) and is taxable.
+        p2Annual = calcAfterTax(pplThisYr);
         leaveYrs.push(yr);
       } else {
+        // Working some of the year: Parental Leave Pay, if it starts this
+        // year, is taxed with the pay (and counts for HELP like pay).
+        if (isLeave) leaveYrs.push(yr);
         const pk2         = inputs.packaging && taxMode && p2DaysGross > 0 ? packageYear(inputs.packaging, 'p2', yr) : NO_PACKAGE;
         pk2Pretax         = Math.min(pk2.pretax, Math.max(0, p2DaysGross - p2Sacrifice));
         pk2Reportable     = pk2.reportable;
-        const p2Repay     = p2HELP > 0 ? Math.min(p2HELP, calcHELPRepayment(p2DaysGross + pk2.reportable)) : 0;
+        const p2Repay     = p2HELP > 0 ? Math.min(p2HELP, calcHELPRepayment(p2DaysGross + pplThisYr + pk2.reportable)) : 0;
 
         if (taxMode) {
-          p2Annual = netPay(p2DaysGross, p2Sacrifice, false, pk2) - p2Repay;
+          p2Annual = netPay(p2DaysGross + pplThisYr, p2Sacrifice, false, pk2) - p2Repay;
           if (pk2.pretax > 0) {
             packSaved += p2Annual - (calcAfterTax(p2DaysGross - p2Sacrifice) - (p2HELP > 0 ? Math.min(p2HELP, calcHELPRepayment(p2DaysGross)) : 0));
           }
         } else {
           // Simple mode mirrors Person 1: entered net pay, own growth rate.
-          p2Annual = person2MonthlyNet * 12 * Math.pow(1 + gG, i + 1) * (phase.days / 5) - p2Sacrifice * NET_MODE_KEEP;
+          p2Annual = person2MonthlyNet * 12 * Math.pow(1 + gG, i + 1) * (p2Work.days / 5) - p2Sacrifice * NET_MODE_KEEP
+            + (pplThisYr > 0 ? calcAfterTax(pplThisYr) : 0);
         }
 
         if (p2Repay > 0) {
@@ -594,9 +643,12 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
         // Super is paid on Paid Parental Leave from 1 July 2025, at the SG
         // rate (Paid Parental Leave Amendment (Adding Superannuation for a
         // More Secure Retirement) Act 2024).
-        const p2SgPay = isLeave ? (isFirstLeave ? pplGross : 0) : p2DaysGross;
-        s1 = step(0, s1, age1, p1Retired, p1DaysGross, p1Sacrifice);
-        if (lc.partnerEnabled) s2 = step(1, s2, age2, p2Retired, p2SgPay, p2Sacrifice);
+        const p2SgPay = p2DaysGross + pplThisYr;
+        // Compulsory super is paid on bonuses too (businessIncome.ts).
+        const bonus = (k: 'p1' | 'p2', working: boolean) =>
+          inputs.business ? businessProfit(inputs.business, k, yr, cy, working, ['bonus']) : 0;
+        s1 = step(0, s1, age1, p1Retired, p1DaysGross + bonus('p1', !p1Retired), p1Sacrifice);
+        if (lc.partnerEnabled) s2 = step(1, s2, age2, p2Retired, p2SgPay + bonus('p2', !p2Retired), p2Sacrifice);
       }
 
       // ── School fees ──
@@ -614,8 +666,8 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
       // gross that leaves it).
       const partner   = lc ? lc.partnerEnabled : (person2FTE > 0 || person2MonthlyNet > 0);
       const p1Taxable = p1Retired ? 0 : taxMode ? Math.max(0, p1DaysGross - p1Sacrifice - pk1.pretax) : grossFromNet(p1Annual);
-      const p2Taxable = p2Retired ? 0 : isLeave ? (isFirstLeave ? pplGross : 0)
-        : taxMode ? Math.max(0, p2DaysGross - p2Sacrifice - pk2Pretax) : grossFromNet(p2Annual);
+      const p2Taxable = p2Retired ? 0 : allLeave ? pplThisYr
+        : taxMode ? Math.max(0, p2DaysGross + pplThisYr - p2Sacrifice - pk2Pretax) : grossFromNet(p2Annual);
 
       // ── Business income ── taxed on top of pay; counts for HELP (businessIncome.ts).
       let bizCash = 0, bizProfit1 = 0, bizProfit2 = 0;
@@ -624,7 +676,7 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
         bizProfit2 = partner ? businessProfit(inputs.business, 'p2', yr, cy, !p2Retired) : 0;
         const b1 = businessYear(bizProfit1, p1Taxable, p1DaysGross + pk1.reportable, p1HELP);
         const b2 = businessYear(bizProfit2, p2Taxable,
-          isLeave ? (isFirstLeave ? pplGross : 0) : p2DaysGross + pk2Reportable, p2HELP);
+          p2DaysGross + pplThisYr + pk2Reportable, p2HELP);
         if (b1.help > 0) {
           p1HELP = Math.max(0, p1HELP - b1.help);
           if (p1HELP < 1 && person1HelpClearedYr === null) { p1HELP = 0; person1HelpClearedYr = yr; }
@@ -666,8 +718,8 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
       let stageCost = 0;
       const ls = inputs.lifeStages;
       if (ls) {
-        const days1 = p1Retired ? 0 : p1Phase.days;
-        const days2 = p2Retired || isLeave ? 0 : phase.days;
+        const days1 = p1Retired ? 0 : p1Work.days;
+        const days2 = p2Retired ? 0 : p2Work.days;
         const st = lifeStageYear(ls, { currentYear: cy, year: yr, workDays: [days1, days2], allRetired });
         stageCost = (st.children + st.childcare + st.work) * priceIdx;
         // From 85 (the younger adult), retirement spending eases (ASFA).
@@ -677,7 +729,21 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
         }
       }
       const nonMortExp  = Math.max(0, (allRetired ? retSpend : expBase) + stageCost) + sf.total + phaseOverlay + rentAnnual;
-      const oneoffTotal = oneoffs.filter(o => o.year === yr).reduce((s, o) => s + o.amt, 0);
+      const oneoffTotal = oneoffs.filter(o => o.year === yr && !isMoneyIn(o)).reduce((s, o) => s + o.amt, 0);
+      // Money coming in lands in cash at the start of the year. Borrowing adds
+      // the same to the home loan (the repayment stays, so it runs longer);
+      // with no home to borrow against, it's carried as money owed.
+      let oneoffIn = 0;
+      for (const o of oneoffs) {
+        if (o.year !== yr || !isMoneyIn(o)) continue;
+        oneoffIn += o.amt;
+        if (o.kind === 'borrow') {
+          if (mb > 0 || pVal > 0) mb += o.amt;
+          else owed += o.amt;
+        }
+      }
+      cash += oneoffIn;
+      oneoffInArr.push(Math.round(oneoffIn));
 
       const monthlyNetFlow = (annualInc + superDraw - nonMortExp) / 12;
       const mortResult = simulateMortgageYear(mb, cash, lMortRate, lMortPayment, monthlyNetFlow);
@@ -734,7 +800,7 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
       owed -= repaid;
       cash -= repaid;
       const moneyIn         = annualInc + superDraw;
-      const surplusThisYear = moneyIn - annualExp - oneoffTotal;
+      const surplusThisYear = moneyIn + oneoffIn - annualExp - oneoffTotal;
       const buffer          = bufMonths * annualExp / 12;
       const available       = Math.max(0, surplusThisYear - repaid);
       const splittable      = bufMonths > 0 ? Math.min(available, Math.max(0, cash - buffer)) : available;
@@ -756,7 +822,7 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
       owedArr.push(Math.round(owed));
 
       // Mortgage stress: annual repayments / gross household income (standard AU definition)
-      const p2GrossForStress = isLeave ? (isFirstLeave ? pplGross : 0) : p2DaysGross;
+      const p2GrossForStress = p2DaysGross + pplThisYr;
       const grossHousehold = p1DaysGross + p2GrossForStress + bizProfit1 + bizProfit2;
       // Repayments actually made: 0 while renting and once the loan is cleared.
       const stressPct = grossHousehold > 0 ? mortPaid / grossHousehold * 100 : 0;
@@ -777,7 +843,7 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
 
     return {
       nwArr, incArr, expArr, mortArr, cashArr, investArr,
-      person1Arr, person2Arr, phaseArr, deficitArr, cashRunningArr, funArr, interestArr, dividendArr, investTaxArr, investIncArr, packagingArr, businessProfitArr, businessArr, bufferArr, stageArr, owedArr, mortStressArr,
+      person1Arr, person2Arr, phaseArr, deficitArr, cashRunningArr, funArr, interestArr, dividendArr, investTaxArr, investIncArr, packagingArr, businessProfitArr, businessArr, bufferArr, stageArr, owedArr, oneoffInArr, mortStressArr,
       sfC1Arr, sfC2Arr, sfSibArr, sfTotalArr, sfChildArr, sfFamilyArr, leaveYrs, person1HelpClearedYr, person2HelpClearedYr,
       rentArr, purchaseYr, purchase,
       super1Arr, super2Arr, superArr, superDrawArr, retiredArr,

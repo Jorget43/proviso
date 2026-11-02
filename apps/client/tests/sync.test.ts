@@ -165,7 +165,7 @@ describe('changes that can’t be applied yet are kept, never lost', () => {
       { change: { hlc: at(3), table: 'oneOff', row: 'r1', column: 'year', value: 2027 }, schema: SCHEMA_VERSION },
       { change: { hlc: at(4), table: 'oneOff', row: 'r1', column: 'deletedAt', value: null }, schema: SCHEMA_VERSION },
     ])
-    expect((await loadHousehold(db)).oneOffs).toEqual([{ id: 'r1', deletedAt: null, name: 'Holiday', amt: 500, year: 2027 }])
+    expect((await loadHousehold(db)).oneOffs).toEqual([{ id: 'r1', deletedAt: null, name: 'Holiday', amt: 500, year: 2027, kind: 'cost' }])
     expect((await syncState(db))!.waiting).toBe(0)
   })
 

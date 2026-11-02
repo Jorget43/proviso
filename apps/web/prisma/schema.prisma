@@ -90,15 +90,17 @@ model IncomeSettings {
 }
 
 model Person1Phase {
-  id   Int @id @default(autoincrement())
-  year Int
-  days Int
+  id    Int @id @default(autoincrement())
+  year  Int
+  days  Int
+  month Int @default(1) // v14: the month the change starts
 }
 
 model Person2Phase {
-  id   Int @id @default(autoincrement())
-  year Int
-  days Int
+  id    Int @id @default(autoincrement())
+  year  Int
+  days  Int
+  month Int @default(1) // v14: the month the change starts
 }
 
 model ProjectionSettings {
@@ -135,6 +137,7 @@ model ProjectionSettings {
   growthPct            Float   @default(70)   // % in growth assets: how much returns swing
   glidePath            Boolean @default(false) // move growthPct to glideTargetPct by retirement
   glideTargetPct       Float   @default(50)
+  superGrowthPct       Float?  // v14: super's own mix; null = same as growthPct
   dividendYield        Float   @default(3)    // % of investments paid as dividends (part of investReturn; schema v11)
   frankedPct           Float   @default(50)   // % of dividends franked
   cashRate             Float   @default(4)    // % a year on cash above the home loan
@@ -183,6 +186,7 @@ model OneOff {
   name String
   amt  Float
   year Int
+  kind String @default("cost") // v14: cost | gift | sale | borrow (core OneOffKind)
 }
 
 // A named set of changes layered on the plan (twin of core's scenario table;

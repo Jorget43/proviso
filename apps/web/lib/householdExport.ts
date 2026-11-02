@@ -193,8 +193,8 @@ export function mapLegacyHousehold(
     void _id
     t.incomeSettings.push({ ...live, ...rest, id: SETTINGS_ID.income })
   }
-  for (const p of L.person1Phases) t.workPhase.push({ ...live, id: legacyId('person1Phase', p.id), person: 'p1', year: p.year, days: p.days })
-  for (const p of L.person2Phases) t.workPhase.push({ ...live, id: legacyId('person2Phase', p.id), person: 'p2', year: p.year, days: p.days })
+  for (const p of L.person1Phases) t.workPhase.push({ ...live, id: legacyId('person1Phase', p.id), person: 'p1', year: p.year, days: p.days, month: p.month })
+  for (const p of L.person2Phases) t.workPhase.push({ ...live, id: legacyId('person2Phase', p.id), person: 'p2', year: p.year, days: p.days, month: p.month })
   if (L.projection) {
     const { id: _id, ...rest } = L.projection
     void _id
@@ -207,7 +207,7 @@ export function mapLegacyHousehold(
     t.lifePhase.push({ ...live, id: legacyId('lifePhase', p.id), name: p.name, type, monthlyAmt: p.monthlyAmt,
       startYear: p.startYear, endYear: p.endYear, cat: p.cat, enabled: p.enabled, sortOrder: p.sortOrder })
   }
-  for (const o of L.oneOffs) t.oneOff.push({ ...live, id: legacyId('oneOff', o.id), name: o.name, amt: o.amt, year: o.year })
+  for (const o of L.oneOffs) t.oneOff.push({ ...live, id: legacyId('oneOff', o.id), name: o.name, amt: o.amt, year: o.year, kind: o.kind })
   for (const p of L.packagedItems) {
     t.packagedItem.push({ ...live, id: legacyId('packagedItem', p.id), person: p.person === 'p2' ? 'p2' : 'p1', kind: p.kind,
       amount: p.amount, carPrice: p.carPrice, startYear: p.startYear, endYear: p.endYear })

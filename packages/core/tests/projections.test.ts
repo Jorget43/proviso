@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buyHome, runProjections, type ProjectionResult } from '../src/projections'
+import { buyHome, runProjections, workDaysForYear, workYear, type ProjectionResult } from '../src/projections'
 import { computeMonthlyRepayment } from '../src/mortgage'
 import { calcAfterTax } from '../src/tax'
 import { PPL_TOTAL } from '../src/constants'
@@ -21,7 +21,7 @@ import {
 function expectShape(r: ProjectionResult, years: number) {
   expect(Object.keys(r).sort()).toEqual([
     'bridgeShortYr', 'bufferArr', 'businessArr', 'businessProfitArr', 'cashArr', 'cashRunningArr', 'deficitArr', 'dividendArr', 'expArr', 'funArr', 'incArr',
-    'interestArr', 'investArr', 'investIncArr', 'investTaxArr', 'leaveYrs', 'mortArr', 'mortStressArr', 'nwArr', 'owedArr', 'packagingArr', 'person1Arr',
+    'interestArr', 'investArr', 'investIncArr', 'investTaxArr', 'leaveYrs', 'mortArr', 'mortStressArr', 'nwArr', 'oneoffInArr', 'owedArr', 'packagingArr', 'person1Arr',
     'person1HelpClearedYr', 'person1RetireYr', 'person2Arr', 'person2HelpClearedYr', 'person2RetireYr',
     'phaseArr', 'purchase', 'purchaseYr', 'rentArr', 'retiredArr', 'sfC1Arr', 'sfC2Arr', 'sfChildArr', 'sfFamilyArr',
     'sfSibArr', 'sfTotalArr', 'shortfallYr', 'stageArr', 'super1Arr', 'super2Arr', 'superArr', 'superDrawArr',
@@ -266,7 +266,7 @@ describe('runProjections — S5 parental leave', () => {
 })
 
 describe('runProjections — S5b two consecutive leave years (PPL edge case)', () => {
-  // leaveSt only records the phase's START year (projections.ts:167), so a
+  // workYear's leaveStarts is true only in the year the leave STARTS, so a
   // days:0 phase spanning two calendar years pays PPL exactly once, in the
   // first year — NOT re-derivable by inspection without reading that line.
   const { base } = runProjections(makeProjectionInputs({
@@ -278,6 +278,62 @@ describe('runProjections — S5b two consecutive leave years (PPL edge case)', (
     expect(base.person2Arr[0]).toBe(Math.round(calcAfterTax(PPL_TOTAL))) // 2027 — first leave year, PPL paid
     expect(base.person2Arr[1]).toBe(0)    // 2028 — still on leave, no PPL
     expect(base.person2Arr[2]).toBe(91080) // 2029 — back full-time
+  })
+})
+
+describe('runProjections — S5c leave and a return that start partway through a year (v14 months)', () => {
+  // Full-time, leave from July 2028, back at 3 days from April 2029.
+  const phases = [{ year: 2026, days: 5 }, { year: 2028, days: 0, month: 7 }, { year: 2029, days: 3, month: 4 }]
+  const { base } = runProjections(makeProjectionInputs({ person2Phases: phases }))
+
+  it('averages the days over the months: 2.5 in 2028, 2.25 in 2029', () => {
+    // 2028: 6 months × 5 + 6 × 0 = 30 / 12; 2029: 3 months × 0 + 9 × 3 = 27 / 12.
+    expect(workYear(phases, 2028)).toEqual({ days: 2.5, offMonths: 6, leaveStarts: true })
+    expect(workYear(phases, 2029)).toEqual({ days: 2.25, offMonths: 3, leaveStarts: false })
+  })
+
+  it('taxes Parental Leave Pay with half a year of pay, in the year the leave starts', () => {
+    // 2028: $120,000 × 2.5 / 5 = $60,000 of pay, plus PPL, taxed together.
+    expect(base.person2Arr[1]).toBe(Math.round(calcAfterTax(60_000 + PPL_TOTAL)))
+    // 2029: $120,000 × 2.25 / 5 = $54,000, no PPL (the leave started in 2028).
+    expect(base.person2Arr[2]).toBe(Math.round(calcAfterTax(54_000)))
+    expect(base.leaveYrs).toEqual([2028, 2029])
+  })
+
+  it('gives the days in force in a given month', () => {
+    expect(workDaysForYear(phases, 2028)).toBe(5)
+    expect(workDaysForYear(phases, 2028, 9)).toBe(0)
+    expect(workDaysForYear(phases, 2029, 4)).toBe(3)
+  })
+})
+
+describe('runProjections — S5d money coming in at once (v14 one-off kinds)', () => {
+  const { base } = runProjections(makeProjectionInputs())
+
+  it('an inheritance lands in cash that year and stays in net worth', () => {
+    const r = runProjections(makeProjectionInputs({ oneoffs: [{ name: 'Inheritance', amt: 100_000, year: 2028, kind: 'gift' }] })).base
+    expect(r.oneoffInArr).toEqual([0, 100_000, 0, 0, 0])
+    // Held in the offset, so it also saves interest: at least $100,000 more from 2028.
+    expect(r.nwArr[1] - base.nwArr[1]).toBeGreaterThanOrEqual(100_000)
+    expect(r.nwArr[0]).toBe(base.nwArr[0])
+    // It isn't spending, and it isn't pay: tight years and money in are unchanged.
+    expect(r.expArr).toEqual(base.expArr)
+    expect(r.deficitArr).toEqual(base.deficitArr)
+  })
+
+  it('borrowing against the home adds the same to cash and to the loan, so net worth is unchanged', () => {
+    const r = runProjections(makeProjectionInputs({ oneoffs: [{ name: 'Refinance', amt: 50_000, year: 2028, kind: 'borrow' }] })).base
+    // Offset cash and the loan rise together, so the interest is the same.
+    expect(r.mortArr[1] - base.mortArr[1]).toBe(50_000)
+    expect(r.cashArr[1] - base.cashArr[1]).toBe(50_000)
+    expect(r.nwArr[1]).toBe(base.nwArr[1])
+  })
+
+  it('treats an unknown kind from a newer version as a cost', () => {
+    const r = runProjections(makeProjectionInputs({ oneoffs: [{ name: 'X', amt: 10_000, year: 2028, kind: 'something-new' }] })).base
+    const cost = runProjections(makeProjectionInputs({ oneoffs: [{ name: 'X', amt: 10_000, year: 2028 }] })).base
+    expect(r.nwArr).toEqual(cost.nwArr)
+    expect(r.oneoffInArr).toEqual([0, 0, 0, 0, 0])
   })
 })
 

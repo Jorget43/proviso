@@ -1192,7 +1192,35 @@ input[type=range] { width: 100%; accent-color: var(--t3); }
 .slider-hint { font-size: 0.75rem; color: var(--t3); margin: -2px 0 6px; }
 .wi-more { margin-top: 6px; border-top: 1px solid var(--border); padding-top: 10px; }
 .wi-more summary { font-size: 0.85rem; font-weight: 500; color: var(--blue); cursor: pointer; padding: 4px 0 10px; }
-.whatif-head, .whatif-fab { display: none; }
+.whatif-fab { display: none; }
+/* What if?: one tab at a time, under the chart on desktop (a drawer on phones, below) */
+.proj-layout { display: flex; flex-direction: column; gap: 1rem; }
+.proj-layout > * { min-width: 0; }
+.whatif-head { padding: 10px 1rem 0; border-bottom: 1px solid var(--border-md); }
+.whatif-title { display: flex; align-items: center; justify-content: space-between; font-size: 1rem; }
+.whatif-tabs { display: flex; gap: 4px; margin-top: 6px; }
+.whatif-tab {
+  flex: 1; font-family: inherit; font-size: 0.9rem; font-weight: 500;
+  color: var(--t2); background: none; border: none; border-bottom: 2px solid transparent;
+  padding: 10px 0; cursor: pointer;
+}
+.whatif-tab.active { color: var(--t1); border-bottom-color: var(--t1); }
+.whatif[data-group="basics"] .wi-group:not([data-group="basics"]),
+.whatif[data-group="work"]   .wi-group:not([data-group="work"]),
+.whatif[data-group="family"] .wi-group:not([data-group="family"]),
+.whatif[data-group="home"]   .wi-group:not([data-group="home"]),
+.whatif[data-group="plans"]  .wi-group:not([data-group="plans"]) { display: none; }
+@media (min-width: 901px) {
+  .whatif { background: var(--surface); border: 1px solid var(--border); border-radius: var(--rl); }
+  .whatif-head { padding: 14px 1.25rem 0; }
+  .whatif-title { font-size: 1.1rem; }
+  .whatif-title .sheet-close { display: none; }
+  .whatif-body { padding: 1rem 1.25rem 1.25rem; }
+  .whatif .scenario-editing { max-width: 560px; }
+  /* Each tab's panels side by side, two to a row */
+  .wi-group { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1rem; align-items: start; }
+  .wi-group > * { min-width: 0; margin: 0; }
+}
 
 /* ── Scenarios: chips over the chart, the Compare card, editing in What if? ── */
 .scrub-diff { font-size: 0.72rem; color: var(--t3); font-variant-numeric: tabular-nums; }
@@ -1271,21 +1299,8 @@ input[type=range] { width: 100%; accent-color: var(--t3); }
     transition: transform .25s ease-out, visibility 0s linear .25s;
   }
   .whatif.open { transform: none; visibility: visible; transition: transform .25s ease-out; }
-  .whatif-head { display: block; padding: 10px 1rem 0; border-bottom: 1px solid var(--border-md); }
-  .whatif-title { display: flex; align-items: center; justify-content: space-between; font-size: 1rem; }
-  .whatif-tabs { display: flex; gap: 4px; margin-top: 6px; }
-  .whatif-tab {
-    flex: 1; font-family: inherit; font-size: 0.85rem; font-weight: 500;
-    color: var(--t2); background: none; border: none; border-bottom: 2px solid transparent;
-    padding: 10px 0; cursor: pointer;
-  }
-  .whatif-tab.active { color: var(--t1); border-bottom-color: var(--t1); }
+  .whatif-tab { font-size: 0.85rem; }
   .whatif-body { flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 12px 1rem 1rem; }
-  .whatif[data-group="basics"] .wi-group:not([data-group="basics"]),
-  .whatif[data-group="work"]   .wi-group:not([data-group="work"]),
-  .whatif[data-group="family"] .wi-group:not([data-group="family"]),
-  .whatif[data-group="home"]   .wi-group:not([data-group="home"]),
-  .whatif[data-group="plans"]  .wi-group:not([data-group="plans"]) { display: none; }
   /* While the drawer is open: room to scroll the chart to the top, and a
      compact explorer (readout + chart only) that fits above the drawer */
   .proj.whatif-open { padding-bottom: 50vh; }

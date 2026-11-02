@@ -660,7 +660,7 @@ export default function ProjectionsClient({
         </p>
       </section>
 
-      <div className="sidebar-layout">
+      <div className="proj-layout">
         {/* ── Main column ── */}
         <div className="proj-main">
           <section className="panel explorer" id="explorer">
@@ -766,80 +766,7 @@ export default function ProjectionsClient({
             </div>
           </section>
 
-          {compareRows.length > 0 && (
-            <Panel title="Compare" dotColor="var(--blue)">
-              <div className="compare" style={{ ['--compare-cols' as string]: compareFees ? 5 : 4 }}>
-                <div className="compare-row compare-head" aria-hidden="true">
-                  <span />
-                  <span>Net worth at the end</span>
-                  <span>Money gets tight</span>
-                  <span>Retirement money</span>
-                  {compareFees && <span>School fees</span>}
-                  <span>Lowest cash</span>
-                </div>
-                {compareRows.map(row => {
-                  const plan = compareRows[0].s
-                  const diff = row.s.endNetWorth - plan.endNetWorth
-                  const vsPlan = Math.abs(diff) < 500 ? 'same as plan' : `${diff > 0 ? '+' : '−'}${fmtK(Math.abs(diff))} vs plan`
-                  return (
-                    <div key={row.key} className="compare-row">
-                      <span className="compare-name">
-                        <i className={`chip-line${row.colour ? ' dashed' : ''}`} style={row.colour ? { borderColor: `var(--${row.colour})` } : undefined} />
-                        <span>{row.name}{row.colour && <small>{row.changes === 0 ? 'No changes yet' : `${row.changes} change${row.changes === 1 ? '' : 's'}`}</small>}</span>
-                      </span>
-                      <span data-label="Net worth at the end">
-                        <strong>{fmtK(row.s.endNetWorth)}</strong>
-                        <small>{row.colour && row.s.endYear === plan.endYear ? vsPlan : `in ${row.s.endYear}`}</small>
-                      </span>
-                      <span data-label="Money gets tight"><strong>{row.s.tightYear ?? 'Not while working'}</strong></span>
-                      <span data-label="Retirement money">
-                        <strong className={row.s.runsOutAge !== null ? 'warn' : undefined}>{row.s.runsOutAge !== null ? `Runs short at ${row.s.runsOutAge}` : `Lasts past ${row.s.lastAge}`}</strong>
-                      </span>
-                      {compareFees && <span data-label="School fees"><strong>{row.s.schoolFees > 0 ? fmtK(row.s.schoolFees) : 'None'}</strong></span>}
-                      <span data-label="Lowest cash"><strong>{fmtK(row.s.lowestCash.value)}</strong><small>in {row.s.lowestCash.year}</small></span>
-                    </div>
-                  )
-                })}
-              </div>
-              <p className="proj-note mt1">
-                Net worth leaves super out. &ldquo;Money gets tight&rdquo; is the first working year more goes out than comes in. Ages are {partnerEnabled ? possessive(person1Name) : 'yours'}. Change a scenario in What if?.
-              </p>
-            </Panel>
-          )}
-
-          <Panel title="The numbers" dotColor="var(--purple)">
-            <div className="proj-summary">
-              {[
-                { label: 'Net worth today',           val: fmtK(initNW),  color: '' },
-                { label: `Net worth in ${lastLabel}`, val: fmtK(finalNW), color: 'var(--green)' },
-                ...(sfOn ? [
-                  { label: 'Without school fees',  val: fmtK(nwNoFeesFinal), color: '' },
-                  { label: 'School fees in total', val: fmtK(totalFees),     color: 'var(--red)' },
-                ] : []),
-                { label: `Cash in ${lastLabel}`,        val: fmtK(main.cashArr[main.cashArr.length - 1]), color: '' },
-                { label: `Investments in ${lastLabel}`, val: fmtK(finalInvest), color: 'var(--purple)' },
-                ...(hasLoan ? [{ label: `Home loan left in ${lastLabel}`, val: fmtK(main.mortArr[main.mortArr.length - 1]), color: 'var(--red)' }] : []),
-                { label: 'Spending today', val: '$' + Math.round(baseline.budgetMonthlyExpenses).toLocaleString('en-AU') + '/mo', color: '' },
-                ...(main.leaveYrs.length ? [{ label: 'Parental leave', val: main.leaveYrs.join(', '), color: 'var(--pink)' }] : []),
-                ...(person1HELPBalance > 0 ? [{ label: `${possessive(person1Name)} HELP debt cleared`, val: main.person1HelpClearedYr ? String(main.person1HelpClearedYr) : `After ${lastLabel}`, color: main.person1HelpClearedYr ? 'var(--teal)' : '' }] : []),
-                ...(person2HELPBalance > 0 ? [{ label: `${possessive(person2Name)} HELP debt cleared`, val: main.person2HelpClearedYr ? String(main.person2HelpClearedYr) : `After ${lastLabel}`, color: main.person2HelpClearedYr ? 'var(--teal)' : '' }] : []),
-              ].map(({ label, val, color }) => (
-                <div key={label} className="proj-summary-row">
-                  <span>{label}</span>
-                  <strong style={{ color: color || undefined }}>{val}</strong>
-                </div>
-              ))}
-            </div>
-          </Panel>
-
-          <ReadOnlyFence canEdit={canEdit}>
-            <Panel title="Track your actual net worth" dotColor="var(--amber)">
-              <NetWorthHistoryPanel snapshots={snapshots} onAdd={addSnapshot} onDelete={deleteSnapshot} />
-            </Panel>
-          </ReadOnlyFence>
-        </div>
-
-        {/* ── What if? — the sidebar on desktop, a half-height drawer on phones ── */}
+        {/* ── What if? — under the chart on desktop, a half-height drawer on phones ── */}
         <aside className={`whatif${whatIfOpen ? ' open' : ''}`} data-group={group} aria-label="What if? settings">
           <div className="whatif-head">
             <div className="whatif-title">
@@ -1367,6 +1294,80 @@ export default function ProjectionsClient({
           </ReadOnlyFence>
           </div>
         </aside>
+
+          {compareRows.length > 0 && (
+            <Panel title="Compare" dotColor="var(--blue)">
+              <div className="compare" style={{ ['--compare-cols' as string]: compareFees ? 5 : 4 }}>
+                <div className="compare-row compare-head" aria-hidden="true">
+                  <span />
+                  <span>Net worth at the end</span>
+                  <span>Money gets tight</span>
+                  <span>Retirement money</span>
+                  {compareFees && <span>School fees</span>}
+                  <span>Lowest cash</span>
+                </div>
+                {compareRows.map(row => {
+                  const plan = compareRows[0].s
+                  const diff = row.s.endNetWorth - plan.endNetWorth
+                  const vsPlan = Math.abs(diff) < 500 ? 'same as plan' : `${diff > 0 ? '+' : '−'}${fmtK(Math.abs(diff))} vs plan`
+                  return (
+                    <div key={row.key} className="compare-row">
+                      <span className="compare-name">
+                        <i className={`chip-line${row.colour ? ' dashed' : ''}`} style={row.colour ? { borderColor: `var(--${row.colour})` } : undefined} />
+                        <span>{row.name}{row.colour && <small>{row.changes === 0 ? 'No changes yet' : `${row.changes} change${row.changes === 1 ? '' : 's'}`}</small>}</span>
+                      </span>
+                      <span data-label="Net worth at the end">
+                        <strong>{fmtK(row.s.endNetWorth)}</strong>
+                        <small>{row.colour && row.s.endYear === plan.endYear ? vsPlan : `in ${row.s.endYear}`}</small>
+                      </span>
+                      <span data-label="Money gets tight"><strong>{row.s.tightYear ?? 'Not while working'}</strong></span>
+                      <span data-label="Retirement money">
+                        <strong className={row.s.runsOutAge !== null ? 'warn' : undefined}>{row.s.runsOutAge !== null ? `Runs short at ${row.s.runsOutAge}` : `Lasts past ${row.s.lastAge}`}</strong>
+                      </span>
+                      {compareFees && <span data-label="School fees"><strong>{row.s.schoolFees > 0 ? fmtK(row.s.schoolFees) : 'None'}</strong></span>}
+                      <span data-label="Lowest cash"><strong>{fmtK(row.s.lowestCash.value)}</strong><small>in {row.s.lowestCash.year}</small></span>
+                    </div>
+                  )
+                })}
+              </div>
+              <p className="proj-note mt1">
+                Net worth leaves super out. &ldquo;Money gets tight&rdquo; is the first working year more goes out than comes in. Ages are {partnerEnabled ? possessive(person1Name) : 'yours'}. Change a scenario in What if?.
+              </p>
+            </Panel>
+          )}
+
+          <Panel title="The numbers" dotColor="var(--purple)">
+            <div className="proj-summary">
+              {[
+                { label: 'Net worth today',           val: fmtK(initNW),  color: '' },
+                { label: `Net worth in ${lastLabel}`, val: fmtK(finalNW), color: 'var(--green)' },
+                ...(sfOn ? [
+                  { label: 'Without school fees',  val: fmtK(nwNoFeesFinal), color: '' },
+                  { label: 'School fees in total', val: fmtK(totalFees),     color: 'var(--red)' },
+                ] : []),
+                { label: `Cash in ${lastLabel}`,        val: fmtK(main.cashArr[main.cashArr.length - 1]), color: '' },
+                { label: `Investments in ${lastLabel}`, val: fmtK(finalInvest), color: 'var(--purple)' },
+                ...(hasLoan ? [{ label: `Home loan left in ${lastLabel}`, val: fmtK(main.mortArr[main.mortArr.length - 1]), color: 'var(--red)' }] : []),
+                { label: 'Spending today', val: '$' + Math.round(baseline.budgetMonthlyExpenses).toLocaleString('en-AU') + '/mo', color: '' },
+                ...(main.leaveYrs.length ? [{ label: 'Parental leave', val: main.leaveYrs.join(', '), color: 'var(--pink)' }] : []),
+                ...(person1HELPBalance > 0 ? [{ label: `${possessive(person1Name)} HELP debt cleared`, val: main.person1HelpClearedYr ? String(main.person1HelpClearedYr) : `After ${lastLabel}`, color: main.person1HelpClearedYr ? 'var(--teal)' : '' }] : []),
+                ...(person2HELPBalance > 0 ? [{ label: `${possessive(person2Name)} HELP debt cleared`, val: main.person2HelpClearedYr ? String(main.person2HelpClearedYr) : `After ${lastLabel}`, color: main.person2HelpClearedYr ? 'var(--teal)' : '' }] : []),
+              ].map(({ label, val, color }) => (
+                <div key={label} className="proj-summary-row">
+                  <span>{label}</span>
+                  <strong style={{ color: color || undefined }}>{val}</strong>
+                </div>
+              ))}
+            </div>
+          </Panel>
+
+          <ReadOnlyFence canEdit={canEdit}>
+            <Panel title="Track your actual net worth" dotColor="var(--amber)">
+              <NetWorthHistoryPanel snapshots={snapshots} onAdd={addSnapshot} onDelete={deleteSnapshot} />
+            </Panel>
+          </ReadOnlyFence>
+        </div>
+
       </div>
 
       {!whatIfOpen && (

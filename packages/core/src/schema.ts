@@ -22,7 +22,7 @@
 import { sqliteTable, text, integer, real } from 'drizzle-orm/sqlite-core'
 
 /** Bumped by every migration. Travels with each sync message and export. */
-export const SCHEMA_VERSION = 13
+export const SCHEMA_VERSION = 14
 
 export type PersonKey = 'p1' | 'p2'
 export const PERSON_KEYS: readonly PersonKey[] = ['p1', 'p2']
@@ -136,6 +136,8 @@ export const workPhase = sqliteTable('workPhase', {
   person: text('person', { enum: ['p1', 'p2'] }).notNull(),
   year:   integer('year').notNull(),
   days:   integer('days').notNull(),
+  // v14: the month the change starts (1–12); older rows start in January.
+  month:  integer('month').notNull().default(1),
 })
 
 /** v3: a child of the household. Eldest first by birth date (people.ts sortChildren). */
@@ -201,6 +203,8 @@ export const projectionSettings = sqliteTable('projectionSettings', {
   growthPct:            real('growthPct').notNull().default(70),
   glidePath:            bool('glidePath').notNull().default(false),
   glideTargetPct:       real('glideTargetPct').notNull().default(50),
+  // v14: super's own mix (% in growth assets); null holds it like the investments (growthPct).
+  superGrowthPct:       real('superGrowthPct'),
   // v11: income from savings and investments (investmentIncome.ts): the
   // dividend yield (part of investReturn, reinvested), the share of dividends
   // franked, interest on cash above the home loan, and the share of that
@@ -263,6 +267,11 @@ export const oneOff = sqliteTable('oneOff', {
   name: text('name').notNull(),
   amt:  real('amt').notNull(),
   year: integer('year').notNull(),
+  // v14: a OneOffKind (projections.ts): 'cost' (paid out), 'gift' (money in,
+  // not taxed: an inheritance or gift), 'sale' (money in from selling
+  // something) or 'borrow' (cash in, added to the home loan). Text, so a
+  // newer kind survives older apps, which treat it as a cost.
+  kind: text('kind').notNull().default('cost'),
 })
 
 /**

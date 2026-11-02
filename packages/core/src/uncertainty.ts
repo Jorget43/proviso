@@ -45,17 +45,25 @@ export const MIX_CHOICES = [
 export const DEFAULT_GLIDE_TARGET_PCT = 50
 
 export interface MixSettings {
-  /** % of investments (and super) in growth assets today. */
+  /** % of investments outside super in growth assets today. */
   growthPct:     number
-  /** Move towards `glideTargetPct` by the time everyone has retired. */
+  /** Super's own share (v14); null holds super like the investments. */
+  superGrowthPct: number | null
+  /** Move each towards `glideTargetPct` by the time everyone has retired (a mix already safer stays put). */
   glidePath:     boolean
   glideTargetPct: number
 }
 
-/** The mix from saved projection settings (defaults for rows from before v10). */
-export function mixFrom(s: { growthPct?: number; glidePath?: boolean; glideTargetPct?: number }): MixSettings {
-  return { growthPct: s.growthPct ?? DEFAULT_GROWTH_PCT, glidePath: s.glidePath ?? false, glideTargetPct: s.glideTargetPct ?? DEFAULT_GLIDE_TARGET_PCT }
+/** The mix from saved projection settings (defaults for rows from before v10 and v14). */
+export function mixFrom(s: { growthPct?: number; superGrowthPct?: number | null; glidePath?: boolean; glideTargetPct?: number }): MixSettings {
+  return {
+    growthPct: s.growthPct ?? DEFAULT_GROWTH_PCT, superGrowthPct: s.superGrowthPct ?? null,
+    glidePath: s.glidePath ?? false, glideTargetPct: s.glideTargetPct ?? DEFAULT_GLIDE_TARGET_PCT,
+  }
 }
+
+/** Super's share in growth assets today. */
+export const superGrowthOf = (mix: MixSettings): number => mix.superGrowthPct ?? mix.growthPct
 
 /** Whether the range is shown: the v10 switch, or before it, a spread above 0. */
 export function rangeOn(s: { showRange?: boolean | null; returnSpread?: number }): boolean {
@@ -68,11 +76,16 @@ export function mixVolatility(growthPct: number): number {
   return Math.sqrt((g * GROWTH_VOL) ** 2 + (d * DEFENSIVE_VOL) ** 2 + 2 * g * d * MIX_CORRELATION * GROWTH_VOL * DEFENSIVE_VOL)
 }
 
-/** The growth share in each projected year (index 0 = next year): flat, or gliding to the target by retirement. */
-export function mixPath(mix: MixSettings, years: number, yearsToRetire: number): number[] {
-  if (!mix.glidePath) return Array(years).fill(mix.growthPct)
+/**
+ * The growth share in each projected year (index 0 = next year), from
+ * `start` (the investments' share unless given): flat, or gliding to the
+ * target by retirement when that's safer than the start.
+ */
+export function mixPath(mix: MixSettings, years: number, yearsToRetire: number, start: number = mix.growthPct): number[] {
+  const target = Math.min(start, mix.glideTargetPct)
+  if (!mix.glidePath || target === start) return Array(years).fill(start)
   const span = Math.max(1, yearsToRetire)
-  return Array.from({ length: years }, (_, i) => mix.growthPct + (mix.glideTargetPct - mix.growthPct) * Math.min(1, (i + 1) / span))
+  return Array.from({ length: years }, (_, i) => start + (target - start) * Math.min(1, (i + 1) / span))
 }
 
 /** Years until the last adult retires (the whole horizon without a life course). */
@@ -87,12 +100,15 @@ export function yearsToLastRetirement(inputs: ProjectionInputs): number {
 /** The plan's inputs: expected returns year by year, moved by the glide path when it's on. */
 export function planInputs(inputs: ProjectionInputs, mix: MixSettings): ProjectionInputs {
   if (!mix.glidePath) return inputs
-  const path = mixPath(mix, inputs.projYears, yearsToLastRetirement(inputs))
-  const shift = (g: number) => (g - mix.growthPct) / 100 * GROWTH_PREMIUM   // percentage points
+  const toRetire = yearsToLastRetirement(inputs)
+  const path = mixPath(mix, inputs.projYears, toRetire)
+  const superStart = superGrowthOf(mix)
+  const superPath = mixPath(mix, inputs.projYears, toRetire, superStart)
+  const shift = (g: number, start: number) => (g - start) / 100 * GROWTH_PREMIUM   // percentage points
   return {
     ...inputs,
-    investReturnByYear: path.map(g => inputs.investReturn + shift(g)),
-    superReturnByYear: inputs.lifeCourse && path.map(g => inputs.lifeCourse!.superReturn + shift(g) / 100),
+    investReturnByYear: path.map(g => inputs.investReturn + shift(g, mix.growthPct)),
+    superReturnByYear: inputs.lifeCourse && superPath.map(g => inputs.lifeCourse!.superReturn + shift(g, superStart) / 100),
   }
 }
 
@@ -186,8 +202,9 @@ export function runOutlook(inputs: ProjectionInputs, mix: MixSettings, on: boole
       shortAgeLow: shortAgeMid, shortAgeMid }
   }
 
-  const path = mixPath(mix, years, yearsToLastRetirement(inputs))
-  const vols = path.map(mixVolatility)
+  // One market: the same draw moves both, each by its own mix's swing.
+  const vols = mixPath(mix, years, yearsToLastRetirement(inputs)).map(mixVolatility)
+  const superVols = mixPath(mix, years, yearsToLastRetirement(inputs), superGrowthOf(mix)).map(mixVolatility)
   const investMedian = planIn.investReturnByYear ?? Array(years).fill(inputs.investReturn)
   const superMedian = inputs.lifeCourse ? (planIn.superReturnByYear ?? Array(years).fill(inputs.lifeCourse.superReturn)) : null
   const z = normals(SEED, runs * years)
@@ -200,7 +217,7 @@ export function runOutlook(inputs: ProjectionInputs, mix: MixSettings, on: boole
     const r = mainOf(runProjections({
       ...planIn, mainOnly: true,
       investReturnByYear: investMedian.map((m, y) => drawReturn(m / 100, vols[y], zk(y)) * 100),
-      superReturnByYear: superMedian?.map((m, y) => drawReturn(m, vols[y], zk(y))),
+      superReturnByYear: superMedian?.map((m, y) => drawReturn(m, superVols[y], zk(y))),
     }))
     nw.push(r.nwArr); sup.push(r.superArr); nwSuper.push(r.nwArr.map((v, i) => v + (r.superArr[i] ?? 0)))
     if (lasts(r)) lasting++
