@@ -440,7 +440,7 @@ In [`docs/architecture.md`](docs/architecture.md) order. Phase 3 there (the sing
 1. **⏰ Remind the owner first — phone test still to do** (deferred 2026-10-08, "soon"). **The Android development build with Phases 34–35** (sync, camera, key backup): it built successfully on EAS on 2026-10-08 (so the key-backup Kotlin module and expo-camera compile); `npm run eas -w @proviso/client -- build:list --limit 1` shows the APK link. Install it and check on the phone: Settings → Recovery phrase → Save to Google Password Manager; Settings → Sync; Join a household (camera scan).
 2. **Run the relay on the NAS** with the owner: `docker compose --profile sync up -d` (image `ghcr.io/jorget43/proviso-relay`, published by CI from master since 2026-10-08), then `tailscale serve --bg --https=8443 http://localhost:8787` (README "Sync relay for the app"). Turn sync on in the app with the `https://<machine>.<tailnet>.ts.net:8443` address, then join from a second phone. Phones need Tailscale running to reach it.
 3. **Owner decisions pending**: none. (Phase 54, the Future redesign: owner OK to merge and push 2026-11-02.)
-   - Phase 55 (the app's side of Phase 54, branch `app-future-redesign`) is built and checked in the app's web build: ask for the OK to merge and push. Not yet seen on a phone (steppers and the year range on touch).
+   - Phase 55 (the app's side of Phase 54) merged and pushed with the owner's OK 2026-11-02. Not yet seen on a phone: check the steppers and the year range by touch in the next development build.
    - Phase 53's app screens (Settings → Business income, and its add / change sheet) are tested but haven't been looked at yet: screenshot them in the app's web build at 390px and 1280px.
 4. **Step B of [`docs/plan-modelling-and-ux.md`](docs/plan-modelling-and-ux.md)**:
    - The life-course engine shipped as Phase 40 (merged to master 2026-10-09 with the owner's OK).
@@ -584,7 +584,7 @@ Ideas that have been evaluated but aren't on the roadmap. Each links to its writ
 - Typed routes are off in `apps/client` (the generated file only existed where a dev server ran, never in CI, and misread the monorepo).
 - Verified: 356 tests; the app at 390px (a Melbourne family of four: $2.32M in today's money in 20 years, HELP cleared 2028, school fees end 2039, loan paid off 2042; a $45k car in 2029 gives $2.28M); the NAS Projections and Super pages rendered against a scratch household. The NAS Super "consider a lower target" hint was fixed on the way (it would have subtracted the mortgage twice and suggested $0).
 
-### Phase 55 — The app's side of the Future redesign (2026-11-02, branch `app-future-redesign`)
+### Phase 55 — The app's side of the Future redesign (2026-11-02, merged and pushed)
 
 Phase 54's NAS screens, built for the app. Nothing in the engine or the numbers changes.
 
