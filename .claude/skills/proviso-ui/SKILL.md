@@ -22,6 +22,12 @@ Households who aren't finance people. Every screen should answer a plain questio
 
 - **Edit in a bottom sheet** on phones (centred dialog on desktop); one question per field.
 - **Charts are scrubbed**: drag sideways to move through time, with a fixed readout above the chart (no floating tooltips). The readout doubles as the legend. Vertical drags scroll the page.
+- **Charts stay readable** (owner's review, Phase 54):
+  - name lines at their right-hand end (`endLabel`), and start secondary lines hidden (`startHidden`), shown on a tap;
+  - one strong plan line; scenarios dashed and thinner; range bands shaded with no edge lines;
+  - Future charts share a year range (10 / 20 years, to retirement, all; `YearWindow`), so long horizons can be read in parts;
+  - a stacked bar chart stacks **both** axes; a line drawn over it gets its own `stack` key, or it's added on top of the bars.
+- **Group related settings in one card**, not a card per year: e.g. one parental leave card holding its start, return and steps back up. Months and years are picked from dropdowns on the NAS and − / + steppers in the app (no free typing of years).
 - **One number, one definition**: if a figure appears twice (e.g. net worth on Home and Wealth), both come from the same core function and have the same name.
 - **Empty states invite the next step** ("Add your take-home pay so we can…"), never "No data".
 

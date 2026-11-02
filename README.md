@@ -19,7 +19,7 @@ Both use the same calculation engine (`packages/core`), so they give the same nu
 
 - **Next.js 16** (App Router) + React, TypeScript
 - **SQLite** via **Prisma 5**
-- Self-hosted auth (scrypt + DB-backed sessions), household RBAC (CFO / Partner)
+- Self-hosted auth (scrypt + DB-backed sessions), household roles (CFO and Partner both edit the plan; the CFO manages members)
 - Chart.js for visualisations
 
 ## Development
@@ -135,12 +135,14 @@ Built for phones first (Add to Home Screen opens it like an app), with the same 
 - **Home** — what's left over each month, things worth a look, where you stand, bills coming up
 - **Spending** — Budget · Actual spending (bank/card statement import)
 - **Wealth** — Own & owe · Super · Investments
-- **Future** — Long term (net worth, money in and out, home, school fees and retirement, projected until you're 95, with "What if?" and saved scenarios shown side by side) · Next 2 years (cashflow)
+- **Future** — Long term (net worth, money in and out, home, school fees and retirement, projected until you're 95, with "What if?" and saved scenarios shown side by side; pick the years each chart shows) · Next 2 years (cash month by month, following your planned work changes and parental leave)
 
 The projection follows a life course:
 - pay stops when each person retires
 - super grows inside the projection and is paid out by the drawdown strategy you choose (spend what you need, the 4% rule, a set percentage, or the legal minimum)
 - it warns if savings run out before super can be reached at 60
+- work changes and parental leave start in any month, with steps back up to more days
+- big one-offs can be costs or money coming in (an inheritance, a sale, borrowing against the home), and bonuses are taxed like pay with super paid on them
 
 The NAS web app is the full product today. `CLAUDE.md` (Backlog → "Where each feature lives") tracks which features the app has so far.
 

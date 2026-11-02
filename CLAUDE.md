@@ -441,7 +441,8 @@ In [`docs/architecture.md`](docs/architecture.md) order. Phase 3 there (the sing
 2. **Run the relay on the NAS** with the owner: `docker compose --profile sync up -d` (image `ghcr.io/jorget43/proviso-relay`, published by CI from master since 2026-10-08), then `tailscale serve --bg --https=8443 http://localhost:8787` (README "Sync relay for the app"). Turn sync on in the app with the `https://<machine>.<tailnet>.ts.net:8443` address, then join from a second phone. Phones need Tailscale running to reach it.
 3. **Owner decisions pending**: none. (Phase 54, the Future redesign: owner OK to merge and push 2026-11-02.)
    - Phase 55 (the app's side of Phase 54) merged and pushed with the owner's OK 2026-11-02. Not yet seen on a phone: check the steppers and the year range by touch in the next development build.
-   - Phase 53's app screens (Settings → Business income, and its add / change sheet) are tested but haven't been looked at yet: screenshot them in the app's web build at 390px and 1280px.
+   - Phase 53's app screens: the list (now "Bonuses and business income") was seen at 390px in Phase 55; its add / change sheet is still unseen (screenshot at 390px and 1280px).
+   - **Suggested in the owner's Future review, not yet agreed** (ask which to do): a plain one-line answer at the top of Future ("On track" / "Tight in some years" / "Runs short at 78"); ⓘ explanations for jargon (offset, drawdown, franking, concessional); "Show as a table" on each chart; today's dollars by default with a switch; franking, dividend yield and the range folded under "More assumptions".
 4. **Step B of [`docs/plan-modelling-and-ux.md`](docs/plan-modelling-and-ux.md)**:
    - The life-course engine shipped as Phase 40 (merged to master 2026-10-09 with the owner's OK).
    - Phase 41 (birth years, the `child` table) merged to master 2026-10-12 with the owner's OK.
