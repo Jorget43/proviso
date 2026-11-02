@@ -25,7 +25,7 @@ import { leftOver as leftOverOf, workingYears, tightWorkingYears, stressYears, M
 import HomeChart          from './HomeChart'
 import RetirementChart    from './RetirementChart'
 import SchoolFeeChart     from './SchoolFeeChart'
-import WorkPhaseTimeline, { type WorkPhaseRow } from './WorkPhaseTimeline'
+import WorkPlan, { type WorkPhaseRow, type WorkPatch } from './WorkPlan'
 import OneOffPanel,       { type OneOffRow }      from './OneOffPanel'
 import LifePhasesPanel                            from './LifePhasesPanel'
 import LifeStagesPanel, { type ChildRow }         from './LifeStagesPanel'
@@ -58,6 +58,7 @@ interface ProjSettings {
   growthPct?:      number
   glidePath?:      boolean
   glideTargetPct?: number
+  superGrowthPct?: number | null
   dividendYield?:      number
   frankedPct?:         number
   cashRate?:           number
@@ -307,60 +308,64 @@ export default function ProjectionsClient({
   }, [])
 
   // ── Person1 phase CRUD ──
-  const addPerson1Phase = useCallback(async () => {
-    const maxY = person1Phases.length ? Math.max(...person1Phases.map(p => p.year)) : currentYear
-    const res = await fetch('/api/person1-phases', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ year: maxY + 2, days: 5 }),
-    })
-    if (!res.ok) return  // failure is reported by SaveErrorToast
-    const created: WorkPhaseRow = await res.json()
-    setPerson1Phases(prev => [...prev, created])
-  }, [person1Phases, currentYear])
+  const addPerson1Phase = useCallback(async (rows: Omit<WorkPhaseRow, 'id'>[]) => {
+    for (const row of rows) {
+      const res = await fetch('/api/person1-phases', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(row),
+      })
+      if (!res.ok) return  // failure is reported by SaveErrorToast
+      const created: WorkPhaseRow = await res.json()
+      setPerson1Phases(prev => [...prev, created])
+    }
+  }, [])
 
-  const updatePerson1Phase = useCallback(async (id: number, field: string, value: number) => {
-    setPerson1Phases(prev => prev.map(p => p.id === id ? { ...p, [field]: value } : p))
+  const updatePerson1Phase = useCallback(async (id: number, patch: WorkPatch) => {
+    setPerson1Phases(prev => prev.map(p => p.id === id ? { ...p, ...patch } : p))
     await fetch(`/api/person1-phases/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ [field]: value }),
+      body: JSON.stringify(patch),
     })
   }, [])
 
-  const deletePerson1Phase = useCallback(async (id: number) => {
-    setPerson1Phases(prev => prev.filter(p => p.id !== id))
-    await fetch(`/api/person1-phases/${id}`, { method: 'DELETE' })
+  const deletePerson1Phase = useCallback(async (ids: number[]) => {
+    setPerson1Phases(prev => prev.filter(p => !ids.includes(p.id)))
+    for (const id of ids) await fetch(`/api/person1-phases/${id}`, { method: 'DELETE' })
   }, [])
 
   // ── Person2 phase CRUD ──
-  const addPerson2Phase = useCallback(async () => {
-    const maxY = person2Phases.length ? Math.max(...person2Phases.map(p => p.year)) : currentYear
-    const res = await fetch('/api/person2-phases', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ year: maxY + 2, days: 3 }),
-    })
-    if (!res.ok) return  // failure is reported by SaveErrorToast
-    const created: WorkPhaseRow = await res.json()
-    setPerson2Phases(prev => [...prev, created])
-  }, [person2Phases, currentYear])
+  const addPerson2Phase = useCallback(async (rows: Omit<WorkPhaseRow, 'id'>[]) => {
+    for (const row of rows) {
+      const res = await fetch('/api/person2-phases', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(row),
+      })
+      if (!res.ok) return  // failure is reported by SaveErrorToast
+      const created: WorkPhaseRow = await res.json()
+      setPerson2Phases(prev => [...prev, created])
+    }
+  }, [])
 
-  const updatePerson2Phase = useCallback(async (id: number, field: string, value: number) => {
-    setPerson2Phases(prev => prev.map(p => p.id === id ? { ...p, [field]: value } : p))
+  const updatePerson2Phase = useCallback(async (id: number, patch: WorkPatch) => {
+    setPerson2Phases(prev => prev.map(p => p.id === id ? { ...p, ...patch } : p))
     await fetch(`/api/person2-phases/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ [field]: value }),
+      body: JSON.stringify(patch),
     })
   }, [])
 
-  const deletePerson2Phase = useCallback(async (id: number) => {
-    setPerson2Phases(prev => prev.filter(p => p.id !== id))
-    await fetch(`/api/person2-phases/${id}`, { method: 'DELETE' })
+  const deletePerson2Phase = useCallback(async (ids: number[]) => {
+    setPerson2Phases(prev => prev.filter(p => !ids.includes(p.id)))
+    for (const id of ids) await fetch(`/api/person2-phases/${id}`, { method: 'DELETE' })
   }, [])
 
   // ── One-off CRUD ──
+  const parseOneOff = (field: string, value: string | number) =>
+    field === 'name' || field === 'kind' ? String(value) : field === 'year' ? parseInt(String(value)) : parseFloat(String(value)) || 0
   const addOneoff = useCallback(async () => {
     const res = await fetch('/api/one-offs', {
       method: 'POST',
@@ -373,7 +378,7 @@ export default function ProjectionsClient({
   }, [currentYear])
 
   const updateOneoff = useCallback(async (id: number, field: string, value: string | number) => {
-    const parsed = field === 'name' ? value : (field === 'year' ? parseInt(String(value)) : parseFloat(String(value)) || 0)
+    const parsed = parseOneOff(field, value)
     setOneoffs(prev => prev.map(o => o.id === id ? { ...o, [field]: parsed } : o))
     await fetch(`/api/one-offs/${id}`, {
       method: 'PUT',
@@ -423,13 +428,27 @@ export default function ProjectionsClient({
     await fetch(`/api/children/${id}`, { method: 'DELETE' })
   }, [])
 
-  const toggleLifePhase = useCallback(async (id: number, enabled: boolean) => {
-    setLifePhases(prev => prev.map(p => p.id === id ? { ...p, enabled } : p))
+  const updateLifePhase = useCallback(async (id: number, patch: Partial<LifePhase>) => {
+    setLifePhases(prev => prev.map(p => p.id === id ? { ...p, ...patch } : p))
     await fetch(`/api/life-phases/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ enabled }),
+      body: JSON.stringify(patch),
     })
+  }, [])
+  const addLifePhase = useCallback(async () => {
+    const res = await fetch('/api/life-phases', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'New cost', type: 'recurring', monthlyAmt: 0, startYear: currentYear + 1, endYear: currentYear + 5, cat: 'Other', enabled: true }),
+    })
+    if (!res.ok) return  // failure is reported by SaveErrorToast
+    const created: LifePhase = await res.json()
+    setLifePhases(prev => [...prev, created])
+  }, [currentYear])
+  const deleteLifePhase = useCallback(async (id: number) => {
+    setLifePhases(prev => prev.filter(p => p.id !== id))
+    await fetch(`/api/life-phases/${id}`, { method: 'DELETE' })
   }, [])
 
 
@@ -494,9 +513,11 @@ export default function ProjectionsClient({
   function scenarioList<R extends { id: number }>(section: ListSection, rows: R[], make: () => Omit<R, 'id'>) {
     const save = (next: R[]) => changeScenario({ [section]: next.map(({ id, ...r }) => { void id; return r }) } as never)
     return {
-      add:    () => save([...rows, { ...make(), id: -1 } as R]),
-      update: (id: number, patch: Partial<R>) => save(rows.map(r => (r.id === id ? { ...r, ...patch } : r))),
-      remove: (id: number) => save(rows.filter(r => r.id !== id)),
+      add:     () => save([...rows, { ...make(), id: -1 } as R]),
+      addRows: (more: Omit<R, 'id'>[]) => save([...rows, ...more.map(r => ({ ...r, id: -1 }) as R)]),
+      update:  (id: number, patch: Partial<R>) => save(rows.map(r => (r.id === id ? { ...r, ...patch } : r))),
+      remove:  (id: number) => save(rows.filter(r => r.id !== id)),
+      removeRows: (ids: number[]) => save(rows.filter(r => !ids.includes(r.id))),
     }
   }
   const nextYear = (rows: { year: number }[]) => (rows.length ? Math.max(...rows.map(r => r.year)) : currentYear) + 2
@@ -506,8 +527,7 @@ export default function ProjectionsClient({
     one:  scenarioList('oneoffs', ed.oneoffs, () => ({ name: 'New expense', amt: 0, year: currentYear + 1 })),
     kids: scenarioList('children', ed.children, () => ({ name: null, birthYear: currentYear + 1, birthMonth: null })),
   }
-  const parseOneOff = (field: string, value: string | number) =>
-    field === 'name' ? String(value) : field === 'year' ? parseInt(String(value)) : parseFloat(String(value)) || 0
+
   const edMain = editingRun ? (editingRun.output.withFees ?? editingRun.output.base) : main
   // Lists keyed by length too: rows are numbered by position, so a removal re-mounts the inputs.
   const listKey = (rows: unknown[]) => `${editing ?? 'plan'}-${editing === null ? '' : rows.length}`
@@ -715,7 +735,7 @@ export default function ProjectionsClient({
                   labels={output.labels} person1Data={main.person1Arr} person2Data={main.person2Arr}
                   person1Name={person1Name} person2Name={person2Name} showPerson2={partnerEnabled}
                   leaveYrs={main.leaveYrs} spendData={main.expArr} sfTotalData={sfOn ? main.sfTotalArr : main.sfTotalArr.map(() => 0)}
-                  phaseData={main.phaseArr} cashData={main.cashRunningArr} superData={main.superDrawArr} investData={main.investIncArr} businessData={main.businessArr}
+                  phaseData={main.phaseArr} cashData={main.cashRunningArr} superData={main.superDrawArr} investData={main.investIncArr} businessData={main.businessArr} oneoffInData={main.oneoffInArr}
                   overlays={overlays(x => x.expArr, x => [{ label: 'Left over (or short)', data: leftOver(x), compareTo: leftOver(main), format: signed }])}
                 />
               )}
@@ -828,7 +848,8 @@ export default function ProjectionsClient({
                 onChange={v => editSettings({ funPct: v })} />
               <Slider label="Investment growth each year" hint="The total, dividends included, before tax." min={0} max={15} step={0.5} value={ed.settings.investReturn} cls="purple-t" onChange={v => editSettings({ investReturn: v })} />
               <MixControls
-                growthPct={mixFrom(ed.settings).growthPct} glidePath={mixFrom(ed.settings).glidePath} glideTargetPct={mixFrom(ed.settings).glideTargetPct}
+                growthPct={mixFrom(ed.settings).growthPct} superGrowthPct={mixFrom(ed.settings).superGrowthPct}
+                glidePath={mixFrom(ed.settings).glidePath} glideTargetPct={mixFrom(ed.settings).glideTargetPct}
                 showRange={rangeOn(ed.settings)} onChange={editSettings} />
               <details className="wi-more">
                 <summary>More assumptions</summary>
@@ -854,12 +875,12 @@ export default function ProjectionsClient({
             <Panel title={`${possessive(person1Name)} work`} dotColor="var(--blue)">
               <Slider label="Stops work at age" hint={`${income.person1Age} now; pay stops in ${edMain.person1RetireYr ?? currentYear}.`} min={Math.max(40, income.person1Age)} max={80} step={1}
                 value={ed.sup.person1RetirementAge} cls="blue-t" fmt={v => String(v)} onChange={v => editSuper({ person1RetirementAge: v })} />
-              <WorkPhaseTimeline
+              <WorkPlan
                 key={listKey(ed.person1Phases)}
                 phases={ed.person1Phases} currentYear={currentYear}
-                fte={income.person1FTE} showLeave={false}
-                onUpdate={sc ? (id, field, value) => sc.p1.update(id, { [field]: value }) : updatePerson1Phase}
-                onDelete={sc ? sc.p1.remove : deletePerson1Phase} onAdd={sc ? sc.p1.add : addPerson1Phase}
+                fte={income.person1FTE}
+                onUpdate={sc ? sc.p1.update : updatePerson1Phase}
+                onDelete={sc ? sc.p1.removeRows : deletePerson1Phase} onAdd={sc ? sc.p1.addRows : addPerson1Phase}
               />
             </Panel>
             <Panel
@@ -880,13 +901,13 @@ export default function ProjectionsClient({
                 <Slider label="Stops work at age" hint={`${income.person2Age} now; pay stops in ${edMain.person2RetireYr}.`} min={Math.max(40, income.person2Age)} max={80} step={1}
                   value={ed.sup.person2RetirementAge} cls="green-t" fmt={v => String(v)} onChange={v => editSuper({ person2RetirementAge: v })} />
               )}
-              <WorkPhaseTimeline
+              <WorkPlan
                 key={listKey(ed.person2Phases)}
                 phases={ed.person2Phases} currentYear={currentYear}
                 fte={income.person2FTE}
-                showLeave={ed.settings.parentalLeaveEnabled}
-                onUpdate={sc ? (id, field, value) => sc.p2.update(id, { [field]: value }) : updatePerson2Phase}
-                onDelete={sc ? sc.p2.remove : deletePerson2Phase} onAdd={sc ? sc.p2.add : addPerson2Phase}
+                leaveOn={ed.settings.parentalLeaveEnabled}
+                onUpdate={sc ? sc.p2.update : updatePerson2Phase}
+                onDelete={sc ? sc.p2.removeRows : deletePerson2Phase} onAdd={sc ? sc.p2.addRows : addPerson2Phase}
               />
             </Panel>
           </div>
@@ -1069,7 +1090,7 @@ export default function ProjectionsClient({
           </div>
 
           <div className="wi-group" data-group="plans">
-            <Panel title="Big one-off costs" dotColor="var(--blue)">
+            <Panel title="Big one-offs" dotColor="var(--blue)">
               <OneOffPanel key={listKey(ed.oneoffs)} oneoffs={ed.oneoffs} onAdd={sc ? sc.one.add : addOneoff}
                 onUpdate={sc ? (id, field, value) => sc.one.update(id, { [field]: parseOneOff(field, value) }) : updateOneoff}
                 onDelete={sc ? sc.one.remove : deleteOneoff} />
@@ -1288,7 +1309,7 @@ export default function ProjectionsClient({
                   : undefined
               }
             >
-              <LifePhasesPanel phases={lifePhases} onToggle={toggleLifePhase} />
+              <LifePhasesPanel phases={lifePhases} onAdd={addLifePhase} onUpdate={updateLifePhase} onDelete={deleteLifePhase} />
             </Panel>
           </div>
           </ReadOnlyFence>
@@ -1388,23 +1409,34 @@ const mixLabel = (m: { growthPct: number; label: string }) => `${m.label} (${m.g
  * How investments and super are held, the glide path, and whether the range
  * of outcomes is shown (@proviso/core/uncertainty).
  */
-function MixControls({ growthPct, glidePath, glideTargetPct, showRange, onChange }: {
-  growthPct: number; glidePath: boolean; glideTargetPct: number; showRange: boolean
-  onChange: (patch: { growthPct?: number; glidePath?: boolean; glideTargetPct?: number; showRange?: boolean }) => void
+function MixControls({ growthPct, superGrowthPct, glidePath, glideTargetPct, showRange, onChange }: {
+  growthPct: number; superGrowthPct: number | null; glidePath: boolean; glideTargetPct: number; showRange: boolean
+  onChange: (patch: { growthPct?: number; superGrowthPct?: number | null; glidePath?: boolean; glideTargetPct?: number; showRange?: boolean }) => void
 }) {
-  const safer = MIX_CHOICES.filter(m => m.growthPct < growthPct)
+  // The glide target has to be safer than at least one of the two mixes.
+  const riskiest = Math.max(growthPct, superGrowthPct ?? growthPct)
+  const safer = MIX_CHOICES.filter(m => m.growthPct < riskiest)
+  const keepTarget = (top: number) => (glideTargetPct >= top ? { glideTargetPct: MIX_CHOICES.find(x => x.growthPct < top)?.growthPct ?? 30 } : {})
   return (
     <div className="mix-controls">
       <div className="wp-field">
-        <label htmlFor="mix-now">How investments and super are held</label>
+        <label htmlFor="mix-now">How your investments are held</label>
         <select id="mix-now" value={growthPct}
-          onChange={e => {
-            const g = Number(e.target.value)
-            onChange({ growthPct: g, ...(glideTargetPct >= g ? { glideTargetPct: MIX_CHOICES.find(x => x.growthPct < g)?.growthPct ?? 30 } : {}) })
-          }}>
+          onChange={e => { const g = Number(e.target.value); onChange({ growthPct: g, ...keepTarget(Math.max(g, superGrowthPct ?? g)) }) }}>
           {MIX_CHOICES.map(m => <option key={m.growthPct} value={m.growthPct}>{mixLabel(m)}</option>)}
         </select>
-        <div className="slider-hint">The rest is in cash and bonds. More in shares and property grows faster on average, but rises and falls more from year to year.</div>
+      </div>
+      <div className="wp-field">
+        <label htmlFor="mix-super">How your super is held</label>
+        <select id="mix-super" value={superGrowthPct ?? ''}
+          onChange={e => {
+            const v = e.target.value === '' ? null : Number(e.target.value)
+            onChange({ superGrowthPct: v, ...keepTarget(Math.max(growthPct, v ?? growthPct)) })
+          }}>
+          <option value="">The same as your investments</option>
+          {MIX_CHOICES.map(m => <option key={m.growthPct} value={m.growthPct}>{mixLabel(m)}</option>)}
+        </select>
+        <div className="slider-hint">Your fund calls it something like &ldquo;Balanced&rdquo; or &ldquo;Growth&rdquo;. The rest is in cash and bonds. More in shares and property grows faster on average, but rises and falls more from year to year.</div>
       </div>
       {safer.length > 0 && (
         <div className="mix-glide">

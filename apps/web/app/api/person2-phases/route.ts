@@ -15,6 +15,6 @@ export const POST = withErrors(async (request: NextRequest) => {
   const gate = await authorize('budget:write')
   if (!gate.ok) return gate.res
   const body = await parseBody(request, phaseCreateSchema)
-  const phase = await prisma.person2Phase.create({ data: { year: body.year, days: body.days ?? 3 } })
+  const phase = await prisma.person2Phase.create({ data: { year: body.year, days: body.days ?? 3, month: body.month ?? 1 } })
   return Response.json(phase, { status: 201 })
 })

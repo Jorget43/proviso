@@ -566,6 +566,25 @@ input[type=range] { width: 100%; accent-color: var(--t3); }
 .wp-field input, .wp-field select, .mix-glide select { font: inherit; font-size: 1rem; min-height: 42px; padding: 0 10px; border: 1px solid var(--border-md); border-radius: 8px; background: var(--surface); color: var(--t1); }
 .wp-pay { font-size: 0.82rem; color: var(--t2); }
 .wp-pay.warn { color: var(--amber); }
+.wk { display: flex; flex-direction: column; gap: 0.75rem; }
+.wk-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+.wk-row { border: 1px solid var(--border); border-left: 4px solid var(--border-md); border-radius: var(--r); padding: 0.6rem 0.75rem; display: flex; flex-direction: column; gap: 0.45rem; background: var(--surface); }
+.wk-row.now { border-left-color: var(--green); }
+.wk-row.off { opacity: 0.6; }
+.wk-row.leave { border-left-color: var(--pink); background: color-mix(in srgb, var(--pink) 6%, var(--surface)); }
+.wk-row-head { display: flex; justify-content: space-between; align-items: center; min-height: 28px; }
+.wk-tag { font-size: 0.78rem; font-weight: 600; letter-spacing: 0.03em; text-transform: uppercase; color: var(--t2); }
+.wk-row.leave .wk-tag { color: var(--pink); }
+.wk-fields { display: flex; flex-wrap: wrap; gap: 0.5rem 0.75rem; align-items: flex-end; }
+.wk-field { display: flex; flex-direction: column; gap: 3px; font-size: 0.78rem; color: var(--t2); }
+.wk-when { display: flex; gap: 6px; }
+.wk-fields select { font: inherit; font-size: 1rem; min-height: 42px; padding: 0 8px; border: 1px solid var(--border-md); border-radius: 8px; background: var(--surface); color: var(--t1); }
+.wk-step { border-top: 1px dashed var(--border-md); padding-top: 0.45rem; display: flex; flex-direction: column; gap: 0.3rem; }
+.wk-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.wk-fields input.wk-input, .wk-money input { font: inherit; font-size: 1rem; min-height: 42px; padding: 0 10px; border: 1px solid var(--border-md); border-radius: 8px; background: var(--surface); color: var(--t1); width: 100%; }
+.wk-fields input.wk-input.narrow { width: 6.5em; }
+.wk-money { display: flex; align-items: center; gap: 4px; }
+.wk-money input { width: 8.5em; text-align: right; }
 .pk-add { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
 /* Future → What if?: investment mix, glide path, range switch (uncertainty.ts) */
 .mix-controls { display: flex; flex-direction: column; gap: 10px; margin: 4px 0 14px; }

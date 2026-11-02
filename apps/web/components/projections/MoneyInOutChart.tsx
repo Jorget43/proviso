@@ -31,6 +31,8 @@ interface Props {
   investData?:  number[]
   /** Business income after its tax and HELP, stacked on the pay bars. */
   businessData?: number[]
+  /** One-offs bringing money in (inheritances, sales, borrowing): listed, not drawn (they'd dwarf the year's pay). */
+  oneoffInData?: number[]
   /** Scenarios' spending, as lines over the plan's, with what's left over in the readout. */
   overlays?:    Overlay[]
 }
@@ -38,7 +40,7 @@ interface Props {
 export const signed = (v: number) => (v > 0 ? '+' : '') + fmtK(v)
 
 export default function MoneyInOutChart({
-  labels, person1Data, person2Data, person1Name, person2Name, showPerson2, leaveYrs, spendData, sfTotalData, phaseData, cashData, superData, investData, businessData, overlays,
+  labels, person1Data, person2Data, person1Name, person2Name, showPerson2, leaveYrs, spendData, sfTotalData, phaseData, cashData, superData, investData, businessData, oneoffInData, overlays,
 }: Props) {
   const c = useChartColors()
   const leave = new Set(leaveYrs)
@@ -58,12 +60,13 @@ export default function MoneyInOutChart({
     { type: 'bar' as const, label: person1Name, data: person1Data, backgroundColor: c.a(c.blue, 0.7), stack: 'in', borderRadius: 3, order: 2 },
     ...(showPerson2 ? [{ type: 'bar' as const, label: person2Name, data: person2Data, stack: 'in', borderRadius: 3, order: 2,
       backgroundColor: labels.map(y => (leave.has(Number(y)) ? c.a(c.pink, 0.7) : c.a(c.green, 0.7))) }] : []),
-    ...(fromBusiness ? [{ type: 'bar' as const, label: 'Business income, after tax', data: fromBusiness, backgroundColor: c.a(c.purple, 0.7), stack: 'in', borderRadius: 3, order: 2 }] : []),
+    ...(fromBusiness ? [{ type: 'bar' as const, label: 'Bonuses and business income, after tax', data: fromBusiness, backgroundColor: c.a(c.purple, 0.7), stack: 'in', borderRadius: 3, order: 2 }] : []),
     ...(fromSuper ? [{ type: 'bar' as const, label: 'From super', data: fromSuper, backgroundColor: c.a(c.teal, 0.7), stack: 'in', borderRadius: 3, order: 2 }] : []),
     // Drawn only when it adds money; a year where tax on reinvested dividends
     // outweighs the interest shows $0 here and is still counted in "left over".
     ...(fromInvest ? [{ type: 'bar' as const, label: 'Interest and dividends, after tax', data: fromInvest.map(v => Math.max(0, v)), backgroundColor: c.a(c.t3, 0.55), stack: 'in', borderRadius: 3, order: 2 }] : []),
     { ...readOnly, label: 'Left over (or short)', data: gap, borderColor: c.t2, format: signed },
+    ...(oneoffInData?.some(v => v > 0) ? [{ ...readOnly, label: 'One-off money in (not in the bars)', data: oneoffInData, borderColor: c.green }] : []),
     { ...readOnly, detail: true, label: 'Of the spending: school fees', data: sfTotalData, borderColor: c.amber },
     { ...readOnly, detail: true, label: 'Of the spending: life stages', data: phaseData, borderColor: c.teal },
     { ...readOnly, detail: true, label: 'Cash at the end of the year', data: cashData, borderColor: c.blue },
@@ -83,7 +86,7 @@ export default function MoneyInOutChart({
         }} />
       </ScrubChart>
       <p className="proj-note mt1">
-        Bars: take-home pay{fromBusiness ? ', business income after tax' : ''}{fromInvest ? ', interest and dividends after tax' : ''}{fromSuper ? ', then money taken from super in retirement' : ''}{showPerson2 && leaveYrs.length ? ' (pink: parental leave)' : ''}. Line: everything that goes out, home loan repayments included; red dots mark years you&rsquo;d be short.
+        Bars: take-home pay{fromBusiness ? ', bonuses and business income after tax' : ''}{fromInvest ? ', interest and dividends after tax' : ''}{fromSuper ? ', then money taken from super in retirement' : ''}{showPerson2 && leaveYrs.length ? ' (pink: parental leave)' : ''}. Line: everything that goes out, home loan repayments included; red dots mark years you&rsquo;d be short.
       </p>
     </>
   )

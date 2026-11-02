@@ -102,8 +102,8 @@ export default function BudgetClient({
   }, [])
 
   // ── Business income ────────────────────────────────────────────────────────
-  const addSource = useCallback(async () => {
-    const draft = { person: 'p1', kind: 'business', name: null, amount: 0, growthPct: 3, startYear: new Date().getFullYear(), endYear: null }
+  const addSource = useCallback(async (kind: 'business' | 'bonus') => {
+    const draft = { person: 'p1', kind, name: null, amount: 0, growthPct: 3, startYear: new Date().getFullYear(), endYear: null }
     const res = await fetch('/api/income-sources', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(draft) })
     if (res.ok) { const row = await res.json() as IncomeSourceRow; setSources(prev => [...prev, row]) }
   }, [])
@@ -285,7 +285,7 @@ export default function BudgetClient({
       )}
 
       <ReadOnlyFence canEdit={canEdit}>
-        <Panel title="Business income" dotColor="var(--green)">
+        <Panel title="Bonuses and business income" dotColor="var(--green)">
           <BusinessPanel items={sources} partnerEnabled={partnerEnabled} person1Name={person1Name} person2Name={person2Name}
             monthlyAdds={businessMonthly} onAdd={addSource} onUpdate={updateSource} onDelete={deleteSource} />
         </Panel>

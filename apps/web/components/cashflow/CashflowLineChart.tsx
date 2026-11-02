@@ -38,7 +38,7 @@ export default function CashflowLineChart({ labels, data, tone, note }: Cashflow
 
   return (
     <>
-      <ScrubChart labels={labels} datasets={datasets} height={240}>
+      <ScrubChart labels={labels} datasets={datasets} height={240} unit="month">
         <Line
           plugins={[crosshair]}
           data={{ labels, datasets }}

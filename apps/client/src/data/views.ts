@@ -462,17 +462,24 @@ export interface CashflowView extends Cashflow {
 export function cashflowView(h: HouseholdData, now: Date): CashflowView {
   const p = phases(h)
   const year = now.getFullYear()
-  const budget = computeBudgetSummary({
+  // Take-home a month for given days a week, as the Budget works it out.
+  const budgetFor = (d1: number, d2: number) => computeBudgetSummary({
     expenses: h.expenses, annualExpenses: h.annualExpenses, income: h.income, childcare: h.childcare,
     rentMonthly: rentMonthly(h),
-    person1Days: workDaysForYear(p.p1, year), person2Days: workDaysForYear(p.p2, year),
+    person1Days: d1, person2Days: d2,
     partnerEnabled: h.settings.partnerEnabled,
-    packaging: packagingNow(h.packagedItems, year, { p1: workDaysForYear(p.p1, year), p2: workDaysForYear(p.p2, year) }),
+    packaging: packagingNow(h.packagedItems, year, { p1: d1, p2: d2 }),
     business: businessNow(h.incomeSources, year),
   })
+  const month = now.getMonth() + 1
+  const budget = budgetFor(workDaysForYear(p.p1, year, month), workDaysForYear(p.p2, year, month))
   const cf = computeCashflow({
-    budget, annualExpenses: h.annualExpenses, cashOnHand: computeCashOnHand(h.assets),
-    parentalLeave: h.settings.partnerEnabled && h.projection.parentalLeaveEnabled, now,
+    budget, annualExpenses: h.annualExpenses, cashOnHand: computeCashOnHand(h.assets), now,
+    plan: {
+      phases: { p1: p.p1, p2: h.settings.partnerEnabled ? p.p2 : [] },
+      incomeFor: (d1, d2) => budgetFor(d1, d2).monthlyIncome,
+      parentalLeave: h.settings.partnerEnabled && h.projection.parentalLeaveEnabled,
+    },
   })
   return { ...cf, person1Name: h.settings.person1Name, person2Name: h.settings.person2Name }
 }

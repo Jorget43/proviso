@@ -1,10 +1,10 @@
-// Future → Next 2 years: cash in the bank month by month if pay and spending
-// stay as they are, with yearly bills landing in their month. The same
+// Future → Next 2 years: cash in the bank month by month, with pay following
+// the plan's work changes and parental leave, and yearly bills landing in their month. The same
 // figures as the NAS's "Next 2 years" page (@proviso/core/cashflow).
 
 import { View } from 'react-native'
 import { Stack } from 'expo-router'
-import { fmt, fmtK, fmtS, possessive } from '@proviso/core/formatting'
+import { fmt, fmtK } from '@proviso/core/formatting'
 import { useHousehold } from '@/data/DataProvider'
 import { cashflowView } from '@/data/views'
 import { Card, H2, Screen, T } from '@/ui/kit'
@@ -40,26 +40,19 @@ export default function CashflowScreen() {
         )}
         <NetWorthBars labels={v.months.map(m => m.label)} values={v.months.map(m => m.balance)} what="Cash in the bank" />
         <T size="small" tone="t2">
-          Each month {fmt(v.monthlyIn)} comes in and {fmt(v.monthlyOut)} goes on regular spending; yearly bills land in the month they’re due.
-          It starts from the {fmt(v.cashOnHand)} you have now and assumes pay and prices stay as they are.
+          Now {fmt(v.monthlyIn)} comes in each month and {fmt(v.monthlyOut)} goes on regular spending; yearly bills land in the month they’re due.
+          It starts from the {fmt(v.cashOnHand)} you have now. Pay follows your plan’s work changes; prices stay as they are.
         </T>
       </Card>
 
-      {v.leave && (
+      {v.payChanges.length > 0 && (
         <View style={{ gap: space.sm }}>
-          <H2>If {v.person2Name} takes parental leave</H2>
+          <H2>Changes to pay</H2>
           <Card>
-            <Row label="While Parental Leave Pay lasts (6 months)" value={`${fmtS(v.leave.onPplSurplus)} a month`} good={v.leave.onPplSurplus >= 0} />
-            <Row label={`After that, on ${possessive(v.person1Name)} pay only`} value={`${fmtS(v.leave.afterPplSurplus)} a month`} good={v.leave.afterPplSurplus >= 0} />
-            <T tone={v.leave.runsOut ? 'red' : 't2'}>
-              {v.leave.runsOut
-                ? `Cash would run out in ${v.leave.runsOut.label}.`
-                : v.leave.runwayMonths === Infinity
-                  ? `${possessive(v.person1Name)} pay covers regular spending on its own.`
-                  : `On one income, today’s cash would last about ${Math.floor(v.leave.runwayMonths)} months.`}
-            </T>
-            <NetWorthBars labels={v.months.map(m => m.label)} values={v.months.map(m => m.leaveBalance ?? 0)} height={64} what="Cash with parental leave" />
-            <T size="small" tone="t2">Parental Leave Pay is the government payment, after tax, starting next month.</T>
+            {v.payChanges.map(c => (
+              <Row key={c.label} label={`From ${c.label}${c.onLeave ? `, ${v.person2Name} on parental leave` : ''}`} value={`${fmt(c.income)} a month`} good />
+            ))}
+            <T size="small" tone="t2">From the work changes and parental leave in your plan (What if? → Work). Parental Leave Pay is after tax.</T>
           </Card>
         </View>
       )}

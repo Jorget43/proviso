@@ -12,3 +12,11 @@ export const PUT = withErrors(async (request: NextRequest, { params }: { params:
   const updated = await prisma.lifePhase.update({ where: { id: parseInt(id) }, data: body })
   return Response.json(updated)
 })
+
+export const DELETE = withErrors(async (_request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
+  const gate = await authorize('budget:write')
+  if (!gate.ok) return gate.res
+  const { id } = await params
+  await prisma.lifePhase.delete({ where: { id: parseInt(id) } })
+  return new Response(null, { status: 204 })
+})

@@ -16,7 +16,7 @@ export const POST = withErrors(async (request: NextRequest) => {
   if (!gate.ok) return gate.res
   const body = await parseBody(request, oneOffSchema)
   const oneoff = await prisma.oneOff.create({
-    data: { name: body.name ?? 'New expense', amt: body.amt ?? 0, year: body.year ?? new Date().getFullYear() + 1 },
+    data: { name: body.name ?? 'New expense', amt: body.amt ?? 0, year: body.year ?? new Date().getFullYear() + 1, kind: body.kind ?? 'cost' },
   })
   return Response.json(oneoff, { status: 201 })
 })

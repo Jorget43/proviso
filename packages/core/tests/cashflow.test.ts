@@ -10,10 +10,10 @@ const bills = [
 ]
 // Budget figures as computeBudgetSummary gives them: $8,000 in, $6,000 out a
 // month, of which $300 is the two yearly bills spread ((1,200 + 2,400) / 12).
-const budget = { monthlyIncome: 8_000, monthlyExpenses: 6_000, person1Net: 5_000 }
+const budget = { monthlyIncome: 8_000, monthlyExpenses: 6_000 }
 
 describe('cashflow, next 24 months', () => {
-  const cf = computeCashflow({ budget, annualExpenses: bills, cashOnHand: 10_000, parentalLeave: false, now: NOW })
+  const cf = computeCashflow({ budget, annualExpenses: bills, cashOnHand: 10_000, now: NOW })
 
   it('regular spending leaves the yearly bills out; they land in their own month', () => {
     // 6,000 − 300 = 5,700 regular; 8,000 − 5,700 = 2,300 surplus each month.
@@ -39,27 +39,41 @@ describe('cashflow, next 24 months', () => {
   it('finds the lowest month; doesn’t run out', () => {
     expect(cf.lowest.label).toBe('Nov 26')
     expect(cf.runsOut).toBeNull()
-    expect(cf.leave).toBeNull()
-    expect(cf.months.every(m => m.leaveBalance === null)).toBe(true)
+    expect(cf.payChanges).toEqual([])
+    expect(cf.months.every(m => m.income === 8_000 && !m.onLeave)).toBe(true)
   })
 
   it('says when cash runs out', () => {
     // 1,000 in the bank, 6,000 − 300 = 5,700 out and 5,600 in: −100 a month, and −1,200 in November.
-    const tight = computeCashflow({ budget: { ...budget, monthlyIncome: 5_600 }, annualExpenses: bills, cashOnHand: 1_000, parentalLeave: false, now: NOW })
+    const tight = computeCashflow({ budget: { ...budget, monthlyIncome: 5_600 }, annualExpenses: bills, cashOnHand: 1_000, now: NOW })
     expect(tight.months[0].balance).toBe(1_000 - 100 - 1_200)
     expect(tight.runsOut?.label).toBe('Nov 26')
   })
 
-  it('parental leave: Parental Leave Pay (after tax) for six months, then one income', () => {
-    const lv = computeCashflow({ budget, annualExpenses: bills, cashOnHand: 10_000, parentalLeave: true, now: NOW })
+  it('follows the plan: leave from July 2027 on Parental Leave Pay for six months, back at 3 days from January 2028', () => {
+    // A made-up take-home: 5,000 for Person 1's full-time pay, plus 600 a day the partner works.
+    const incomeFor = (d1: number, d2: number) => (d1 ? 5_000 : 0) + d2 * 600
+    const plan = {
+      phases: { p1: [{ year: 2026, days: 5 }], p2: [{ year: 2026, days: 5 }, { year: 2027, month: 7, days: 0 }, { year: 2028, month: 1, days: 3 }] },
+      incomeFor, parentalLeave: true,
+    }
+    const lv = computeCashflow({ budget, annualExpenses: bills, cashOnHand: 10_000, plan, now: NOW })
     const ppl = calcAfterTax(PPL_TOTAL) / 6
-    expect(lv.leave!.onPplSurplus).toBeCloseTo(5_000 + ppl - 5_700, 6)
-    expect(lv.leave!.afterPplSurplus).toBe(-700)
-    expect(lv.leave!.runwayMonths).toBeCloseTo(10_000 / 700, 6)
-    // May 2027 (month 7): six months on PPL, one after, both bills paid.
-    expect(lv.months[6].leaveBalance).toBe(Math.round(10_000 + 6 * (5_000 + ppl - 5_700) - 700 - 3_600))
-    // The both-working line is unchanged.
-    expect(lv.months[6].balance).toBe(cf.months[6].balance)
+    // Nov 2026 – Jun 2027: both full-time, 8,000. Jul – Dec 2027: 5,000 + PPL. From Jan 2028: 5,000 + 1,800.
+    expect(lv.months[7]).toMatchObject({ label: 'Jun 27', income: 8_000, onLeave: false })
+    expect(lv.months[8]).toMatchObject({ label: 'Jul 27', income: Math.round(5_000 + ppl), onLeave: true })
+    expect(lv.months[13]).toMatchObject({ label: 'Dec 27', income: Math.round(5_000 + ppl), onLeave: true })
+    expect(lv.months[14]).toMatchObject({ label: 'Jan 28', income: 6_800, onLeave: false })
+    expect(lv.payChanges.map(c => c.label)).toEqual(['Jul 27', 'Jan 28'])
+    // Cash in June 2027 matches the plain line; from July it follows the lower pay.
+    expect(lv.months[7].balance).toBe(cf.months[7].balance)
+    expect(lv.months[8].balance).toBe(Math.round(cf.months[7].balance + 5_000 + ppl - 5_700))
+  })
+
+  it('without parental leave switched on, 0 days is simply no pay', () => {
+    const plan = { phases: { p1: [{ year: 2026, days: 5 }], p2: [{ year: 2027, month: 7, days: 0 }] }, incomeFor: (d1: number, d2: number) => d1 * 1_000 + d2 * 600, parentalLeave: false }
+    const off = computeCashflow({ budget, annualExpenses: [], cashOnHand: 0, plan, now: NOW })
+    expect(off.months[8]).toMatchObject({ income: 5_000, onLeave: false })
   })
 
   it('month labels are fixed English, whatever the locale', () => {
@@ -68,7 +82,7 @@ describe('cashflow, next 24 months', () => {
   })
 
   it('a January start rolls over the year correctly', () => {
-    const jan = computeCashflow({ budget, annualExpenses: [], cashOnHand: 0, parentalLeave: false, now: new Date(2026, 11, 31) })
+    const jan = computeCashflow({ budget, annualExpenses: [], cashOnHand: 0, now: new Date(2026, 11, 31) })
     expect(jan.months[0].label).toBe('Jan 27')
     expect(jan.months[11].label).toBe('Dec 27')
   })

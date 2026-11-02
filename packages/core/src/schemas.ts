@@ -275,6 +275,7 @@ const pct = (min: number, max: number) => z.number().finite().min(min).max(max)
 export const phaseCreateSchema = z.object({
   year,
   days: z.number().int().min(0).max(5).optional(),  // each route keeps its own default
+  month: z.number().int().min(1).max(12).optional(),  // v14; January when missing
 })
 
 export const annualExpenseSchema = z.object({

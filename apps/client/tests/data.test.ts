@@ -430,8 +430,8 @@ describe('future', () => {
     expect(cf.cashOnHand).toBe(home.cash)
     expect(cf.months[0].label).toBe('Nov 26')
     expect(cf.months[11].balance).toBeCloseTo(home.cash + 12 * home.left, -1)
-    // A couple with parental leave on (the starter's default) gets the leave line.
-    expect(cf.leave === null).toBe(!h.projection.parentalLeaveEnabled)
+    // No work changes planned: pay is the same every month.
+    expect(cf.payChanges).toEqual([])
   })
 
   it('saves the assumptions and the retirement goal', async () => {

@@ -43,6 +43,8 @@ interface ScrubChartProps {
   format?:       (v: number) => string
   /** index selected before the user touches the chart; defaults to the last */
   defaultIndex?: number
+  /** What each point is, for the hint: 'year' (default) or 'month'. */
+  unit?:         'year' | 'month'
   children:      React.ReactNode
 }
 
@@ -51,7 +53,7 @@ function colorAt(c: unknown, i: number): string | undefined {
   return typeof c === 'string' ? c : undefined
 }
 
-export default function ScrubChart({ labels, datasets, height, format = fmtK, defaultIndex, children }: ScrubChartProps) {
+export default function ScrubChart({ labels, datasets, height, format = fmtK, defaultIndex, unit = 'year', children }: ScrubChartProps) {
   const wrapRef = useRef<HTMLDivElement>(null)
   const [picked, setPicked] = useState<number | null>(null)
   // Series the user has tapped, by label: shown if it started hidden, hidden
@@ -113,10 +115,12 @@ export default function ScrubChart({ labels, datasets, height, format = fmtK, de
   })
 
   // Series that are empty throughout (e.g. school fees when switched off) add
-  // nothing to the readout.
+  // nothing to the readout, and neither does a $0 in the year shown (pay
+  // once retired), unless it's a scenario being compared.
   const items = datasets
     .map((d, k) => ({ d, k }))
-    .filter(({ d }) => d.readout !== false && d.data.some(v => v != null && v !== 0))
+    .filter(({ d }) => d.readout !== false && d.data.some(v => v != null && v !== 0)
+      && (d.data[idx] !== 0 || d.compareTo !== undefined))
 
   return (
     <div className="scrub">
@@ -158,7 +162,7 @@ export default function ScrubChart({ labels, datasets, height, format = fmtK, de
       </div>
       <div className="scrub-hint">
         <span className="scrub-hint-touch">Drag across the chart · tap a label to hide it</span>
-        <span className="scrub-hint-mouse">Move across the chart to see each year · click a label to hide it</span>
+        <span className="scrub-hint-mouse">Move across the chart to see each {unit} · click a label to hide it</span>
       </div>
     </div>
   )
