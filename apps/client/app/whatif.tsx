@@ -12,12 +12,15 @@ import { router, Stack, useLocalSearchParams } from 'expo-router'
 import { fmt, fmtK, possessive } from '@proviso/core/formatting'
 import { useHousehold } from '@/data/DataProvider'
 import { futureView } from '@/data/views'
-import { addWorkChange, applyWhatIf, hasChanges, keepWhatIf, saveAsScenario, startWhatIf, updateScenario, withScenario, type WhatIf } from '@/data/whatif'
+import { addWork, applyWhatIf, hasChanges, keepWhatIf, saveAsScenario, startWhatIf, updateScenario, withScenario, type WhatIf } from '@/data/whatif'
 import { Button, Card, Choice, Field, H2, NumberField, Sheet, Stepper, T, TextField, parseAmount } from '@/ui/kit'
 import { ScrubChart } from '@/ui/ScrubChart'
 import { readOverrides, validOverrides } from '@proviso/core/scenarios'
 import { DEFAULT_LEAVE_HOME_AGE, MAX_LEAVE_HOME_AGE } from '@proviso/core/lifeStages'
 import { usePalette, space } from '@/ui/theme'
+import { MONTH_NAMES, monthKey, newLeave, newLeaveStep, newWorkChange, sortByStart, whenLabel, workBlocks } from '@proviso/core/workPlan'
+import { PPL_WEEKS } from '@proviso/core/constants'
+type WorkPhase = WhatIf['workPhases'][number]
 
 const YES_NO = [{ key: 'no', label: 'No' }, { key: 'yes', label: 'Yes' }]
 const TERMS = [20, 25, 30, 35].map(y => ({ key: String(y), label: `${y} yrs` }))
@@ -143,7 +146,7 @@ export default function WhatIfSheet() {
 
         {group === 'work' && (
           <>
-            <T size="small" tone="t2">Days a week at work from a given year. Pay follows the days worked.</T>
+            <T size="small" tone="t2">Days a week at work, from a month and year. Pay follows the days worked.</T>
             {(['p1', ...(h.settings.partnerEnabled ? ['p2'] : [])] as ('p1' | 'p2')[]).map(person => (
               <WorkChanges key={person} person={person} w={w} setW={setW} year={year}
                 name={person === 'p1' ? h.settings.person1Name : h.settings.person2Name}
@@ -203,33 +206,74 @@ function WorkChanges({ person, name, w, setW, year, leave }: {
   person: 'p1' | 'p2'; name: string; w: WhatIf; setW: (f: (x: WhatIf) => WhatIf) => void; year: number; leave: boolean
 }) {
   const p = usePalette()
-  const mine = w.workPhases.filter(x => x.person === person).sort((a, b) => a.year - b.year)
-  const edit = (id: string, patch: { year?: number; days?: number }) =>
+  const mine = w.workPhases.filter(x => x.person === person)
+  const blocks = workBlocks(mine, leave)
+  const edit = (id: string, patch: { year?: number; month?: number; days?: number }) =>
     setW(x => ({ ...x, workPhases: x.workPhases.map(ph => (ph.id === id ? { ...ph, ...patch } : ph)) }))
-  const remove = (id: string) => setW(x => ({ ...x, workPhases: x.workPhases.filter(ph => ph.id !== id) }))
-  const daysFmt = (d: number) => (d === 0 && leave ? 'Parental leave' : daysLabel(d))
+  const remove = (ids: string[]) => setW(x => ({ ...x, workPhases: x.workPhases.filter(ph => !ids.includes(ph.id)) }))
+  const add = (rows: { year: number; month: number; days: number }[]) => setW(x => addWork(x, person, rows))
+  const nowKey = year * 12 + new Date().getMonth()
+  const isNow = (ph: WorkPhase) => {
+    const next = sortByStart(mine).find(x => monthKey(x) > monthKey(ph))
+    return monthKey(ph) <= nowKey && (!next || monthKey(next) > nowKey)
+  }
+
+  // The month and year a change starts, then the days a week.
+  // Plain calls, not components: a component made here would remount on every press (losing screen-reader focus).
+  const when = (ph: WorkPhase, label: string) => (
+    <>
+      <Stepper label="Month" a11yLabel={`${label}: month`} min={1} max={12} step={1} value={ph.month} onChange={v => edit(ph.id, { month: v })} format={v => MONTH_NAMES[v - 1].slice(0, 3)} />
+      <Stepper label="Year" a11yLabel={`${label}: year`} min={Math.min(ph.year, year)} max={year + 45} step={1} value={ph.year} onChange={v => edit(ph.id, { year: v })} />
+    </>
+  )
+  const days = (ph: WorkPhase, min = 0) => (
+    <Stepper label="Days a week" min={min} max={5} step={1} value={ph.days} onChange={v => edit(ph.id, { days: v })} format={daysLabel} />
+  )
 
   return (
     <View style={{ gap: space.sm }}>
       <H2>{name}</H2>
-      <Card style={{ gap: 0, paddingVertical: space.sm }}>
-        {mine.length === 0 && <T tone="t2" style={{ paddingVertical: space.sm }}>Full-time throughout.</T>}
-        {mine.map((ph, i) => (
-          <View key={ph.id} style={{ gap: space.sm, paddingVertical: space.md, borderTopWidth: i ? 1 : 0, borderTopColor: p.border }}>
-            {i === 0
-              ? <T weight="600">{ph.year <= year ? 'Now' : `From ${ph.year}`}</T>
-              : <Stepper label="From" min={Math.max(year, mine[i - 1].year + 1)} max={year + 40} step={1} value={ph.year} onChange={v => edit(ph.id, { year: v })} />}
-            <Stepper label="Days a week" min={0} max={5} step={1} value={ph.days} onChange={v => edit(ph.id, { days: v })} format={daysFmt} />
-            {i > 0 && (
-              <View style={{ alignItems: 'flex-start' }}>
-                <Button kind="danger" title="Remove" onPress={() => remove(ph.id)} />
-              </View>
+      {blocks.length === 0 && <Card><T tone="t2">Full-time throughout.</T></Card>}
+      {blocks.map(b => b.kind === 'change' ? (
+        <Card key={b.phase.id} tone={isNow(b.phase) ? 'good' : undefined}>
+          <T weight="600">{isNow(b.phase) ? `Now (from ${whenLabel(b.phase)})` : `From ${whenLabel(b.phase)}`}</T>
+          {when(b.phase, "Starts")}
+          {days(b.phase, leave ? 1 : 0)}
+          {mine.length > 1 && (
+            <View style={{ alignItems: 'flex-start' }}>
+              <Button kind="danger" title="Remove" onPress={() => remove([b.phase.id])} />
+            </View>
+          )}
+        </Card>
+      ) : (
+        <Card key={b.leave.id} style={{ borderLeftWidth: 4, borderLeftColor: p.pink }}>
+          <T weight="600">Parental leave from {whenLabel(b.leave)}</T>
+          {when(b.leave, "Leave starts")}
+          <T size="small" tone="t2">Parental Leave Pay: {PPL_WEEKS} weeks at the national minimum wage, from when leave starts.</T>
+          {b.steps.length === 0 && <T size="small" tone="amber">No return to work set yet.</T>}
+          {b.steps.map((st, k) => (
+            <View key={st.id} style={{ gap: space.sm, paddingTop: space.sm, borderTopWidth: 1, borderTopColor: p.border }}>
+              <T weight="600">{k === 0 ? `Back at work from ${whenLabel(st)}` : `Then from ${whenLabel(st)}`}</T>
+              {when(st, k === 0 ? 'Back at work' : 'Step up')}
+              {days(st, 1)}
+              {k > 0 && (
+                <View style={{ alignItems: 'flex-start' }}>
+                  <Button kind="danger" title="Remove this step" onPress={() => remove([st.id])} />
+                </View>
+              )}
+            </View>
+          ))}
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>
+            {(b.steps.at(-1)?.days ?? 0) < 5 && (
+              <Button kind="quiet" title={b.steps.length ? '+ Add a step back up' : '+ Add the return to work'} onPress={() => add([newLeaveStep(b)])} />
             )}
+            <Button kind="danger" title="Remove this leave" onPress={() => remove([b.leave.id, ...b.steps.map(x => x.id)])} />
           </View>
-        ))}
-      </Card>
-      <View style={{ alignItems: 'flex-start' }}>
-        <Button kind="quiet" title="+ Add a change" onPress={() => setW(x => addWorkChange(x, person, year))} />
+        </Card>
+      ))}
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>
+        <Button kind="quiet" title="+ Add a change" onPress={() => add(newWorkChange(mine, year))} />
+        {leave && <Button kind="quiet" title="+ Plan parental leave" onPress={() => add(newLeave(mine, year))} />}
       </View>
     </View>
   )

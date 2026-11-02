@@ -440,7 +440,7 @@ In [`docs/architecture.md`](docs/architecture.md) order. Phase 3 there (the sing
 1. **⏰ Remind the owner first — phone test still to do** (deferred 2026-10-08, "soon"). **The Android development build with Phases 34–35** (sync, camera, key backup): it built successfully on EAS on 2026-10-08 (so the key-backup Kotlin module and expo-camera compile); `npm run eas -w @proviso/client -- build:list --limit 1` shows the APK link. Install it and check on the phone: Settings → Recovery phrase → Save to Google Password Manager; Settings → Sync; Join a household (camera scan).
 2. **Run the relay on the NAS** with the owner: `docker compose --profile sync up -d` (image `ghcr.io/jorget43/proviso-relay`, published by CI from master since 2026-10-08), then `tailscale serve --bg --https=8443 http://localhost:8787` (README "Sync relay for the app"). Turn sync on in the app with the `https://<machine>.<tailnet>.ts.net:8443` address, then join from a second phone. Phones need Tailscale running to reach it.
 3. **Owner decisions pending**: none. (Phase 54, the Future redesign: owner OK to merge and push 2026-11-02.)
-   - **The app's side of Phase 54** is still to do (screens are app-first, but this round was NAS feedback): month pickers and the parental-leave card in What if? → Work, one-off kinds, bonuses in Settings → Business income, super's own mix in Assumptions, and the year range on its charts. The data and engine already carry all of it.
+   - Phase 55 (the app's side of Phase 54, branch `app-future-redesign`) is built and checked in the app's web build: ask for the OK to merge and push. Not yet seen on a phone (steppers and the year range on touch).
    - Phase 53's app screens (Settings → Business income, and its add / change sheet) are tested but haven't been looked at yet: screenshot them in the app's web build at 390px and 1280px.
 4. **Step B of [`docs/plan-modelling-and-ux.md`](docs/plan-modelling-and-ux.md)**:
    - The life-course engine shipped as Phase 40 (merged to master 2026-10-09 with the owner's OK).
@@ -462,7 +462,7 @@ The full list:
 - **Dependency advisories**: GitHub lists some on master, believed to be all in Expo's build and dev-server tools (`braces`, `node-forge`, `uuid` via `xcode`, `decode-uri-component`, and an old `zod` 3 inside `@expo/cli`), several with no fixed version yet. They don't reach the NAS image (CI audits exactly what it ships). Dependabot was preparing a security update for them on 2026-10-06: review it carefully, because Expo pins some of them, and React / React Native / `expo*` move only with the Expo SDK (`proviso-release` skill). 2026-10-27: Dependabot's grouped update (next 16.3.8 → 16.4.2, zod 4.6.7, chart.js 4.6.1, vitest / vite patches) merged and tagged `v1.14.0`; it fixed two critical Next advisories in the NAS image (RCE via SVG image optimisation and `use cache`) and zod's oversized-collection advisory. The nonce CSP was checked on Next 16.4 (every script carries the nonce).
 - **Starter estimates** (`packages/core/src/starter.ts`): re-check the figures yearly with the July recalibration; electricity still uses the AER's 2020 usage benchmarks (no longer updated).
 
-### Where each feature lives (NAS ↔ app), as of Phase 54
+### Where each feature lives (NAS ↔ app), as of Phase 55
 
 | Feature | NAS web app | The app | Notes |
 |---|---|---|---|
@@ -485,11 +485,11 @@ The full list:
 | Costs that change with age (life stages), where you live | ✓ (What if? → Family) | ✓ (Assumptions; What if? leave-home age); milestones | `core/lifeStages.ts`, Phase 44 |
 | Interest and dividends, taxed (franking, who owns them) | ✓ What if? → More assumptions; Money in & out readout | ✓ Assumptions | `core/investmentIncome.ts`, Phase 50 |
 | Business income (profit from a business, sole trading, gig work) | ✓ Budget → Bonuses and business income cards; a stacked bar on Money in & out | ✓ Settings → Business income; a readout row on Money in & out | `core/businessIncome.ts`, Phase 53; Home, Budget, Next 2 years and Future all count it |
-| Bonuses and commission (taxed like pay, super paid on them) | ✓ Budget → Bonuses and business income | Counted, not editable (no kind choice yet) | `core/businessIncome.ts` kind 'bonus', Phase 54 |
-| Work changes by month; parental leave card (start, return, steps up) | ✓ What if? → Work | Counted; edited by year only | `core/projections.ts` `workYear`, Phase 54 |
-| One-offs that bring money in (inheritance, sale, borrowing against the home) | ✓ What if? → Plans → Big one-offs | Counted; added as costs only | `OneOffKind`, Phase 54 |
-| Super held differently from investments | ✓ What if? → Basics | Counted, not editable | `core/uncertainty.ts` `superGrowthOf`, Phase 54 |
-| Chart year range (10 / 20 years, to retirement, slider) | ✓ every Future chart | — | `YearRange` + `ScrubChart`'s `YearWindow`, Phase 54 |
+| Bonuses and commission (taxed like pay, super paid on them) | ✓ Budget → Bonuses and business income | ✓ Settings → Bonuses and business income | `core/businessIncome.ts` kind 'bonus', Phases 54–55 |
+| Work changes by month; parental leave card (start, return, steps up) | ✓ What if? → Work (dropdowns) | ✓ What if? → Work (steppers) | `core/projections.ts` `workYear`; `core/workPlan.ts` groups and adds for both, Phases 54–55 |
+| One-offs that bring money in (inheritance, sale, borrowing against the home) | ✓ What if? → Plans → Big one-offs | ✓ Future → Big one-offs | `ONE_OFF_KINDS` in `core/projections.ts`, Phases 54–55 |
+| Super held differently from investments | ✓ What if? → Basics | ✓ Assumptions | `core/uncertainty.ts` `superGrowthOf`, Phases 54–55 |
+| Chart year range (10 / 20 years, to retirement) | ✓ every Future chart (slider) | ✓ every Future chart (a "starting in" stepper) | `YearRange` + `ScrubChart`'s `YearWindow` in each app, Phases 54–55 |
 | Salary packaging (charity / hospital caps, electric-car novated lease) | ✓ Budget → Salary packaging cards | ✓ Settings → Salary packaging | `core/packaging.ts`, Phase 51; Home, Budget, Next 2 years and Future all count it |
 | Range of outcomes (Monte Carlo band, chance money lasts) | ✓ Net worth and Retirement charts, headline, takeaways; What if? → Basics: mix, glide path, on/off | ✓ Future headline, net worth and super charts, retirement line; Assumptions | `core/uncertainty.ts`, Phase 49 (replaced Phase 48's ±points band) |
 | Scenarios (save and compare) | ✓ make, edit, rename, delete in What if?; dashed lines on every Future chart; Compare card | Save a What if? draft as one; change one (Compare → Change opens What if? on it, Phase 52); dashed lines on the net worth, Money in & out and Home loan charts; show / hide; Compare card; delete | `core/scenarios.ts`, Phase 45; app lines Phase 47. The app edits a scenario's settings, rent and work patterns; its retirement, one-off and children changes are NAS-only (kept as they are) |
@@ -583,6 +583,18 @@ Ideas that have been evaluated but aren't on the roadmap. Each links to its writ
 - **School fees decided**: the questionnaire's school-cost lines stay in today's budget; the projection models the two eldest children's fees year by year (ending after Year 12) and leaves those lines out (`isModelledSchoolLine`), so nothing is counted twice. The questionnaire switches `schoolFeesOn` on when there are children.
 - Typed routes are off in `apps/client` (the generated file only existed where a dev server ran, never in CI, and misread the monorepo).
 - Verified: 356 tests; the app at 390px (a Melbourne family of four: $2.32M in today's money in 20 years, HELP cleared 2028, school fees end 2039, loan paid off 2042; a $45k car in 2029 gives $2.28M); the NAS Projections and Super pages rendered against a scratch household. The NAS Super "consider a lower target" hint was fixed on the way (it would have subtracted the mortgage twice and suggested $0).
+
+### Phase 55 — The app's side of the Future redesign (2026-11-02, branch `app-future-redesign`)
+
+Phase 54's NAS screens, built for the app. Nothing in the engine or the numbers changes.
+
+- **Core** (`workPlan.ts`, new): `workBlocks` (plain changes, and each parental leave with its return and steps back up), `newWorkChange` (a year after the last, a day fewer), `newLeave` (July next year, back at 3 days the January after), `newLeaveStep` (a day more every six months), with "full-time from now" recorded before a first change; `monthKey`, `whenLabel`, `MONTH_NAMES`. The NAS's `WorkPlan` uses them too. `ONE_OFF_KINDS` / `oneOffKindOf` in `projections.ts` give both apps the one-off choices and hints.
+- **What if? → Work:** cards like the NAS, with − / + steppers for month and year (the app has no dropdowns). `Stepper` gained `a11yLabel` so "Month" reads as "Leave starts: month". Drafts, keeping and scenarios carry the month (`workChanges` compares it).
+- **One-offs:** "What kind?" on the one-off sheet; Future's list shows money in as +$ in green.
+- **Bonuses:** Settings → Bonuses and business income, with "Add a bonus or commission" (`?kind=bonus`).
+- **Assumptions:** "How your super is held" (Same as investments, or a mix); mixes read "Growth (70% shares)". Fixed "Investments in Your name".
+- **Charts:** `YearWindow` context in the app's `ScrubChart` (the wrapper cuts labels, data, comparisons and bands to the window; `windowRange` in `chartGeometry.ts`); `YearRange` on Future: 10 / 20 years, to retirement, all, and a "Starting in" stepper.
+- **Verified:** 627 tests (new: work plan helpers, a bonus adding to super, money in raising net worth, the window range; updated: a new change is a day fewer, scenarios keep the month). The app's web build in headless Edge with the scratch NAS's export imported: Future with 10 years and to retirement (390px light, 1280px dark), What if? → Work and adding a step back up (390px dark), the one-off sheet, Bonuses and business income, Assumptions. Gotchas for the harness: clicks need `userGesture: true` for the file picker, and finding text by `innerText` over every element stalls; use XPath.
 
 ### Phase 54 — Future redesign from the owner's review (2026-11-02, merged and pushed)
 

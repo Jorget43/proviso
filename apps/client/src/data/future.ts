@@ -29,6 +29,8 @@ export interface Assumptions {
   growthPct?:      number
   glidePath?:      boolean
   glideTargetPct?: number
+  /** Super's own mix (v14); null: the same as growthPct. */
+  superGrowthPct?: number | null
   /** Income from savings and investments (schema v11; core/investmentIncome.ts). */
   cashRate?:           number
   dividendYield?:      number
@@ -49,10 +51,10 @@ export async function saveAssumptions(db: Db, a: Assumptions, retirementIncome: 
 export const saveDrawdown = (db: Db, strategy: DrawdownStrategy, pct?: number) =>
   saveSettings(db, 'superSettings', pct === undefined ? { drawdownStrategy: strategy } : { drawdownStrategy: strategy, drawdownPct: pct })
 
-export interface OneOffDraft { name: string; amt: number; year: number }
+export interface OneOffDraft { name: string; amt: number; year: number; kind: string }
 
 export async function saveOneOff(db: Db, id: string | null, d: OneOffDraft): Promise<string> {
-  const row = { name: d.name.trim(), amt: d.amt, year: d.year }
+  const row = { name: d.name.trim(), amt: d.amt, year: d.year, kind: d.kind }
   if (id) { await updateRow(db, 'oneOff', id, row); return id }
   return insertRow(db, 'oneOff', row)
 }

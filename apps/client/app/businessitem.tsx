@@ -1,4 +1,4 @@
-// Add or change one business's income (?id= to change).
+// Add or change a bonus or a business's income (?id= to change; ?kind=bonus to add a bonus).
 
 import { useState } from 'react'
 import { View } from 'react-native'
@@ -11,11 +11,13 @@ import { confirmAction } from '@/ui/confirm'
 import { space } from '@/ui/theme'
 
 export default function BusinessItem() {
-  const params = useLocalSearchParams<{ id?: string }>()
+  const params = useLocalSearchParams<{ id?: string; kind?: string }>()
   const { household: h, change } = useHousehold()
   const existing = params.id ? h.incomeSources.find(i => i.id === params.id) : undefined
   const year = new Date().getFullYear()
 
+  const kind: 'business' | 'bonus' = (existing?.kind ?? params.kind) === 'bonus' ? 'bonus' : 'business'
+  const bonus = kind === 'bonus'
   const [person, setPerson] = useState<'p1' | 'p2'>(existing?.person ?? 'p1')
   const [label, setLabel] = useState(existing?.name ?? '')
   const [amount, setAmount] = useState(existing ? String(existing.amount) : '')
@@ -28,7 +30,7 @@ export default function BusinessItem() {
     let problem: string | null = null
     await change(async db => {
       problem = await saveBusiness(db, existing?.id ?? null, {
-        person, name: label, amount: parseAmount(amount), growthPct: parseAmount(growth),
+        kind, person, name: label, amount: parseAmount(amount), growthPct: parseAmount(growth),
         startYear: parseAmount(from), endYear: until.trim() === '' ? null : parseAmount(until),
       })
     })
@@ -38,7 +40,7 @@ export default function BusinessItem() {
 
   function remove() {
     if (!existing) return
-    confirmAction('Remove this business income?', 'Money in goes back to what it would be without it.', 'Remove', async () => {
+    confirmAction(bonus ? 'Remove this bonus?' : 'Remove this business income?', 'Money in goes back to what it would be without it.', 'Remove', async () => {
       await change(db => removeBusiness(db, existing.id))
       router.back()
     })
@@ -46,7 +48,7 @@ export default function BusinessItem() {
 
   return (
     <Sheet>
-      <Stack.Screen options={{ title: existing ? 'Business income' : 'Add business income' }} />
+      <Stack.Screen options={{ title: bonus ? (existing ? 'Bonus or commission' : 'Add a bonus or commission') : existing ? 'Business income' : 'Add business income' }} />
       {h.settings.partnerEnabled && (
         <Field label="Whose income">
           <Choice label="Whose income" value={person} onChange={k => setPerson(k as 'p1' | 'p2')}
@@ -54,13 +56,19 @@ export default function BusinessItem() {
         </Field>
       )}
       <Field label="Name (optional)">
-        <TextField label="Name" placeholder="e.g. Photography" value={label} onChange={setLabel} />
+        <TextField label="Name" placeholder={bonus ? 'e.g. Sales commission' : 'e.g. Photography'} value={label} onChange={setLabel} />
       </Field>
-      <Field label="Profit a year" hint="What’s left after the business’s own costs, before income tax. A loss counts as nothing.">
-        <NumberField label="Profit a year" value={amount} onChange={setAmount} />
-      </Field>
+      {bonus ? (
+        <Field label="A typical year’s bonus or commission" hint="Before tax. It’s taxed with pay, and your employer pays super on it too.">
+          <NumberField label="Bonus a year" value={amount} onChange={setAmount} />
+        </Field>
+      ) : (
+        <Field label="Profit a year" hint="What’s left after the business’s own costs, before income tax. A loss counts as nothing.">
+          <NumberField label="Profit a year" value={amount} onChange={setAmount} />
+        </Field>
+      )}
       <Field label="Grows each year">
-        <NumberField unit="%" label="Profit grows, percent a year" value={growth} onChange={setGrowth} />
+        <NumberField unit="%" label={bonus ? 'Bonus grows, percent a year' : 'Profit grows, percent a year'} value={growth} onChange={setGrowth} />
       </Field>
       <Field label="From the year">
         <NumberField unit="" label="From the year" value={from} onChange={setFrom} />

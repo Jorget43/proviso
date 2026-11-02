@@ -35,6 +35,16 @@ export type OneOffKind = 'cost' | 'gift' | 'sale' | 'borrow'
 export const MONEY_IN_KINDS: readonly OneOffKind[] = ['gift', 'sale', 'borrow']
 export const isMoneyIn = (o: { kind?: string | null }): boolean => (MONEY_IN_KINDS as readonly string[]).includes(o.kind ?? 'cost')
 
+/** How each kind is offered in both apps. */
+export const ONE_OFF_KINDS: { key: OneOffKind; label: string; hint: string }[] = [
+  { key: 'cost',   label: 'A cost',                     hint: 'Paid out of savings that year.' },
+  { key: 'gift',   label: 'An inheritance or gift',     hint: 'Money in, not taxed. It goes into savings, then is invested like any money left over.' },
+  { key: 'sale',   label: 'Selling something',          hint: 'Money in from a sale. Capital gains tax isn’t worked out, so enter what you’d keep.' },
+  { key: 'borrow', label: 'Borrowing against the home', hint: 'Money in, with the same added to the home loan (a top-up or refinance). Repayments stay the same, so the loan runs longer.' },
+]
+/** A kind's choice; unknown kinds (from newer versions) show as a cost, as the engine counts them. */
+export const oneOffKindOf = (kind?: string | null) => ONE_OFF_KINDS.find(k => k.key === kind) ?? ONE_OFF_KINDS[0]
+
 export interface OneOff {
   name: string;
   amt:  number;

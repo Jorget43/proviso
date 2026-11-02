@@ -416,7 +416,7 @@ describe('future', () => {
   it('a one-off cost lowers the end net worth; removing it restores it', async () => {
     const db = await setUp()
     const before = futureView(await loadHousehold(db), NOW).endNetWorth
-    const id = await saveOneOff(db, null, { name: 'New car', amt: 50_000, year: 2028 })
+    const id = await saveOneOff(db, null, { name: 'New car', amt: 50_000, year: 2028, kind: 'cost' })
     expect(futureView(await loadHousehold(db), NOW).endNetWorth).toBeLessThan(before)
     await removeOneOff(db, id)
     expect(futureView(await loadHousehold(db), NOW).endNetWorth).toBe(before)
@@ -523,7 +523,7 @@ describe('what if', () => {
     expect(h.workPhases.filter(p => p.person === 'p2')).toHaveLength(1)
     let w = addWorkChange(startWhatIf(h), 'p2', 2026)
     const added = w.workPhases.find(p => p.person === 'p2' && p.year === 2027)!
-    expect(added.days).toBe(5)
+    expect(added.days).toBe(4)   // a day fewer than before: going part-time is the usual change
     w = { ...w, workPhases: w.workPhases.map(p => (p.id === added.id ? { ...p, days: 3 } : p)) }
     expect(futureView(applyWhatIf(h, w), NOW).endNetWorth).toBeLessThan(futureView(h, NOW).endNetWorth)
 
@@ -547,7 +547,7 @@ describe('what if', () => {
     let w = addWorkChange(startWhatIf(h), 'p2', 2026)
     const added = w.workPhases.find(p => p.person === 'p2' && p.year === 2027)!
     w = { ...w, projection: { ...w.projection, savingsRate: 90 }, workPhases: w.workPhases.map(p => (p.id === added.id ? { ...p, days: 3 } : p)) }
-    expect(overridesFromWhatIf(h, w)).toEqual({ settings: { savingsRate: 90 }, person2Phases: [{ year: 2026, days: 5 }, { year: 2027, days: 3 }] })
+    expect(overridesFromWhatIf(h, w)).toEqual({ settings: { savingsRate: 90 }, person2Phases: [{ year: 2026, month: 1, days: 5 }, { year: 2027, month: 1, days: 3 }] })
 
     await saveAsScenario(db, h, w, '  Sam part-time  ')
     const after = await loadHousehold(db)
@@ -611,7 +611,7 @@ describe('what if', () => {
     expect(o.super).toEqual({ person1RetirementAge: 58 })
     expect(o.oneoffs).toEqual([{ name: 'Car', amt: 40_000, year: 2030 }])
     expect(o.person1Phases).toEqual([{ year: 2026, days: 5 }, { year: 2030, days: 3 }])
-    expect(o.person2Phases).toEqual([{ year: 2026, days: 5 }, { year: 2027, days: 5 }])
+    expect(o.person2Phases).toEqual([{ year: 2026, month: 1, days: 5 }, { year: 2027, month: 1, days: 4 }])
     expect(o.somethingNew).toEqual({ a: 1 })
     // The plan is untouched.
     expect(after.projection).toEqual(before.projection)
@@ -653,7 +653,7 @@ describe('what if', () => {
 
   it('with no work phases, a change starts from full-time now', () => {
     const w = addWorkChange({ projection: {} as never, rent: {} as never, workPhases: [] }, 'p1', 2026)
-    expect(w.workPhases.map(p => [p.person, p.year, p.days])).toEqual([['p1', 2026, 5], ['p1', 2027, 5]])
+    expect(w.workPhases.map(p => [p.person, p.year, p.month, p.days])).toEqual([['p1', 2026, 1, 5], ['p1', 2027, 1, 4]])
   })
 })
 
@@ -797,7 +797,7 @@ describe('settings and backups', () => {
   it('business income adds to money in today, in Next 2 years and in the projection; removing it takes it away', async () => {
     const db = await setUp()   // Alex earns 90,000 full-time, with a HELP debt
     const before = homeView(await loadHousehold(db), NOW).budget
-    expect(await saveBusiness(db, null, { person: 'p1', name: ' Photography ', amount: 20_000, growthPct: 3, startYear: 2026, endYear: null }, 2026)).toBeNull()
+    expect(await saveBusiness(db, null, { kind: 'business', person: 'p1', name: ' Photography ', amount: 20_000, growthPct: 3, startYear: 2026, endYear: null }, 2026)).toBeNull()
     const h = await loadHousehold(db)
     expect(h.incomeSources).toMatchObject([{ kind: 'business', name: 'Photography', amount: 20_000 }])
     const after = homeView(h, NOW).budget
@@ -812,8 +812,28 @@ describe('settings and backups', () => {
     expect(homeView(gone, NOW).budget.businessMonthly).toBe(0)
     expect(futureView(gone, NOW, { runs: 0 }).netWorth[3]).toBeLessThan(f.netWorth[3])
     // Checks.
-    expect(await saveBusiness(db, null, { person: 'p1', name: null, amount: -1, growthPct: 3, startYear: 2026, endYear: null }, 2026)).toMatch(/profit/)
-    expect(await saveBusiness(db, null, { person: 'p1', name: null, amount: 5_000, growthPct: 3, startYear: 2030, endYear: 2028 }, 2026)).toMatch(/last year/)
+    expect(await saveBusiness(db, null, { kind: 'business', person: 'p1', name: null, amount: -1, growthPct: 3, startYear: 2026, endYear: null }, 2026)).toMatch(/profit/)
+    expect(await saveBusiness(db, null, { kind: 'business', person: 'p1', name: null, amount: 5_000, growthPct: 3, startYear: 2030, endYear: 2028 }, 2026)).toMatch(/last year/)
+  })
+
+  it('a bonus is taxed like business income, and adds to super too', async () => {
+    const asBusiness = await setUp(), asBonus = await setUp()
+    const item = { person: 'p1' as const, name: null, amount: 10_000, growthPct: 3, startYear: 2026, endYear: null }
+    expect(await saveBusiness(asBusiness, null, { kind: 'business', ...item }, 2026)).toBeNull()
+    expect(await saveBusiness(asBonus, null, { kind: 'bonus', ...item }, 2026)).toBeNull()
+    const b = futureView(await loadHousehold(asBusiness), NOW, { runs: 0 })
+    const k = futureView(await loadHousehold(asBonus), NOW, { runs: 0 })
+    expect(k.inOut.business[0]).toBe(b.inOut.business[0])
+    expect(k.retirement.superByYear[3]).toBeGreaterThan(b.retirement.superByYear[3])
+  })
+
+  it('a one-off bringing money in raises net worth from its year', async () => {
+    const db = await setUp()
+    const before = futureView(await loadHousehold(db), NOW, { runs: 0 })
+    await saveOneOff(db, null, { name: 'Inheritance', amt: 100_000, year: 2028, kind: 'gift' })
+    const after = futureView(await loadHousehold(db), NOW, { runs: 0 })
+    expect(after.netWorth[0]).toBe(before.netWorth[0])
+    expect(after.netWorth[1] - before.netWorth[1]).toBeGreaterThanOrEqual(100_000)
   })
 
   it('refuses names that can’t be told apart', async () => {

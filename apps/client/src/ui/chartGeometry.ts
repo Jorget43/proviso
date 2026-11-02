@@ -102,3 +102,19 @@ export function bandPath(low: (number | null)[], high: (number | null)[], scale:
   const bottom = [...idx].reverse().map(i => `L${pt(i, low[i]!)}`)
   return [...top, ...bottom, 'Z'].join(' ')
 }
+
+/**
+ * The first and last index shown for a window of years (inclusive), from
+ * year labels; the whole range when there's no window or it misses them all.
+ */
+export function windowRange(labels: string[], win: { from: number; to: number } | null): [number, number] {
+  const last = labels.length - 1
+  if (!win) return [0, last]
+  let lo = -1, hi = -1
+  labels.forEach((l, i) => {
+    const y = Number(l)
+    if (lo < 0 && y >= win.from) lo = i
+    if (y <= win.to) hi = i
+  })
+  return lo >= 0 && hi >= lo ? [lo, hi] : [0, last]
+}

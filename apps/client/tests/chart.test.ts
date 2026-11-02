@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { niceCeil, scaleFor, xAt, yAt, indexAt, linePath, areaPath, axisLabels, tickLabel, bandPath, type Plot } from '@/ui/chartGeometry'
+import { niceCeil, scaleFor, xAt, yAt, indexAt, linePath, areaPath, axisLabels, tickLabel, bandPath, windowRange, type Plot } from '@/ui/chartGeometry'
 
 // A 240 × 120 chart with no margins on the right or top, 40 on the left and 20 at the bottom:
 // the plotting area is 200 wide and 100 tall.
@@ -46,5 +46,16 @@ describe('the chart’s maths', () => {
     // Top edge 50 → 100, back along the bottom 50 → 0.
     expect(bandPath([0, 50], [50, 100], s, plot)).toBe('M40.0 50.0 L240.0 0.0 L240.0 50.0 L40.0 100.0 Z')
     expect(bandPath([0], [1], s, plot)).toBe('')
+  })
+})
+
+describe('a window of years', () => {
+  const labels = ['2027', '2028', '2029', '2030', '2031']
+  it('gives the first and last index shown', () => {
+    expect(windowRange(labels, null)).toEqual([0, 4])
+    expect(windowRange(labels, { from: 2028, to: 2030 })).toEqual([1, 3])
+    expect(windowRange(labels, { from: 2020, to: 2028 })).toEqual([0, 1])
+    // A window that misses every year shows them all.
+    expect(windowRange(labels, { from: 2040, to: 2050 })).toEqual([0, 4])
   })
 })

@@ -183,8 +183,10 @@ export function TextField({ value, onChange, label, placeholder }: { value: stri
  * A number nudged down and up in fixed steps: a slider's job, but exact and
  * easy to hit. Screen readers adjust it with the usual swipe up / down.
  */
-export function Stepper({ label, value, onChange, min, max, step, format = String }: {
+export function Stepper({ label, value, onChange, min, max, step, format = String, a11yLabel }: {
   label: string
+  /** What screen readers say, when the visible label leans on a heading nearby ("Month" → "Leave starts: month"). */
+  a11yLabel?: string
   value: number
   onChange: (v: number) => void
   min: number
@@ -203,7 +205,7 @@ export function Stepper({ label, value, onChange, min, max, step, format = Strin
     </Pressable>
   )
   return (
-    <View accessible accessibilityRole="adjustable" accessibilityLabel={label} accessibilityValue={{ text: shown }}
+    <View accessible accessibilityRole="adjustable" accessibilityLabel={a11yLabel ?? label} accessibilityValue={{ text: shown }}
       accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
       onAccessibilityAction={e => set(value + (e.nativeEvent.actionName === 'increment' ? step : -step))}
       style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>

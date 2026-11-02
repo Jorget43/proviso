@@ -13,9 +13,13 @@ import { useHousehold } from '@/data/DataProvider'
 import { saveAssumptions, saveRegional } from '@/data/future'
 import { DEFAULT_LEAVE_HOME_AGE, MAX_LEAVE_HOME_AGE } from '@proviso/core/lifeStages'
 import { MIX_CHOICES, mixFrom, rangeOn } from '@proviso/core/uncertainty'
+
 import { DEFAULT_CASH_RATE, DEFAULT_DIVIDEND_YIELD, DEFAULT_FRANKED_PCT, DEFAULT_PERSON1_SHARE } from '@proviso/core/investmentIncome'
 import { Button, Choice, Field, NumberField, Sheet, T, parseAmount } from '@/ui/kit'
 import { space } from '@/ui/theme'
+
+/** "Growth (70% shares)": the choice with its share in shares and property. */
+const mixLabel = (m: { growthPct: number; label: string }) => `${m.label} (${m.growthPct}% shares)`
 
 const YES_NO = [{ key: 'no', label: 'No' }, { key: 'yes', label: 'Yes' }]
 const WHERE = [{ key: 'metro', label: 'Capital city' }, { key: 'regional', label: 'Regional or rural' }]
@@ -40,7 +44,8 @@ export default function AssumptionsSheet() {
     stages: s.lifeStagesOn, leave: String(s.childLeavesHomeAge), regional: h.settings.regional,
     cashRate: String(s.cashRate ?? DEFAULT_CASH_RATE), yield: String(s.dividendYield ?? DEFAULT_DIVIDEND_YIELD),
     franked: String(s.frankedPct ?? DEFAULT_FRANKED_PCT), share: String(s.person1InvestShare ?? DEFAULT_PERSON1_SHARE),
-    range: rangeOn(s), growth: String(mixFrom(s).growthPct), glide: mixFrom(s).glidePath, target: String(mixFrom(s).glideTargetPct),
+    range: rangeOn(s), growth: String(mixFrom(s).growthPct), superGrowth: mixFrom(s).superGrowthPct === null ? 'same' : String(mixFrom(s).superGrowthPct),
+    glide: mixFrom(s).glidePath, target: String(mixFrom(s).glideTargetPct),
     sib2: String(s.sfSib2Pct), sib3: String(s.sfSib3Pct), sib4: String(s.sfSib4Pct), family: String(s.sfFamilyFee), entry: String(s.sfEntryFee),
   })
   const [error, setError] = useState<string | null>(null)
@@ -71,7 +76,7 @@ export default function AssumptionsSheet() {
       person1Growth: pct[0], person2Growth: pct[1], expInfl: pct[2], investReturn: pct[3], savingsRate: pct[4], propGrowth: pct[5],
       cashBufferMonths: buffer, funPct: fun, lifeStagesOn: f.stages, childLeavesHomeAge: leave, horizonAge: age, schoolFeesOn: f.fees,
       ...income,
-      showRange: f.range, growthPct: n(f.growth), glidePath: f.glide, glideTargetPct: n(f.target),
+      showRange: f.range, growthPct: n(f.growth), superGrowthPct: f.superGrowth === 'same' ? null : n(f.superGrowth), glidePath: f.glide, glideTargetPct: n(f.target),
       sfSib2Pct: rules[0], sfSib3Pct: rules[1], sfSib4Pct: rules[2], sfFamilyFee: n(f.family), sfEntryFee: n(f.entry),
     }, Math.round(n(f.monthly) * 12)))
     router.back()
@@ -104,19 +109,22 @@ export default function AssumptionsSheet() {
         <NumberField unit="%" label="Savings interest, percent a year" value={f.cashRate} onChange={set('cashRate')} />
       </Field>
       {h.settings.partnerEnabled && (
-        <Field label={`Investments in ${possessive(h.settings.person1Name)} name`} hint={`The rest in ${possessive(h.settings.person2Name)}. Income in the lower earner’s name is taxed less.`}>
+        <Field label={`Investments in ${possessive(h.settings.person1Name).replace(/^Your$/, 'your')} name`} hint={`The rest in ${possessive(h.settings.person2Name)}. Income in the lower earner’s name is taxed less.`}>
           <NumberField unit="%" label={`Share of investments in ${possessive(h.settings.person1Name)} name, percent`} value={f.share} onChange={set('share')} />
         </Field>
       )}
-      <Field label="How your investments and super are held" hint="More in shares and property grows faster on average but rises and falls more from year to year. Most super funds’ default is Growth.">
-        <Choice wrap label="Investment mix" options={MIX_CHOICES.map(m => ({ key: String(m.growthPct), label: m.label }))} value={f.growth} onChange={set('growth')} />
+      <Field label="How your investments are held" hint="More in shares and property grows faster on average but rises and falls more from year to year.">
+        <Choice wrap label="Investment mix" options={MIX_CHOICES.map(m => ({ key: String(m.growthPct), label: mixLabel(m) }))} value={f.growth} onChange={set('growth')} />
+      </Field>
+      <Field label="How your super is held" hint="Your fund calls it something like Balanced or Growth. Most funds’ default is Growth.">
+        <Choice wrap label="Super mix" options={[{ key: 'same', label: 'Same as investments' }, ...MIX_CHOICES.map(m => ({ key: String(m.growthPct), label: mixLabel(m) }))]} value={f.superGrowth} onChange={set('superGrowth')} />
       </Field>
       <Field label="Move to safer investments by retirement?" hint="A glide path: the mix shifts step by step until everyone has retired. Lower swings, slightly lower growth.">
         <Choice label="Glide path" options={[{ key: 'no', label: 'No' }, { key: 'yes', label: 'Yes' }]} value={f.glide ? 'yes' : 'no'} onChange={k => setF(x => ({ ...x, glide: k === 'yes' }))} />
       </Field>
       {f.glide && (
         <Field label="By retirement, move to">
-          <Choice wrap label="Mix at retirement" options={MIX_CHOICES.filter(m => m.growthPct < n0(f.growth)).map(m => ({ key: String(m.growthPct), label: m.label }))} value={f.target} onChange={set('target')} />
+          <Choice wrap label="Mix at retirement" options={MIX_CHOICES.filter(m => m.growthPct < Math.max(n0(f.growth), f.superGrowth === 'same' ? 0 : n0(f.superGrowth))).map(m => ({ key: String(m.growthPct), label: mixLabel(m) }))} value={f.target} onChange={set('target')} />
         </Field>
       )}
       <Field label="Show the range of outcomes?" hint="Future shades what happens in the middle 8 of 10 of 500 runs where returns rise and fall at random, and the chance your money lasts.">

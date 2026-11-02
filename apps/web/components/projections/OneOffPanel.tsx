@@ -1,4 +1,5 @@
 'use client'
+import { ONE_OFF_KINDS, oneOffKindOf } from '@proviso/core/projections'
 
 // Big one-offs: costs paid in a year (a car, a wedding) and money coming
 // in at once (an inheritance, selling something, borrowing against the
@@ -19,23 +20,16 @@ interface OneOffPanelProps {
   onDelete: (id: number) => void
 }
 
-const KINDS: { key: string; label: string; hint: string }[] = [
-  { key: 'cost',   label: 'A cost',                       hint: 'Paid out of savings that year.' },
-  { key: 'gift',   label: 'An inheritance or gift',       hint: 'Money in, not taxed. It goes into savings, then is invested like any money left over.' },
-  { key: 'sale',   label: 'Selling something',            hint: 'Money in from a sale. Capital gains tax isn’t worked out, so enter what you’d keep.' },
-  { key: 'borrow', label: 'Borrowing against the home',   hint: 'Money in, with the same added to the home loan (a top-up or refinance). Repayments stay the same, so the loan runs longer.' },
-]
 
 export default function OneOffPanel({ oneoffs, onAdd, onUpdate, onDelete }: OneOffPanelProps) {
   const sorted = [...oneoffs].sort((a, b) => a.year - b.year)
-  const known = (k?: string) => KINDS.find(x => x.key === (k ?? 'cost')) ?? KINDS[0]
 
   return (
     <div className="wk">
       <p className="wp-intro">Big costs in a particular year, and money that arrives all at once.</p>
       <ul className="wk-list">
         {sorted.map(o => {
-          const kind = known(o.kind)
+          const kind = oneOffKindOf(o.kind)
           const moneyIn = kind.key !== 'cost'
           return (
             <li key={o.id} className={`wk-row${moneyIn ? ' now' : ''}`}>
@@ -46,7 +40,7 @@ export default function OneOffPanel({ oneoffs, onAdd, onUpdate, onDelete }: OneO
               <div className="wk-fields">
                 <label className="wk-field" style={{ flex: '1 1 180px' }}><span>What is it?</span>
                   <select value={kind.key} onChange={e => onUpdate(o.id, 'kind', e.target.value)}>
-                    {KINDS.map(k => <option key={k.key} value={k.key}>{k.label}</option>)}
+                    {ONE_OFF_KINDS.map(k => <option key={k.key} value={k.key}>{k.label}</option>)}
                   </select>
                 </label>
                 <label className="wk-field" style={{ flex: '1 1 160px' }}><span>Name</span>

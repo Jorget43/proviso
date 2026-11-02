@@ -10,6 +10,7 @@ import { sortChildren } from '@proviso/core/people'
 import type { Db } from './db'
 import type { HouseholdData } from './household'
 import { insertRow, updateRow, deleteRow, saveSettings } from './mutate'
+import { newWorkChange, sortByStart } from '@proviso/core/workPlan'
 
 type WorkPhase = HouseholdData['workPhases'][number]
 type Scenario  = HouseholdData['scenarios'][number]
@@ -65,7 +66,7 @@ function workChanges(prev: WorkPhase[], next: WorkPhase[]) {
   const after = new Set(next.map(p => p.id))
   return {
     added:   next.filter(p => !before.has(p.id)),
-    updated: next.filter(p => { const b = before.get(p.id); return b && (b.year !== p.year || b.days !== p.days || b.person !== p.person) }),
+    updated: next.filter(p => { const b = before.get(p.id); return b && (b.year !== p.year || b.month !== p.month || b.days !== p.days || b.person !== p.person) }),
     removed: prev.filter(p => !after.has(p.id)),
   }
 }
@@ -77,20 +78,14 @@ export function hasChanges(h: HouseholdData, w: WhatIf): boolean {
     || c.added.length + c.updated.length + c.removed.length > 0
 }
 
-/**
- * Adds a work change for `person`: the year after their last one, same days.
- * With no phases yet (full-time throughout, as the projection assumes) it
- * first records that, so the change doesn't reach back to earlier years.
- */
-export function addWorkChange(w: WhatIf, person: 'p1' | 'p2', currentYear: number): WhatIf {
-  const phase = (year: number, days: number): WorkPhase => ({ id: newId(), deletedAt: null, person, year, days, month: 1 })
-  const mine = w.workPhases.filter(p => p.person === person).sort((a, b) => a.year - b.year)
-  const last = mine[mine.length - 1]
-  const added = last
-    ? [phase(Math.max(currentYear, last.year) + 1, last.days)]
-    : [phase(currentYear, 5), phase(currentYear + 1, 5)]
-  return { ...w, workPhases: [...w.workPhases, ...added] }
+/** Adds work changes for `person` (from @proviso/core/workPlan's newWorkChange, newLeave or newLeaveStep). */
+export function addWork(w: WhatIf, person: 'p1' | 'p2', rows: { year: number; month: number; days: number }[]): WhatIf {
+  return { ...w, workPhases: [...w.workPhases, ...rows.map(r => ({ id: newId(), deletedAt: null, person, ...r }))] }
 }
+
+/** Adds a work change for `person` a year after their last one (with "full-time from now" first, if they have none). */
+export const addWorkChange = (w: WhatIf, person: 'p1' | 'p2', currentYear: number): WhatIf =>
+  addWork(w, person, newWorkChange(w.workPhases.filter(p => p.person === person), currentYear))
 
 /**
  * The draft as a scenario's changes (@proviso/core/scenarios): only what
@@ -108,7 +103,7 @@ export function overridesFromWhatIf(h: HouseholdData, w: WhatIf): ScenarioOverri
     const c = workChanges(mine(h.workPhases), mine(w.workPhases))
     if (c.added.length + c.updated.length + c.removed.length === 0) continue
     o[person === 'p1' ? 'person1Phases' : 'person2Phases'] =
-      mine(w.workPhases).sort((a, b) => a.year - b.year).map(p => ({ year: p.year, days: p.days }))
+      sortByStart(mine(w.workPhases)).map(p => ({ year: p.year, month: p.month, days: p.days }))
   }
   return o
 }
@@ -153,7 +148,7 @@ export async function updateScenario(db: Db, h: HouseholdData, scenario: Scenari
     const key = person === 'p1' ? 'person1Phases' : 'person2Phases'
     const vsPlan = workChanges(mine(h.workPhases), mine(w.workPhases))
     if (vsPlan.added.length + vsPlan.updated.length + vsPlan.removed.length === 0) delete next[key]
-    else next[key] = mine(w.workPhases).sort((a, b) => a.year - b.year).map(p => ({ year: p.year, days: p.days }))
+    else next[key] = sortByStart(mine(w.workPhases)).map(p => ({ year: p.year, month: p.month, days: p.days }))
   }
   await updateRow(db, 'scenario', scenario.id, { name: name.trim() || scenario.name, overrides: writeOverrides(next) })
 }
@@ -171,6 +166,6 @@ export async function keepWhatIf(db: Db, h: HouseholdData, w: WhatIf): Promise<v
   if (Object.keys(rent).length) await saveSettings(db, 'rentSettings', rent)
   const c = workChanges(h.workPhases, w.workPhases)
   for (const p of c.removed) await deleteRow(db, 'workPhase', p.id)
-  for (const p of c.updated) await updateRow(db, 'workPhase', p.id, { person: p.person, year: p.year, days: p.days })
-  for (const p of c.added) await insertRow(db, 'workPhase', { person: p.person, year: p.year, days: p.days }, p.id)
+  for (const p of c.updated) await updateRow(db, 'workPhase', p.id, { person: p.person, year: p.year, month: p.month, days: p.days })
+  for (const p of c.added) await insertRow(db, 'workPhase', { person: p.person, year: p.year, month: p.month, days: p.days }, p.id)
 }

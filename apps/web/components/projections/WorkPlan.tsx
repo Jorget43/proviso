@@ -1,6 +1,7 @@
 'use client'
 import { PARTNER_FTE, PPL_WEEKS } from '@proviso/core/constants'
 import { fmt } from '@proviso/core/formatting'
+import { MONTH_NAMES as MONTHS, monthKey as key, whenLabel as when, sortByStart, workBlocks, newWorkChange, newLeave, newLeaveStep } from '@proviso/core/workPlan'
 
 // Someone's work over time, as a short list of changes ("from July 2028,
 // 3 days a week"). Each stretch of parental leave is one card holding when
@@ -27,10 +28,7 @@ interface Props {
   onAdd:       (rows: Omit<WorkPhaseRow, 'id'>[]) => void
 }
 
-const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
 const monthOf = (p: { month?: number }) => p.month ?? 1
-const key = (p: { year: number; month?: number }) => p.year * 12 + monthOf(p) - 1
-const when = (p: { year: number; month?: number }) => `${MONTHS[monthOf(p) - 1]} ${p.year}`
 
 function daysLabel(days: number, leaveOn: boolean): string {
   if (days === 0) return leaveOn ? 'Parental leave' : 'Not working'
@@ -67,28 +65,10 @@ function DaysPicker({ p, leaveOn, label, onChange, min = 0 }: {
 }
 
 export default function WorkPlan({ phases, currentYear, fte = PARTNER_FTE, leaveOn = false, onUpdate, onDelete, onAdd }: Props) {
-  const sorted = [...phases].sort((a, b) => key(a) - key(b))
+  const sorted = sortByStart(phases)
   const nowKey = currentYear * 12 + new Date().getMonth()
   const pay = (days: number) => (days > 0 ? `about ${fmt(fte * days / 5)} a year before tax` : leaveOn ? '' : 'no pay')
-
-  // Group into plain changes and leave stretches (a leave and the steps after it, up to the next leave).
-  type Block = { kind: 'change'; p: WorkPhaseRow } | { kind: 'leave'; leave: WorkPhaseRow; steps: WorkPhaseRow[] }
-  const blocks: Block[] = []
-  for (const p of sorted) {
-    const open = blocks[blocks.length - 1]
-    if (leaveOn && p.days === 0) blocks.push({ kind: 'leave', leave: p, steps: [] })
-    else if (open?.kind === 'leave' && p.days > 0) open.steps.push(p)
-    else blocks.push({ kind: 'change', p })
-  }
-  const last = sorted[sorted.length - 1]
-  // With no changes yet the projection assumes full-time throughout. A first
-  // change would otherwise reach back to today (the earliest change also
-  // covers the years before it), so "full-time from now" is recorded with it.
-  const withStart = (rows: Omit<WorkPhaseRow, 'id'>[]) => (sorted.length ? rows : [{ year: currentYear, month: 1, days: 5 }, ...rows])
-  const after = (p: WorkPhaseRow, months: number) => {
-    const k = key(p) + months
-    return { year: Math.floor(k / 12), month: (k % 12) + 1 }
-  }
+  const blocks = workBlocks(phases, leaveOn)
 
   return (
     <div className="wk">
@@ -96,24 +76,24 @@ export default function WorkPlan({ phases, currentYear, fte = PARTNER_FTE, leave
       <ol className="wk-list">
         {blocks.map((b, i) => {
           if (b.kind === 'change') {
-            const isNow = key(b.p) <= nowKey && (i === blocks.length - 1 || key(sorted[sorted.indexOf(b.p) + 1]) > nowKey)
+            const isNow = key(b.phase) <= nowKey && (i === blocks.length - 1 || key(sorted[sorted.indexOf(b.phase) + 1]) > nowKey)
             return (
-              <li key={b.p.id} className={`wk-row${isNow ? ' now' : ''}`}>
+              <li key={b.phase.id} className={`wk-row${isNow ? ' now' : ''}`}>
                 <div className="wk-row-head">
-                  <span className="wk-tag">{isNow ? 'Now' : key(b.p) < nowKey ? 'Earlier' : 'Then'}</span>
+                  <span className="wk-tag">{isNow ? 'Now' : key(b.phase) < nowKey ? 'Earlier' : 'Then'}</span>
                   {sorted.length > 1 && (
-                    <button type="button" className="wp-remove" onClick={() => onDelete([b.p.id])} aria-label={`Remove the change from ${when(b.p)}`}>Remove</button>
+                    <button type="button" className="wp-remove" onClick={() => onDelete([b.phase.id])} aria-label={`Remove the change from ${when(b.phase)}`}>Remove</button>
                   )}
                 </div>
                 <div className="wk-fields">
                   <label className="wk-field"><span>From</span>
-                    <WhenPicker p={b.p} currentYear={currentYear} label="Starts" onChange={patch => onUpdate(b.p.id, patch)} />
+                    <WhenPicker p={b.phase} currentYear={currentYear} label="Starts" onChange={patch => onUpdate(b.phase.id, patch)} />
                   </label>
                   <label className="wk-field"><span>Works</span>
-                    <DaysPicker p={b.p} leaveOn={false} min={leaveOn ? 1 : 0} label="Days a week" onChange={patch => onUpdate(b.p.id, patch)} />
+                    <DaysPicker p={b.phase} leaveOn={false} min={leaveOn ? 1 : 0} label="Days a week" onChange={patch => onUpdate(b.phase.id, patch)} />
                   </label>
                 </div>
-                {pay(b.p.days) && <p className="wp-pay">That&rsquo;s {pay(b.p.days)}.</p>}
+                {pay(b.phase.days) && <p className="wp-pay">That&rsquo;s {pay(b.phase.days)}.</p>}
               </li>
             )
           }
@@ -148,7 +128,7 @@ export default function WorkPlan({ phases, currentYear, fte = PARTNER_FTE, leave
                 </div>
               ))}
               {lastStep.days < 5 && (
-                <button type="button" className="add-btn" onClick={() => onAdd([{ ...after(lastStep, steps.length ? 6 : 12), days: steps.length ? Math.min(5, lastStep.days + 1) : 3 }])}>
+                <button type="button" className="add-btn" onClick={() => onAdd([newLeaveStep(b)])}>
                   {steps.length ? '+ Add a step back up (more days)' : '+ Add the return to work'}
                 </button>
               )}
@@ -157,14 +137,11 @@ export default function WorkPlan({ phases, currentYear, fte = PARTNER_FTE, leave
         })}
       </ol>
       <div className="wk-actions">
-        <button type="button" className="add-btn" onClick={() => onAdd(withStart([{ ...(last ? after(last, 12) : { year: currentYear + 1, month: 1 }), days: last && last.days > 0 ? last.days - (last.days > 1 ? 1 : 0) : 4 }]))}>
+        <button type="button" className="add-btn" onClick={() => onAdd(newWorkChange(phases, currentYear))}>
           + Add a change (for example, going part-time)
         </button>
         {leaveOn && (
-          <button type="button" className="add-btn" onClick={() => {
-            const start = Math.max(currentYear + 1, last ? last.year + 1 : currentYear + 1)
-            onAdd(withStart([{ year: start, month: 7, days: 0 }, { year: start + 1, month: 1, days: 3 }]))
-          }}>+ Plan parental leave</button>
+          <button type="button" className="add-btn" onClick={() => onAdd(newLeave(phases, currentYear))}>+ Plan parental leave</button>
         )}
       </div>
     </div>

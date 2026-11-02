@@ -4,13 +4,13 @@
 // Up-and-down drags still scroll the page. Same behaviour as the NAS charts
 // (apps/web/components/ui/ScrubChart.tsx); the maths is in chartGeometry.ts.
 
-import { useMemo, useRef, useState } from 'react'
+import { createContext, useContext, useMemo, useRef, useState } from 'react'
 import { Platform, Pressable, View, type GestureResponderEvent, type LayoutChangeEvent } from 'react-native'
 import Svg, { Circle, Line, Path, Text as SvgText } from 'react-native-svg'
 import { fmtK } from '@proviso/core/formatting'
 import { T } from './kit'
 import { usePalette, space, radius } from './theme'
-import { areaPath, axisLabels, bandPath, indexAt, linePath, scaleFor, tickLabel, xAt, yAt, type Plot } from './chartGeometry'
+import { areaPath, axisLabels, bandPath, indexAt, linePath, scaleFor, tickLabel, windowRange, xAt, yAt, type Plot } from './chartGeometry'
 
 export interface ChartSeries {
   key:    string
@@ -47,7 +47,25 @@ const MARGIN = { left: 44, right: 8, top: 8, bottom: 20 }
 // SVG text on the web falls back to a serif font; use the same system font as the app's text.
 const AXIS_FONT = Platform.OS === 'web' ? 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif' : undefined
 
-export function ScrubChart({ labels, series, height = 180, defaultIndex, title, compact }: Props) {
+/** The years every chart inside it shows (inclusive); null shows them all (YearRange sets it). */
+export const YearWindow = createContext<{ from: number; to: number } | null>(null)
+
+/** The chart, cut to the YearWindow's years when there is one. */
+export function ScrubChart(props: Props) {
+  const [lo, hi] = windowRange(props.labels, useContext(YearWindow))
+  if (lo === 0 && hi === props.labels.length - 1) return <Chart {...props} />
+  const cut = <V,>(a: V[]) => a.slice(lo, hi + 1)
+  return (
+    <Chart {...props} labels={cut(props.labels)}
+      defaultIndex={props.defaultIndex === undefined ? undefined : Math.max(0, props.defaultIndex - lo)}
+      series={props.series.map(s => ({
+        ...s, data: cut(s.data), compareTo: s.compareTo && cut(s.compareTo),
+        band: s.band && { low: cut(s.band.low), high: cut(s.band.high) },
+      }))} />
+  )
+}
+
+function Chart({ labels, series, height = 180, defaultIndex, title, compact }: Props) {
   const p = usePalette()
   const [width, setWidth] = useState(0)
   const [picked, setPicked] = useState<number | null>(null)

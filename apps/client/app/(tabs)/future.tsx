@@ -16,8 +16,10 @@ import { removeScenario, showScenario } from '@/data/whatif'
 import { saveDrawdown } from '@/data/future'
 import { confirmAction } from '@/ui/confirm'
 import { Button, Card, Choice, Field, H2, Screen, Stepper, T } from '@/ui/kit'
-import { ScrubChart, type ChartSeries } from '@/ui/ScrubChart'
+import { ScrubChart, YearWindow, type ChartSeries } from '@/ui/ScrubChart'
+import { YearRange, type YearSpan } from '@/ui/YearRange'
 import { usePalette, space, radius, touch } from '@/ui/theme'
+import { isMoneyIn } from '@proviso/core/projections'
 
 export default function Future() {
   const { household, change } = useHousehold()
@@ -27,8 +29,18 @@ export default function Future() {
   const cf = cashflowView(household, new Date())
   const a = v.assumptions
   const compare = compareView(household, new Date())
+  // Years shown on every chart here (null: all of them).
+  const [yearWin, setYearWin] = useState<YearSpan | null>(null)
+  const firstYr = Number(v.labels[0]), lastYr = Number(v.labels[v.labels.length - 1])
+  const retired = v.inOut.retiredFrom ? Number(v.inOut.retiredFrom) : null
+  const yearPresets = [
+    ...[10, 20].filter(k => firstYr + k - 1 < lastYr).map(k => ({ key: `n${k}`, label: `${k} years`, span: { from: firstYr, to: firstYr + k - 1 } })),
+    ...(retired && retired > firstYr + 4 && retired < lastYr ? [{ key: 'retire', label: 'To retirement', span: { from: firstYr, to: retired } }] : []),
+    { key: 'all', label: 'All', span: null },
+  ]
 
   return (
+    <YearWindow.Provider value={yearWin}>
     <Screen>
       <Card tone={v.endNetWorth >= v.netWorthToday ? 'good' : 'bad'}>
         <T size="small" tone="t2">Net worth in {v.years} years</T>
@@ -39,7 +51,8 @@ export default function Future() {
         {v.range.on && (
           <T tone="t2">In 8 of 10 runs, somewhere between {fmtK(v.range.endLowReal)} and {fmtK(v.range.endHighReal)} in today’s money, depending on how investments do.</T>
         )}
-        <View style={{ marginTop: space.md }}>
+        <View style={{ marginTop: space.md, gap: space.sm }}>
+          <YearRange first={firstYr} last={lastYr} value={yearWin} presets={yearPresets} onChange={setYearWin} />
           <ScrubChart title="Net worth by year" labels={v.labels} series={[
             { key: 'plan', label: compare.length ? 'Your plan' : 'Net worth', data: v.netWorth, color: p.green, area: true,
               band: v.range.on ? { low: v.range.netWorthLow, high: v.range.netWorthHigh } : undefined },
@@ -160,9 +173,9 @@ export default function Future() {
       </View>
 
       <View style={{ gap: space.sm }}>
-        <H2>Big one-off costs</H2>
+        <H2>Big one-offs</H2>
         <Card style={{ gap: 0, paddingVertical: space.sm }}>
-          {household.oneOffs.length === 0 && <T tone="t2" style={{ paddingVertical: space.sm }}>A new car, a renovation, a wedding: add them here to see the effect.</T>}
+          {household.oneOffs.length === 0 && <T tone="t2" style={{ paddingVertical: space.sm }}>A new car or a wedding, or money coming in at once, like an inheritance: add them here to see the effect.</T>}
           {[...household.oneOffs].sort((x, y) => x.year - y.year).map((o, i) => (
             <Pressable key={o.id} accessibilityRole="button" accessibilityHint="Change or remove"
               onPress={() => router.push({ pathname: '/oneoff', params: { id: o.id } })}
@@ -170,12 +183,12 @@ export default function Future() {
                 borderTopWidth: i ? 1 : 0, borderTopColor: p.border, opacity: pressed ? 0.6 : 1 })}>
               <T weight="700" style={{ width: 48 }}>{o.year}</T>
               <T style={{ flex: 1 }}>{o.name}</T>
-              <T weight="600">{fmt(o.amt)}</T>
+              <T weight="600" tone={isMoneyIn(o) ? 'green' : 't1'}>{isMoneyIn(o) ? `+${fmt(o.amt)}` : fmt(o.amt)}</T>
             </Pressable>
           ))}
         </Card>
         <View style={{ alignItems: 'flex-start' }}>
-          <Button kind="quiet" title="+ Add a one-off cost" onPress={() => router.push('/oneoff')} />
+          <Button kind="quiet" title="+ Add a cost or money coming in" onPress={() => router.push('/oneoff')} />
         </View>
       </View>
 
@@ -192,6 +205,7 @@ export default function Future() {
         </Card>
       </View>
     </Screen>
+    </YearWindow.Provider>
   )
 }
 
