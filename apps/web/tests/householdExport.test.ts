@@ -60,6 +60,7 @@ function legacy(): LegacyHousehold {
     children: [{ id: 1, name: 'Kid', birthYear: 2015, birthMonth: 4, primarySchool: 'government', secondarySchool: 'independent' }, { id: 2, name: null, birthYear: 2028, birthMonth: null, primarySchool: null, secondarySchool: null }],
     scenarios: [{ id: 1, name: 'Retire at 55', colour: 'amber', enabled: false, overrides: '{"super":{"person1RetirementAge":55}}' }],
     packagedItems: [{ id: 1, person: 'p2', kind: 'evLease', amount: 15000, carPrice: 60000, startYear: 2026, endYear: 2029 }],
+    incomeSources: [{ id: 1, person: 'p1', kind: 'business', name: 'Consulting', amount: 25000, growthPct: 3, startYear: 2026, endYear: null }],
   }
 }
 
@@ -113,6 +114,12 @@ describe('mapLegacyHousehold', () => {
   it('carries salary packaging across (schema v12)', () => {
     expect(exportOf().household.packagedItem).toEqual([expect.objectContaining({
       person: 'p2', kind: 'evLease', amount: 15000, carPrice: 60000, startYear: 2026, endYear: 2029, deletedAt: null,
+    })])
+  })
+
+  it('carries business income across (schema v13)', () => {
+    expect(exportOf().household.incomeSource).toEqual([expect.objectContaining({
+      person: 'p1', kind: 'business', name: 'Consulting', amount: 25000, growthPct: 3, startYear: 2026, endYear: null, deletedAt: null,
     })])
   })
 

@@ -153,6 +153,20 @@ export const packagedItemSchema = z
   })
   .partial()
 
+// Business income (businessIncome.ts). Unknown kinds are refused here: the
+// NAS writes only kinds it knows.
+export const incomeSourceSchema = z
+  .object({
+    person:    z.enum(['p1', 'p2']),
+    kind:      z.enum(['business']),
+    name:      z.string().trim().max(60).nullable(),
+    amount:    num.min(0).max(5_000_000),
+    growthPct: num.min(-10).max(20),
+    startYear: int.min(1900).max(2200),
+    endYear:   int.min(1900).max(2200).nullable(),
+  })
+  .partial()
+
 export const lifePhaseSchema = z
   .object({
     name:       z.string().min(1),

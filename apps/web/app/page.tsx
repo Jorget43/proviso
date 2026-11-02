@@ -32,7 +32,7 @@ export default async function Home() {
   // Only a CFO can save the wizard (budget:write) — others go straight in.
   if (!hs.onboardingDone && me.role === 'CFO') redirect('/onboarding')
 
-  const [expenses, annualExpenses, income, childcare, rent, person1Phases, person2Phases, assets, debts, mortgage, superSettings, snapshots, packagedItems] = await Promise.all([
+  const [expenses, annualExpenses, income, childcare, rent, person1Phases, person2Phases, assets, debts, mortgage, superSettings, snapshots, packagedItems, incomeSources] = await Promise.all([
     prisma.expense.findMany({ orderBy: { id: 'asc' } }),
     prisma.annualExpense.findMany({ orderBy: { month: 'asc' } }),
     prisma.incomeSettings.findUniqueOrThrow({ where: { id: 1 } }),
@@ -46,6 +46,7 @@ export default async function Home() {
     prisma.superSettings.findUnique({ where: { id: 1 } }),
     prisma.netWorthSnapshot.findMany({ orderBy: { takenAt: 'asc' } }),
     prisma.packagedItem.findMany(),
+    prisma.incomeSource.findMany(),
   ])
 
   // Every figure comes from the shared overview, so the app shows the same.
@@ -60,6 +61,7 @@ export default async function Home() {
     superBalances: { p1: superSettings?.currentBalance ?? 0, p2: superSettings?.partnerBalance ?? 0 },
     snapshots,
     packaging: packagedItems,
+    business: incomeSources,
   })
   const { budget, noIncome, left, cash, coverMonths, mortgageLeft, mortgageEndYear, superTotal, upcoming } = o
   const netPosition = o.netWorth

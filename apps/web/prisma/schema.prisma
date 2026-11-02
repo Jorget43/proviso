@@ -165,6 +165,19 @@ model PackagedItem {
   endYear   Int?
 }
 
+// Income other than pay (twin of core's incomeSource; schema v13). person
+// is p1 / p2; kind is a core IncomeKind ('business'), kept as text.
+model IncomeSource {
+  id        Int     @id @default(autoincrement())
+  person    String
+  kind      String
+  name      String?
+  amount    Float
+  growthPct Float   @default(3)
+  startYear Int
+  endYear   Int?
+}
+
 model OneOff {
   id   Int    @id @default(autoincrement())
   name String

@@ -8,6 +8,7 @@ import { workDaysForYear } from './projections'
 import { isEofySeason } from './eofy'
 import { fmt } from './formatting'
 import { packagingNow, type PackagedItemLike } from './packaging'
+import { businessNow, type IncomeSourceLike } from './businessIncome'
 
 /** Where a prompt's button leads — each platform maps these to its own screens. */
 export type OverviewTarget = 'income' | 'budget' | 'savings' | 'eofy' | 'children'
@@ -43,6 +44,8 @@ export interface OverviewInputs<E extends BudgetExpense> {
   childrenMissing?: boolean
   /** Salary packaging items (packaging.ts): today's take-home pay counts them. */
   packaging?:     PackagedItemLike[]
+  /** Business income (businessIncome.ts): today's money in counts this year's profit after tax. */
+  business?:      IncomeSourceLike[]
 }
 
 export interface HomeOverview<E extends BudgetExpense> {
@@ -73,6 +76,7 @@ export function computeHomeOverview<E extends BudgetExpense>(i: OverviewInputs<E
     partnerEnabled: i.partnerEnabled,
     packaging: i.packaging && packagingNow(i.packaging, year,
       { p1: workDaysForYear(i.workPhases.p1, year), p2: workDaysForYear(i.workPhases.p2, year) }),
+    business: i.business && businessNow(i.business, year),
   })
 
   // Same figure as Wealth → Own & owe: everything owned minus owed.

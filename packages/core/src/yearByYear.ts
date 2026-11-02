@@ -10,11 +10,12 @@ interface MoneyRun {
   expArr:        number[]
   superDrawArr?: number[]
   investIncArr?: number[]
+  businessArr?:  number[]
 }
 
-/** Money in each year: take-home pay, anything taken from super to live on, and interest less tax on investment income. */
+/** Money in each year: take-home pay, anything taken from super to live on, interest less tax on investment income, and business income after tax. */
 export function moneyIn(r: Omit<MoneyRun, 'expArr'>, showPerson2: boolean): number[] {
-  return r.person1Arr.map((v, i) => v + (showPerson2 ? r.person2Arr[i] ?? 0 : 0) + (r.superDrawArr?.[i] ?? 0) + (r.investIncArr?.[i] ?? 0))
+  return r.person1Arr.map((v, i) => v + (showPerson2 ? r.person2Arr[i] ?? 0 : 0) + (r.superDrawArr?.[i] ?? 0) + (r.investIncArr?.[i] ?? 0) + (r.businessArr?.[i] ?? 0))
 }
 
 /** Money in less everything that goes out, each year (negative = short). */

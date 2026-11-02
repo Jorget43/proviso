@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic'
 import { prisma } from '@/lib/db'
 import { packagingNow } from '@proviso/core/packaging'
+import { businessNow } from '@proviso/core/businessIncome'
 import { requireAdult } from '@/lib/auth'
 import { CATS, PPL_WEEKS } from '@proviso/core/constants'
 import { workDaysForYear } from '@proviso/core/projections'
@@ -14,7 +15,7 @@ import IncVsExpChart from '@/components/cashflow/IncVsExpChart'
 
 export default async function CashflowPage() {
   await requireAdult()
-  const [income, expenses, person1Phases, person2Phases, assets, hs, projSettings, annualExpenses, rent, childcare, packagedItems] = await Promise.all([
+  const [income, expenses, person1Phases, person2Phases, assets, hs, projSettings, annualExpenses, rent, childcare, packagedItems, incomeSources] = await Promise.all([
     prisma.incomeSettings.findUniqueOrThrow({ where: { id: 1 } }),
     prisma.expense.findMany(),
     prisma.person1Phase.findMany(),
@@ -26,6 +27,7 @@ export default async function CashflowPage() {
     prisma.rentSettings.findFirst(),
     prisma.childcareSettings.upsert({ where: { id: 1 }, update: {}, create: { id: 1 } }),
     prisma.packagedItem.findMany(),
+    prisma.incomeSource.findMany(),
   ])
   const person1Name = hs?.person1Name ?? 'Person 1'
   const person2Name = hs?.person2Name ?? 'Person 2'
@@ -42,6 +44,7 @@ export default async function CashflowPage() {
     person1Days: workDaysForYear(person1Phases, year), person2Days: workDaysForYear(person2Phases, year),
     partnerEnabled,
     packaging: packagingNow(packagedItems, year, { p1: workDaysForYear(person1Phases, year), p2: workDaysForYear(person2Phases, year) }),
+    business: businessNow(incomeSources, year),
   })
   const cf = computeCashflow({ budget, annualExpenses, cashOnHand: computeCashOnHand(assets), parentalLeave: showLeave, now: new Date() })
 

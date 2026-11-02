@@ -21,8 +21,8 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 export const monthLabel = (year: number, month: number) => `${MONTHS[month - 1]} ${String(year).slice(-2)}`
 
 export interface CashflowInputs {
-  /** From computeBudgetSummary: monthly after-tax income, monthly spending (yearly bills spread), person 1's monthly take-home. */
-  budget:         { monthlyIncome: number; monthlyExpenses: number; person1Net: number }
+  /** From computeBudgetSummary: monthly after-tax income, monthly spending (yearly bills spread), person 1's monthly take-home, business income after tax (it carries on through leave). */
+  budget:         { monthlyIncome: number; monthlyExpenses: number; person1Net: number; businessMonthly?: number }
   annualExpenses: { name: string; amt: number; month: number }[]
   /** Cash available today (computeCashOnHand). */
   cashOnHand:     number
@@ -75,8 +75,9 @@ export function computeCashflow(i: CashflowInputs): Cashflow {
 
   // Parental Leave Pay is taxable: its after-tax amount, spread over the months it's paid.
   const pplNetMonthly = calcAfterTax(PPL_TOTAL) / PPL_MONTHS
-  const onPplSurplus = i.budget.person1Net + pplNetMonthly - monthlyOut
-  const afterPplSurplus = i.budget.person1Net - monthlyOut
+  const oneIncome = i.budget.person1Net + (i.budget.businessMonthly ?? 0)
+  const onPplSurplus = oneIncome + pplNetMonthly - monthlyOut
+  const afterPplSurplus = oneIncome - monthlyOut
 
   const months: CashflowMonth[] = []
   let billsSoFar = 0

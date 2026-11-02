@@ -258,10 +258,11 @@ function YearByYear({ v, compare, names }: { v: FutureView; compare: CompareRow[
               ...(some(io.pay2) ? [{ key: 'p2', label: `Pay: ${names[1]}`, data: io.pay2, color: p.blue, readout: true }] : []),
               ...(some(io.fromSuper) ? [{ key: 'super', label: 'From super', data: io.fromSuper, color: p.teal, readout: true }] : []),
               ...(some(io.investIncome) ? [{ key: 'inv', label: 'Interest, less tax on investment income', data: io.investIncome, color: p.purple, readout: true, format: signed }] : []),
+              ...(some(io.business) ? [{ key: 'biz', label: 'Business income, after tax', data: io.business, color: p.green, readout: true }] : []),
               { key: 'fees', label: 'Of the spending: school fees', data: io.schoolFees, color: p.amber, readout: true },
               { key: 'cash', label: 'Cash at the end of the year', data: io.cash, color: p.blue, readout: true },
             ]} />
-            <T size="caption" tone="t3">In each year’s dollars. Money in is take-home pay{some(io.fromSuper) ? ', money taken from super in retirement' : ''} and interest; spending includes home loan repayments.</T>
+            <T size="caption" tone="t3">In each year’s dollars. Money in is take-home pay{some(io.business) ? ', business income after tax' : ''}{some(io.fromSuper) ? ', money taken from super in retirement' : ''} and interest; spending includes home loan repayments.</T>
           </>
         ) : home && (
           <>

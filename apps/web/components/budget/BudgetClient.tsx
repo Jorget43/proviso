@@ -8,6 +8,8 @@ import ReadOnlyFence from '@/components/ui/ReadOnlyFence'
 import IncomePanel, { type IncomeSettings } from './IncomePanel'
 import PackagingPanel, { type PackagedItemRow } from './PackagingPanel'
 import { packagingNow, type PackageKind } from '@proviso/core/packaging'
+import BusinessPanel, { type IncomeSourceRow } from './BusinessPanel'
+import { businessNow } from '@proviso/core/businessIncome'
 import ExpenseTable, { type Expense, type AnnualExpense } from './ExpenseTable'
 import ChildcarePanel, { type ChildcareSettings } from './ChildcarePanel'
 import SpendDonut from './SpendDonut'
@@ -39,6 +41,7 @@ interface BudgetClientProps {
   initialAnnualExpenses: AnnualExpense[]
   initialRentSettings: RentSettings | null
   initialPackagedItems: PackagedItemRow[]
+  initialIncomeSources: IncomeSourceRow[]
   person1Days: number
   person2Days: number
   partnerEnabled: boolean
@@ -55,6 +58,7 @@ export default function BudgetClient({
   initialAnnualExpenses,
   initialRentSettings,
   initialPackagedItems,
+  initialIncomeSources,
   person1Days,
   person2Days,
   partnerEnabled,
@@ -70,15 +74,17 @@ export default function BudgetClient({
   const [packaged, setPackaged] = useState<PackagedItemRow[]>(initialPackagedItems)
   const packagingThisYear = useMemo(() => packagingNow(packaged, new Date().getFullYear(), { p1: person1Days, p2: person2Days }),
     [packaged, person1Days, person2Days])
+  const [sources, setSources] = useState<IncomeSourceRow[]>(initialIncomeSources)
+  const businessThisYear = useMemo(() => businessNow(sources, new Date().getFullYear()), [sources])
 
   const {
-    familyIncome, person1Net, person2Net, monthlyIncome, packagingMonthly, childcareNet,
+    familyIncome, person1Net, person2Net, monthlyIncome, packagingMonthly, businessMonthly, childcareNet,
     shownExpenses, monthlyExpenses, catMonthly, delta, savingsRate,
   } = useMemo(() => computeBudgetSummary({
     expenses, annualExpenses, income, childcare,
     rentMonthly: rentSettings?.enabled ? rentSettings.monthlyRent : null,
-    person1Days, person2Days, partnerEnabled, packaging: packagingThisYear,
-  }), [expenses, annualExpenses, income, childcare, rentSettings, person1Days, person2Days, partnerEnabled, packagingThisYear])
+    person1Days, person2Days, partnerEnabled, packaging: packagingThisYear, business: businessThisYear,
+  }), [expenses, annualExpenses, income, childcare, rentSettings, person1Days, person2Days, partnerEnabled, packagingThisYear, businessThisYear])
 
   // ── Salary packaging ───────────────────────────────────────────────────────
   const addPackaged = useCallback(async (kind: PackageKind) => {
@@ -93,6 +99,21 @@ export default function BudgetClient({
   const deletePackaged = useCallback(async (id: number) => {
     setPackaged(prev => prev.filter(i => i.id !== id))
     await fetch(`/api/packaging/${id}`, { method: 'DELETE' })
+  }, [])
+
+  // ── Business income ────────────────────────────────────────────────────────
+  const addSource = useCallback(async () => {
+    const draft = { person: 'p1', kind: 'business', name: null, amount: 0, growthPct: 3, startYear: new Date().getFullYear(), endYear: null }
+    const res = await fetch('/api/income-sources', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(draft) })
+    if (res.ok) { const row = await res.json() as IncomeSourceRow; setSources(prev => [...prev, row]) }
+  }, [])
+  const updateSource = useCallback(async (id: number, patch: Partial<IncomeSourceRow>) => {
+    setSources(prev => prev.map(i => i.id === id ? { ...i, ...patch } : i))
+    await fetch(`/api/income-sources/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch) })
+  }, [])
+  const deleteSource = useCallback(async (id: number) => {
+    setSources(prev => prev.filter(i => i.id !== id))
+    await fetch(`/api/income-sources/${id}`, { method: 'DELETE' })
   }, [])
 
   // ── Regular expense CRUD ────────────────────────────────────────────────────
@@ -262,6 +283,13 @@ export default function BudgetClient({
           </Panel>
         </ReadOnlyFence>
       )}
+
+      <ReadOnlyFence canEdit={canEdit}>
+        <Panel title="Business income" dotColor="var(--green)">
+          <BusinessPanel items={sources} partnerEnabled={partnerEnabled} person1Name={person1Name} person2Name={person2Name}
+            monthlyAdds={businessMonthly} onAdd={addSource} onUpdate={updateSource} onDelete={deleteSource} />
+        </Panel>
+      </ReadOnlyFence>
 
       {/* Phones: one pinned line instead of five metric cards */}
       <div className={`budget-bar ${delta >= 0 ? 'good' : 'bad'}`} aria-label="Monthly summary">

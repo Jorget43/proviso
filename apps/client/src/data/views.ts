@@ -3,6 +3,7 @@
 // arrange them for the app's screens.
 
 import { packagingNow } from '@proviso/core/packaging'
+import { businessNow } from '@proviso/core/businessIncome'
 import { computeHomeOverview, type HomeOverview } from '@proviso/core/overview'
 import { computeBudgetSummary, isManagedChildcare } from '@proviso/core/budgetSummary'
 import { workDaysForYear, runProjections, type PurchasePaid } from '@proviso/core/projections'
@@ -49,6 +50,7 @@ export function homeView(h: HouseholdData, now: Date): HomeView {
     snapshots: h.netWorthSnapshots,
     childrenMissing: h.projection.schoolFeesOn && h.children.length === 0,
     packaging: h.packagedItems,
+    business: h.incomeSources,
   })
   const situation = situationFrom({ partnerEnabled: h.settings.partnerEnabled, childcare: h.childcare, rent: h.rent, projection: h.projection })
   return { ...o, person1Name: h.settings.person1Name, person2Name: h.settings.person2Name, situation: situationLabels(situation, h.settings.person2Name) }
@@ -95,6 +97,7 @@ export function spendingView(h: HouseholdData, now: Date): SpendingView {
     person1Days: workDaysForYear(p.p1, year), person2Days: workDaysForYear(p.p2, year),
     partnerEnabled: h.settings.partnerEnabled,
     packaging: packagingNow(h.packagedItems, year, { p1: workDaysForYear(p.p1, year), p2: workDaysForYear(p.p2, year) }),
+    business: businessNow(h.incomeSources, year),
   })
 
   const lines = new Map<string, SpendingLine[]>()
@@ -236,6 +239,8 @@ export interface FutureView {
     fromSuper:    number[]
     /** Interest less tax on investment income (can be negative). */
     investIncome: number[]
+    /** Business income after its tax and HELP. */
+    business:     number[]
     schoolFees:   number[]
     cash:         number[]
     /** Years at least one person still works (from the first). */
@@ -323,6 +328,7 @@ function planOf(h: HouseholdData, year: number) {
     life: { partnerEnabled: h.settings.partnerEnabled, ...ages, super: h.superSettings },
     children: h.children,
     packaging: h.packagedItems,
+    business: h.incomeSources,
     regional: h.settings.regional,
     state: h.settings.state,
     ownSchedule: feeScheduleFor(null, h.schoolFeeLevels),
@@ -395,7 +401,7 @@ export function futureView(h: HouseholdData, now: Date, opts: { runs?: number } 
       return {
         moneyIn: moneyIn(run, h.settings.partnerEnabled), spending: run.expArr, leftOver: left,
         pay1: run.person1Arr, pay2: h.settings.partnerEnabled ? run.person2Arr : run.person2Arr.map(() => 0),
-        fromSuper: run.superDrawArr, investIncome: run.investIncArr,
+        fromSuper: run.superDrawArr, investIncome: run.investIncArr, business: run.businessArr,
         schoolFees: s.schoolFeesOn ? run.sfTotalArr : run.sfTotalArr.map(() => 0),
         cash: run.cashRunningArr,
         workingYears: working,
@@ -462,6 +468,7 @@ export function cashflowView(h: HouseholdData, now: Date): CashflowView {
     person1Days: workDaysForYear(p.p1, year), person2Days: workDaysForYear(p.p2, year),
     partnerEnabled: h.settings.partnerEnabled,
     packaging: packagingNow(h.packagedItems, year, { p1: workDaysForYear(p.p1, year), p2: workDaysForYear(p.p2, year) }),
+    business: businessNow(h.incomeSources, year),
   })
   const cf = computeCashflow({
     budget, annualExpenses: h.annualExpenses, cashOnHand: computeCashOnHand(h.assets),

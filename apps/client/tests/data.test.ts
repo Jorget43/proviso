@@ -6,6 +6,7 @@ import type { Db } from '@/data/db'
 import { loadHousehold } from '@/data/household'
 import { importHousehold, exportHousehold, restoreHousehold, eraseHousehold } from '@/data/importExport'
 import { savePackaged, removePackaged } from '@/data/packaging'
+import { saveBusiness, removeBusiness } from '@/data/business'
 import { savePeople, saveRent, saveChildcare, fillBirthYears, saveChild, removeChild } from '@/data/settings'
 import { encryptBackup, decryptBackup, newHouseholdKey } from '@proviso/core/backup'
 import { parseHouseholdExport } from '@proviso/core/householdExport'
@@ -791,6 +792,28 @@ describe('settings and backups', () => {
     // Checks.
     expect(await savePackaged(db, null, { person: 'p1', kind: 'evLease', amount: 10_000, carPrice: null, startYear: 2026, endYear: null }, 2026)).toMatch(/car’s price/)
     expect(await savePackaged(db, null, { person: 'p1', kind: 'pbi', amount: 5_000, carPrice: null, startYear: 2030, endYear: 2028 }, 2026)).toMatch(/last year/)
+  })
+
+  it('business income adds to money in today, in Next 2 years and in the projection; removing it takes it away', async () => {
+    const db = await setUp()   // Alex earns 90,000 full-time, with a HELP debt
+    const before = homeView(await loadHousehold(db), NOW).budget
+    expect(await saveBusiness(db, null, { person: 'p1', name: ' Photography ', amount: 20_000, growthPct: 3, startYear: 2026, endYear: null }, 2026)).toBeNull()
+    const h = await loadHousehold(db)
+    expect(h.incomeSources).toMatchObject([{ kind: 'business', name: 'Photography', amount: 20_000 }])
+    const after = homeView(h, NOW).budget
+    // 90,000 + 20,000 stays in the 30% band: 32% tax, plus 15c of HELP: 20,000 × 53% = 10,600 a year.
+    expect(after.businessMonthly).toBeCloseTo(10_600 / 12, 2)
+    expect(after.monthlyIncome - before.monthlyIncome).toBeCloseTo(after.businessMonthly, 6)
+    expect(spendingView(h, NOW).monthlyIncome).toBeCloseTo(after.monthlyIncome, 6)
+    const f = futureView(h, NOW, { runs: 0 })
+    expect(f.inOut.business[0]).toBeGreaterThan(0)
+    await removeBusiness(db, h.incomeSources[0].id)
+    const gone = await loadHousehold(db)
+    expect(homeView(gone, NOW).budget.businessMonthly).toBe(0)
+    expect(futureView(gone, NOW, { runs: 0 }).netWorth[3]).toBeLessThan(f.netWorth[3])
+    // Checks.
+    expect(await saveBusiness(db, null, { person: 'p1', name: null, amount: -1, growthPct: 3, startYear: 2026, endYear: null }, 2026)).toMatch(/profit/)
+    expect(await saveBusiness(db, null, { person: 'p1', name: null, amount: 5_000, growthPct: 3, startYear: 2030, endYear: 2028 }, 2026)).toMatch(/last year/)
   })
 
   it('refuses names that can’t be told apart', async () => {

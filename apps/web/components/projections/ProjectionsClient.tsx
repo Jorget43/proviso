@@ -11,6 +11,7 @@ import { type FeeSchedule } from '@proviso/core/schoolFees'
 import { LOCATION_OPTIONS, presetScheduleFor, presetTotalFor } from '@proviso/core/educationCosts'
 import { childLabel, sortChildren } from '@proviso/core/people'
 import type { PackagedItemLike } from '@proviso/core/packaging'
+import type { IncomeSourceLike } from '@proviso/core/businessIncome'
 import type { SchoolChoice } from '@proviso/core/schoolFees'
 
 interface FeeRow { id: number; level: string; tuition: number; fixed: number }
@@ -123,6 +124,8 @@ interface ProjectionsClientProps {
   initialChildren:      ChildRow[]
   /** Salary packaging items (edited on Budget). */
   packaging:            PackagedItemLike[]
+  /** Business income (edited on Budget). */
+  business:             IncomeSourceLike[]
   initialRegional:      boolean
   /** Where the household lives (a state key), for typical school fees. */
   initialState:         string | null
@@ -184,7 +187,7 @@ export default function ProjectionsClient({
   initialSettings, initialPerson1Phases, initialPerson2Phases, initialOneoffs, initialLifePhases, initialFeeSchedule,
   income, baseline, mortRate, mortPayment, mortEndDate, currentYear,
   person1Name, person2Name, initialRentSettings, initialSnapshots,
-  superSettings, partnerEnabled, initialChildren, initialRegional, initialState, initialScenarios, packaging,
+  superSettings, partnerEnabled, initialChildren, initialRegional, initialState, initialScenarios, packaging, business,
 }: ProjectionsClientProps) {
   const [children,       setChildren]       = useState<ChildRow[]>(initialChildren)
   const [regional,       setRegional]       = useState(initialRegional)
@@ -227,8 +230,8 @@ export default function ProjectionsClient({
     income, settings, person1Phases, person2Phases, oneoffs, lifePhases, sfSchedule,
     rent: rentSt, mortgage: { rate: mortRate, payment: mortPayment }, currentYear,
     life: { partnerEnabled, person1Age: income.person1Age, person2Age: income.person2Age, super: sup },
-    children, regional, state: initialState, ownSchedule, packaging,
-  }), [income, settings, person1Phases, person2Phases, oneoffs, lifePhases, sfSchedule, rentSt, mortRate, mortPayment, currentYear, partnerEnabled, sup, children, regional, initialState, ownSchedule, packaging])
+    children, regional, state: initialState, ownSchedule, packaging, business,
+  }), [income, settings, person1Phases, person2Phases, oneoffs, lifePhases, sfSchedule, rentSt, mortRate, mortPayment, currentYear, partnerEnabled, sup, children, regional, initialState, ownSchedule, packaging, business])
   const inputs = useMemo(() => buildProjectionInputs(baseline, live), [baseline, live])
   // Scenarios run through the same engine, layered on the plan (@proviso/core/scenarios).
   const runs = useMemo(() => runScenarios(baseline, live, scenarios, ownSchedule), [baseline, live, scenarios, ownSchedule])
@@ -699,7 +702,7 @@ export default function ProjectionsClient({
                   labels={output.labels} person1Data={main.person1Arr} person2Data={main.person2Arr}
                   person1Name={person1Name} person2Name={person2Name} showPerson2={partnerEnabled}
                   leaveYrs={main.leaveYrs} spendData={main.expArr} sfTotalData={sfOn ? main.sfTotalArr : main.sfTotalArr.map(() => 0)}
-                  phaseData={main.phaseArr} cashData={main.cashRunningArr} superData={main.superDrawArr} investData={main.investIncArr}
+                  phaseData={main.phaseArr} cashData={main.cashRunningArr} superData={main.superDrawArr} investData={main.investIncArr} businessData={main.businessArr}
                   overlays={overlays(x => x.expArr, x => [{ label: 'Left over (or short)', data: leftOver(x), compareTo: leftOver(main), format: signed }])}
                 />
               )}

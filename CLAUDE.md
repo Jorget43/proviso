@@ -224,7 +224,7 @@ All migrations must be **additive only** — `update.sh` (or Watchtower, if opte
 - **`apps/web/proxy.ts`**: optimistic cookie gate (fast, not the security boundary); `requireSession()` is the real boundary
 - **`apps/web/lib/rbac.ts`**: scopes `actuals:write`, `budget:write`, `users:write`, `child:write`; `authorize(action)` called at the top of all mutating handlers
 - **Roles**: CFO (all scopes), PARTNER (`actuals:write` only), CHILD (`child:write` only — `/child` pocket money page)
-- **69 mutating route handlers** have `authorize()` guards; update the count when adding routes. Passkey management routes (`register-options`, `register-verify`, DELETE `passkey/[id]`) and the device routes (`/api/auth/sessions`, `/api/auth/sessions/[id]`, `/api/auth/me`) use `getSession()` directly (every role manages its own) — they are auth-gated but not RBAC-gated, and always scoped to the caller's userId.
+- **72 mutating route handlers** have `authorize()` guards; update the count when adding routes. Passkey management routes (`register-options`, `register-verify`, DELETE `passkey/[id]`) and the device routes (`/api/auth/sessions`, `/api/auth/sessions/[id]`, `/api/auth/me`) use `getSession()` directly (every role manages its own) — they are auth-gated but not RBAC-gated, and always scoped to the caller's userId.
 
 ## Roadmap
 
@@ -400,6 +400,7 @@ The assumptions watchdog (`/admin/watchdog` for the CFO when `WATCHDOG_ENABLED=t
 - Medicare: single low-income threshold only; family/senior thresholds and the Medicare levy surcharge aren't modelled.
 - CCS: assumes Centre Based Day Care for a below-school-age child, a 10-hour session, and that the family's activity level covers the days booked; no withholding.
 - Projection shortfalls (Phase 29) are carried as money owed with no interest, and repaid before anything is invested.
+- Business income (Phase 53) is profit only: a loss counts as nothing (no offset against pay), and there's no GST, PAYG instalments, personal services income rules, small business income tax offset or deductible super contributions. Tax is taken in the year it's earned. Today's budget counts it even if the person has already retired (no end year); the projection stops it at retirement. Scenarios can't change it: it's shared with the plan.
 - School fees (Phase 46): two stages per child (Kinder–Year 6, Years 7–12), not any year level; typical fees by school type and location come from the Futurity 2026 totals spread over year levels. One set of fee rules for the household, not per school; sibling discounts apply to tuition only, counting the children at school that year eldest first, whatever school they're at. An entry fee is charged at the first level and again at Year 7 only when secondary is a different kind of school. The old "exits after" setting still applies to the two eldest.
 - One-off costs aren't inflated: the amount is what's paid in that year.
 - Salary packaging (Phase 51): not-for-profit caps and electric-car novated leases only, in tax mode; the packaged amount is assumed to pay costs already in the budget. The reportable amount counts for HELP, but not for the Medicare levy surcharge or the Child Care Subsidy income test. Cars: the statutory formula on the whole year, no pro-rating; the announced April 2027 change (cars over $75,000) is treated as no exemption rather than modelled. FBT figures are for the year ending 31 March 2027 and need re-checking each April.
@@ -431,21 +432,21 @@ Tracked in [`docs/security-privacy-legal.md`](docs/security-privacy-legal.md) §
 - ~~Small-text desktop layouts on phones~~ — done (v1.12.0), checked at 390px: Own & owe rows restacked, Investments labels/dropdowns fixed, work-pattern wording plain; EOFY, Super and the school-fee controls were already fine. Investment parcel cards rebuilt in Phase 24.
 - ~~Native app: token auth alongside the cookie session~~ — done (Phase 24), see [`docs/app-api.md`](docs/app-api.md). Still open for the app: passkey sign-in (WebAuthn from a native app needs the platform APIs and an associated domain), and CORS if the app is ever a web view on another origin.
 
-### The app — next steps (as of 2026-10-27)
+### The app — next steps (as of 2026-11-02)
 In [`docs/architecture.md`](docs/architecture.md) order. Phase 3 there (the single-device app) is built except for a store build; Phase 4 (sync) is built (Phases 34–35) and needs its first real run on the NAS. Settings passed the owner's phone check on 2026-10-07. The owner is enrolling in the Apple Developer Program.
 
 **Start here next session**, in this order:
 1. **⏰ Remind the owner first — phone test still to do** (deferred 2026-10-08, "soon"). **The Android development build with Phases 34–35** (sync, camera, key backup): it built successfully on EAS on 2026-10-08 (so the key-backup Kotlin module and expo-camera compile); `npm run eas -w @proviso/client -- build:list --limit 1` shows the APK link. Install it and check on the phone: Settings → Recovery phrase → Save to Google Password Manager; Settings → Sync; Join a household (camera scan).
 2. **Run the relay on the NAS** with the owner: `docker compose --profile sync up -d` (image `ghcr.io/jorget43/proviso-relay`, published by CI from master since 2026-10-08), then `tailscale serve --bg --https=8443 http://localhost:8787` (README "Sync relay for the app"). Turn sync on in the app with the `https://<machine>.<tailnet>.ts.net:8443` address, then join from a second phone. Phones need Tailscale running to reach it.
-3. **Owner decisions pending**: none. (Phase 51, salary packaging: owner OK to merge and push 2026-10-19.)
+3. **Owner decisions pending**: none. (Phase 53, business income: owner OK to merge and push 2026-11-02.)
 4. **Step B of [`docs/plan-modelling-and-ux.md`](docs/plan-modelling-and-ux.md)**:
    - The life-course engine shipped as Phase 40 (merged to master 2026-10-09 with the owner's OK).
    - Phase 41 (birth years, the `child` table) merged to master 2026-10-12 with the owner's OK.
 5. **Step C**: the cash-buffer rule is Phase 43 (merged to master 2026-10-14). Life stages are Phase 44 (merged to master 2026-10-14 with the owner's OK).
 6. **Step D**: scenarios are Phase 45 (merged and pushed 2026-10-18). Next:
    - School fees v2 (plan item 7) is Phase 46 (merged and pushed 2026-10-18).
-   - Step E (uncertainty): 8a, ranges of returns, is Phase 48; Monte Carlo (8b) and the glide path are Phase 49, which replaces 8a's band. Step E is then complete. Step F (income and tax): 5a, interest and dividends, is Phase 50; 6, salary packaging, is Phase 51. Next: 5b business income, then 5c rental.
-   - The app's chart component is Phase 47 (merged and pushed 2026-10-18). Editing a saved scenario, the Money in & out and Home charts, and the drawdown strategy choice are Phase 52 (2026-10-27, waiting for the owner's OK).
+   - Step E (uncertainty): 8a, ranges of returns, is Phase 48; Monte Carlo (8b) and the glide path are Phase 49, which replaces 8a's band. Step E is then complete. Step F (income and tax): 5a, interest and dividends, is Phase 50; 6, salary packaging, is Phase 51; 5b, business income, is Phase 53 (merged and pushed 2026-11-02). Next: 5c rental.
+   - The app's chart component is Phase 47 (merged and pushed 2026-10-18). Editing a saved scenario, the Money in & out and Home charts, and the drawdown strategy choice are Phase 52 (2026-10-27; owner OK 2026-11-02).
    - Step A (dark mode, editing, chart trim) shipped as Phases 37–39.
    - Also open: the relay enforcing roles, and the iOS build once the Apple account is ready.
 
@@ -458,7 +459,7 @@ The full list:
 - **Dependency advisories**: GitHub lists some on master, believed to be all in Expo's build and dev-server tools (`braces`, `node-forge`, `uuid` via `xcode`, `decode-uri-component`, and an old `zod` 3 inside `@expo/cli`), several with no fixed version yet. They don't reach the NAS image (CI audits exactly what it ships). Dependabot was preparing a security update for them on 2026-10-06: review it carefully, because Expo pins some of them, and React / React Native / `expo*` move only with the Expo SDK (`proviso-release` skill). 2026-10-27: Dependabot's grouped update (next 16.3.8 → 16.4.2, zod 4.6.7, chart.js 4.6.1, vitest / vite patches) merged and tagged `v1.14.0`; it fixed two critical Next advisories in the NAS image (RCE via SVG image optimisation and `use cache`) and zod's oversized-collection advisory. The nonce CSP was checked on Next 16.4 (every script carries the nonce).
 - **Starter estimates** (`packages/core/src/starter.ts`): re-check the figures yearly with the July recalibration; electricity still uses the AER's 2020 usage benchmarks (no longer updated).
 
-### Where each feature lives (NAS ↔ app), as of Phase 52
+### Where each feature lives (NAS ↔ app), as of Phase 53
 
 | Feature | NAS web app | The app | Notes |
 |---|---|---|---|
@@ -480,6 +481,7 @@ The full list:
 | Children (birth year, month, name; planned babies) | ✓ (What if? → Family) | ✓ edit (Settings); drive school-fee years | NAS `Child` table since Phase 44; with children recorded, school-fee years follow them on both |
 | Costs that change with age (life stages), where you live | ✓ (What if? → Family) | ✓ (Assumptions; What if? leave-home age); milestones | `core/lifeStages.ts`, Phase 44 |
 | Interest and dividends, taxed (franking, who owns them) | ✓ What if? → More assumptions; Money in & out readout | ✓ Assumptions | `core/investmentIncome.ts`, Phase 50 |
+| Business income (profit from a business, sole trading, gig work) | ✓ Budget → Business income cards; a stacked bar on Money in & out | ✓ Settings → Business income; a readout row on Money in & out | `core/businessIncome.ts`, Phase 53; Home, Budget, Next 2 years and Future all count it |
 | Salary packaging (charity / hospital caps, electric-car novated lease) | ✓ Budget → Salary packaging cards | ✓ Settings → Salary packaging | `core/packaging.ts`, Phase 51; Home, Budget, Next 2 years and Future all count it |
 | Range of outcomes (Monte Carlo band, chance money lasts) | ✓ Net worth and Retirement charts, headline, takeaways; What if? → Basics: mix, glide path, on/off | ✓ Future headline, net worth and super charts, retirement line; Assumptions | `core/uncertainty.ts`, Phase 49 (replaced Phase 48's ±points band) |
 | Scenarios (save and compare) | ✓ make, edit, rename, delete in What if?; dashed lines on every Future chart; Compare card | Save a What if? draft as one; change one (Compare → Change opens What if? on it, Phase 52); dashed lines on the net worth, Money in & out and Home loan charts; show / hide; Compare card; delete | `core/scenarios.ts`, Phase 45; app lines Phase 47. The app edits a scenario's settings, rent and work patterns; its retirement, one-off and children changes are NAS-only (kept as they are) |
@@ -573,6 +575,31 @@ Ideas that have been evaluated but aren't on the roadmap. Each links to its writ
 - **School fees decided**: the questionnaire's school-cost lines stay in today's budget; the projection models the two eldest children's fees year by year (ending after Year 12) and leaves those lines out (`isModelledSchoolLine`), so nothing is counted twice. The questionnaire switches `schoolFeesOn` on when there are children.
 - Typed routes are off in `apps/client` (the generated file only existed where a dev server ran, never in CI, and misread the monorepo).
 - Verified: 356 tests; the app at 390px (a Melbourne family of four: $2.32M in today's money in 20 years, HELP cleared 2028, school fees end 2039, loan paid off 2042; a $45k car in 2029 gives $2.28M); the NAS Projections and Super pages rendered against a scratch household. The NAS Super "consider a lower target" hint was fixed on the way (it would have subtracted the mortgage twice and suggested $0).
+
+### Phase 53 — Plan step F, part 3: business income (2026-11-02)
+
+Plan item 5b. Owner's decisions (2026-11-02): it counts in today's budget as well as the projection; with no end year it stops when the person stops work; profit only (a loss counts as nothing); editors in both the app and the NAS. Merged and pushed with the owner's OK the same day.
+
+- **Core** (`businessIncome.ts`):
+  - `businessProfit(items, person, year, baseYear, working)`: the person's profit that year, grown at each item's `growthPct` from this year. With no end year it stops at retirement; an end year past retirement keeps it going. Unknown kinds (from newer versions) and losses count as nothing. `businessNow` is this year's per person.
+  - `businessYear(profit, taxable, helpIncome, helpLeft)`: tax on top of the person's other taxable income (`taxOnTop`, so the marginal rate with Medicare), plus the extra HELP it adds to repayment income (capped at what's still owed). `cash` is what's left.
+  - No compulsory super on it; the screens nudge towards adding some.
+- **Engine** (`projections.ts` input `business`; outputs `businessProfitArr`, `businessArr`):
+  - Taxed on top of each person's pay after salary sacrifice and packaging; take-home-pay households use `grossFromNet`; retirees have no other income.
+  - The extra HELP repaid lowers the balance (and can clear it sooner).
+  - Investment income is now taxed on top of pay plus business profit.
+  - Business profit counts as income for the mortgage stress percentage.
+  - `moneyIn()` (`yearByYear.ts`) adds `businessArr`, so left over, tight years and both Money in & out charts count it.
+- **Today:** `computeBudgetSummary({ business })` returns `businessMonthly` (in `monthlyIncome`) and counts the profit in family income for the Child Care Subsidy test. Home, Budget and Next 2 years on both. Next 2 years keeps it through parental leave.
+- **Schema v13** (Drizzle `0012_business_income`, Prisma `0017_business_income`): the `incomeSource` table: person, kind (text: 'business' so far, so a later kind is kept and ignored by older apps), name (optional), amount (profit a year now), growthPct (default 3), startYear, endYear. `TABLE_SINCE.incomeSource = 13`. The NAS export maps it; `incomeSourceSchema` validates input.
+- **NAS:** `GET/POST /api/income-sources`, `PUT/DELETE /api/income-sources/[id]` (`budget:write`; 3 more authorize guards, 72 in total). Budget gains a "Business income" panel (`BusinessPanel`) of cards, in both tax and take-home modes. Money in & out stacks "Business income, after tax" on the pay bars.
+- **App:** Settings → Business income (`app/business.tsx`: the list and what it adds this year) and `app/businessitem.tsx` (add or change: whose, name, profit, growth, years). Writes go through `src/data/business.ts`. Future → Year by year → Money in & out gains a "Business income, after tax" readout row.
+- **Numbers:** they change only for households that add business income.
+- **Verified:**
+  - 603 tests. New in core, hand-worked: growth, start / end, stopping at retirement and carrying past it, losses and unknown kinds; $20,000 on $100,000 pay = $6,400 tax ($3,000 more with HELP); $30,000 with no other income = $1,268.90; the HELP cap; today's budget ($1,133.33 a month), family income, take-home-pay households and no partner; in the engine, $6,800 more money in on $120,000 pay, HELP repaid faster, a partner's business.
+  - App: saving, today's and the projection's figures, removing, and the checks. NAS: the export mapping.
+  - Prisma migration on a fresh scratch database (`migrate diff` against the schema: empty). Headless Edge against that scratch NAS with a made-up couple (one business of $20,000 in Sam's name): Budget at 1280px light and 390px dark, Home at 390px ($1,133 a month counted), Future → Money in & out at 1280px and 390px dark (the bar stops at retirement). No page errors, no sideways scroll.
+  - Not yet seen on screen: the app's two new screens (covered by the app tests, not by screenshots).
 
 ### Phase 52 — The app: editing scenarios, Money in & out and Home charts, the drawdown choice (2026-10-27)
 

@@ -22,7 +22,7 @@
 import { sqliteTable, text, integer, real } from 'drizzle-orm/sqlite-core'
 
 /** Bumped by every migration. Travels with each sync message and export. */
-export const SCHEMA_VERSION = 12
+export const SCHEMA_VERSION = 13
 
 export type PersonKey = 'p1' | 'p2'
 export const PERSON_KEYS: readonly PersonKey[] = ['p1', 'p2']
@@ -240,6 +240,24 @@ export const packagedItem = sqliteTable('packagedItem', {
   endYear:   integer('endYear'),
 })
 
+/**
+ * v13: income other than pay (businessIncome.ts). kind is an IncomeKind
+ * ('business' so far), stored as text so newer kinds survive older apps
+ * (they're ignored there). amount is profit a year before tax now,
+ * growing at growthPct in later years; endYear null runs until the person
+ * stops work.
+ */
+export const incomeSource = sqliteTable('incomeSource', {
+  id: id(), deletedAt: deletedAt(),
+  person:    text('person', { enum: ['p1', 'p2'] }).notNull(),
+  kind:      text('kind').notNull(),
+  name:      text('name'),
+  amount:    real('amount').notNull(),
+  growthPct: real('growthPct').notNull().default(3),
+  startYear: integer('startYear').notNull(),
+  endYear:   integer('endYear'),
+})
+
 export const oneOff = sqliteTable('oneOff', {
   id: id(), deletedAt: deletedAt(),
   name: text('name').notNull(),
@@ -433,7 +451,7 @@ export const pocketMoneyTx = sqliteTable('pocketMoneyTx', {
 /** Tables in the household space, in an order that respects references. */
 export const HOUSEHOLD_TABLES = {
   householdSettings, member, expense, annualExpense, debt, asset, mortgageSettings,
-  childcareSettings, incomeSettings, workPhase, child, packagedItem, projectionSettings, lifePhase, oneOff, scenario,
+  childcareSettings, incomeSettings, workPhase, child, packagedItem, incomeSource, projectionSettings, lifePhase, oneOff, scenario,
   transaction, categorisationRule, suggestionState, actualsSettings, schoolFeeLevel,
   helpDebtDetail, superSettings, superHistory, investmentParcel, netWorthSnapshot,
   donation, workExpense, rentSettings,
@@ -443,7 +461,7 @@ export const HOUSEHOLD_TABLES = {
  * The schema version that added each table after the baseline. Export files
  * and backups from before it don't have the table; it's read as empty.
  */
-export const TABLE_SINCE: Partial<Record<keyof typeof HOUSEHOLD_TABLES, number>> = { child: 3, scenario: 7, packagedItem: 12 }
+export const TABLE_SINCE: Partial<Record<keyof typeof HOUSEHOLD_TABLES, number>> = { child: 3, scenario: 7, packagedItem: 12, incomeSource: 13 }
 
 /** Tables in a pocket-money space. */
 export const POCKET_MONEY_TABLES = { allowanceSchedule, pocketMoneyTx } as const

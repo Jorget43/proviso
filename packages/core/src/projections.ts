@@ -7,6 +7,7 @@
 import { calcAfterTax, calcHELPRepayment } from './tax';
 import { investIncomeYear, grossFromNet, type InvestIncomeSettings } from './investmentIncome';
 import { packageYear, netPay, NO_PACKAGE, type PackagedItemLike } from './packaging';
+import { businessProfit, businessYear, type IncomeSourceLike } from './businessIncome';
 import { simulateMortgageYear, computeMonthlyRepayment } from './mortgage';
 import { schoolFeesYear, LEGACY_FEE_RULES, SF_BASE as SF_DEFAULT, type FeeSchedule, type SchoolKid, type SchoolFeeRules } from './schoolFees';
 import { lifePhaseCostForYear } from './lifephases';
@@ -106,6 +107,8 @@ export interface ProjectionInputs {
   investIncome?:       InvestIncomeSettings;
   /** Salary packaging items (packaging.ts): paid from pre-tax pay, in tax mode, while working. */
   packaging?:          PackagedItemLike[];
+  /** Business income (businessIncome.ts): profit taxed on top of each person's other income. */
+  business?:           IncomeSourceLike[];
 
   projYears:          number;
 
@@ -209,6 +212,9 @@ export interface ProjectionResult {
   investIncArr:   number[];
   /** Extra take-home pay from salary packaging each year (tax saved, less any extra HELP). */
   packagingArr:   number[];
+  /** Business profit each year, and what reached cash after its tax and HELP (zeros without `business`). */
+  businessProfitArr: number[];
+  businessArr:    number[];
   /** The cash buffer aimed for at the end of each year (0 without one). */
   bufferArr:      number[];
   /** Shortfalls not covered by cash or investments, carried as money owed (in net worth). */
@@ -420,6 +426,8 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
     const investTaxArr:   number[] = [];
     const investIncArr:   number[] = [];
     const packagingArr:   number[] = [];
+    const businessProfitArr: number[] = [];
+    const businessArr:    number[] = [];
     const stageArr:       number[] = [];
     // Prices relative to today, for amounts given in today's dollars.
     let priceIdx  = 1;
@@ -524,6 +532,7 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
       const p2Sacrifice = lc && p2DaysGross > 0 ? Math.min(Math.max(0, lc.person2ExtraSuper), p2DaysGross) : 0;
       let p2Annual: number;
       let pk2Pretax = 0;
+      let pk2Reportable = 0;
       if (p2Retired) {
         p2Annual = 0;
       } else if (isLeave) {
@@ -533,6 +542,7 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
       } else {
         const pk2         = inputs.packaging && taxMode && p2DaysGross > 0 ? packageYear(inputs.packaging, 'p2', yr) : NO_PACKAGE;
         pk2Pretax         = Math.min(pk2.pretax, Math.max(0, p2DaysGross - p2Sacrifice));
+        pk2Reportable     = pk2.reportable;
         const p2Repay     = p2HELP > 0 ? Math.min(p2HELP, calcHELPRepayment(p2DaysGross + pk2.reportable)) : 0;
 
         if (taxMode) {
@@ -600,15 +610,40 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
       sf.perChild.forEach((v, i) => sfChildArr[i].push(Math.round(v)));
       sfFamilyArr.push(Math.round(sf.family));
 
+      // Each person's taxable income from pay (take-home pay households: the
+      // gross that leaves it).
+      const partner   = lc ? lc.partnerEnabled : (person2FTE > 0 || person2MonthlyNet > 0);
+      const p1Taxable = p1Retired ? 0 : taxMode ? Math.max(0, p1DaysGross - p1Sacrifice - pk1.pretax) : grossFromNet(p1Annual);
+      const p2Taxable = p2Retired ? 0 : isLeave ? (isFirstLeave ? pplGross : 0)
+        : taxMode ? Math.max(0, p2DaysGross - p2Sacrifice - pk2Pretax) : grossFromNet(p2Annual);
+
+      // ── Business income ── taxed on top of pay; counts for HELP (businessIncome.ts).
+      let bizCash = 0, bizProfit1 = 0, bizProfit2 = 0;
+      if (inputs.business) {
+        bizProfit1 = businessProfit(inputs.business, 'p1', yr, cy, !p1Retired);
+        bizProfit2 = partner ? businessProfit(inputs.business, 'p2', yr, cy, !p2Retired) : 0;
+        const b1 = businessYear(bizProfit1, p1Taxable, p1DaysGross + pk1.reportable, p1HELP);
+        const b2 = businessYear(bizProfit2, p2Taxable,
+          isLeave ? (isFirstLeave ? pplGross : 0) : p2DaysGross + pk2Reportable, p2HELP);
+        if (b1.help > 0) {
+          p1HELP = Math.max(0, p1HELP - b1.help);
+          if (p1HELP < 1 && person1HelpClearedYr === null) { p1HELP = 0; person1HelpClearedYr = yr; }
+        }
+        if (b2.help > 0) {
+          p2HELP = Math.max(0, p2HELP - b2.help);
+          if (p2HELP < 1 && person2HelpClearedYr === null) { p2HELP = 0; person2HelpClearedYr = yr; }
+        }
+        bizCash = b1.cash + b2.cash;
+      }
+      businessProfitArr.push(Math.round(bizProfit1 + bizProfit2));
+      businessArr.push(Math.round(bizCash));
+
       // ── Investment income ── on start-of-year balances, taxed on top of
-      // each person's other taxable income (investmentIncome.ts).
+      // each person's other taxable income, business profit included (investmentIncome.ts).
       let investCash = 0;
       if (inputs.investIncome) {
-        const p1Taxable = p1Retired ? 0 : taxMode ? Math.max(0, p1DaysGross - p1Sacrifice - pk1.pretax) : grossFromNet(p1Annual);
-        const p2Taxable = p2Retired ? 0 : isLeave ? (isFirstLeave ? pplGross : 0)
-          : taxMode ? Math.max(0, p2DaysGross - p2Sacrifice - pk2Pretax) : grossFromNet(p2Annual);
-        const partner = lc ? lc.partnerEnabled : (person2FTE > 0 || person2MonthlyNet > 0);
-        const yi = investIncomeYear(inputs.investIncome, { cash, loan: mb, invest }, [p1Taxable, p2Taxable], partner);
+        const yi = investIncomeYear(inputs.investIncome, { cash, loan: mb, invest },
+          [p1Taxable + bizProfit1, p2Taxable + bizProfit2], partner);
         investCash = yi.cash;
         interestArr.push(Math.round(yi.interest)); dividendArr.push(Math.round(yi.dividends));
         investTaxArr.push(Math.round(yi.tax));     investIncArr.push(Math.round(yi.cash));
@@ -622,7 +657,7 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
       const phaseOverlay = lifePhaseCostForYear(yr, lifePhases, yearInflRate * 100, cI * 100);
 
       // ── Monthly cashflow loop (mortgage with live offset) ──
-      const annualInc  = p2Annual + p1Annual + investCash;
+      const annualInc  = p2Annual + p1Annual + investCash + bizCash;
       // Rent is separate from expBase and grows at rentIncreaseRate. Mortgage
       // repayments are NOT in here: simulateMortgageYear pays them out of cash
       // at the actual (un-inflated) amount and stops once the loan is cleared,
@@ -722,7 +757,7 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
 
       // Mortgage stress: annual repayments / gross household income (standard AU definition)
       const p2GrossForStress = isLeave ? (isFirstLeave ? pplGross : 0) : p2DaysGross;
-      const grossHousehold = p1DaysGross + p2GrossForStress;
+      const grossHousehold = p1DaysGross + p2GrossForStress + bizProfit1 + bizProfit2;
       // Repayments actually made: 0 while renting and once the loan is cleared.
       const stressPct = grossHousehold > 0 ? mortPaid / grossHousehold * 100 : 0;
       mortStressArr.push(parseFloat(stressPct.toFixed(1)));
@@ -742,7 +777,7 @@ export function runProjections(inputs: ProjectionInputs): ProjectionOutput {
 
     return {
       nwArr, incArr, expArr, mortArr, cashArr, investArr,
-      person1Arr, person2Arr, phaseArr, deficitArr, cashRunningArr, funArr, interestArr, dividendArr, investTaxArr, investIncArr, packagingArr, bufferArr, stageArr, owedArr, mortStressArr,
+      person1Arr, person2Arr, phaseArr, deficitArr, cashRunningArr, funArr, interestArr, dividendArr, investTaxArr, investIncArr, packagingArr, businessProfitArr, businessArr, bufferArr, stageArr, owedArr, mortStressArr,
       sfC1Arr, sfC2Arr, sfSibArr, sfTotalArr, sfChildArr, sfFamilyArr, leaveYrs, person1HelpClearedYr, person2HelpClearedYr,
       rentArr, purchaseYr, purchase,
       super1Arr, super2Arr, superArr, superDrawArr, retiredArr,
