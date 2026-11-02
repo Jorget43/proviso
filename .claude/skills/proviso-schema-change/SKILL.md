@@ -28,7 +28,7 @@ Data lives on every device and syncs as end-to-end encrypted, per-field change m
 ## Checklist
 
 - [ ] Schema edited in `packages/core/src/schema.ts` (Drizzle) — the one definition; `SCHEMA_VERSION` bumped.
-- [ ] Migration generated with `npm run db:generate -w @proviso/core` and committed (CI regenerates and fails if anything new appears). Never edit a generated migration.
+- [ ] Migration generated with `npm run db:generate -w @proviso/core` and committed. It gives the file a random name; for a descriptive one run `npx drizzle-kit generate --name <what_it_adds>` then `node scripts/bundle-migrations.mjs` (both in `packages/core`), and give the Prisma twin the same name (CI regenerates and fails if anything new appears). Never edit a generated migration.
 - [ ] `packages/core/tests/schema.test.ts` passes (migrations build exactly the schema; sync rules hold).
 - [ ] Sync: schema version bumped; the merge code handles the new field; a test feeds **messages from the previous schema version** and from a **newer** one (unknown column) and checks nothing is lost.
 - [ ] Loaders and core calculations updated; tests in core.
