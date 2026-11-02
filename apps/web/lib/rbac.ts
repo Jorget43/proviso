@@ -1,25 +1,12 @@
-// Role-based access control (Phase 4.1).
-//
-// Two write scopes cover every mutating route:
-//   - 'actuals:write'  → importing/categorising bank actuals
-//   - 'budget:write'   → everything else (budget, debts, super, settings, …)
-// CFO can do both; PARTNER can only touch Actuals; CHILD has no write access.
+// Role-based access control (Phase 4.1). Which role may do what is in
+// roles.ts (shared with client screens); this enforces it on the API.
 // Reads are not gated here (page-level requireSession covers authentication).
 
-import { getSession, type Role, type SessionUser } from './auth'
+import { getSession, type SessionUser } from './auth'
 import { setAuditActor } from './audit'
+import { can, type Action } from './roles'
 
-export type Action = 'actuals:write' | 'budget:write' | 'users:write' | 'child:write'
-
-const MATRIX: Record<Role, Action[]> = {
-  CFO:     ['actuals:write', 'budget:write', 'users:write', 'child:write'],
-  PARTNER: ['actuals:write'],
-  CHILD:   ['child:write'],
-}
-
-export function can(role: Role, action: Action): boolean {
-  return MATRIX[role]?.includes(action) ?? false
-}
+export { can, type Action }
 
 type AuthResult =
   | { ok: true;  user: SessionUser }

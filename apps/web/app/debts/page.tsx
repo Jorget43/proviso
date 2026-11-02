@@ -4,6 +4,7 @@ import { requireAdult } from '@/lib/auth'
 import DebtsClient from '@/components/debts/DebtsClient'
 import { workDaysForYear } from '@proviso/core/projections'
 import { findHelpDebt } from '@proviso/core/members'
+import { can } from '@/lib/roles'
 
 function currentFyEnding(): number {
   const now   = new Date()
@@ -73,7 +74,7 @@ export default async function DebtsPage() {
 
   return (
     <DebtsClient
-      canEdit={me.role === 'CFO'}
+      canEdit={can(me.role, 'budget:write')}
       initialDebts={debts}
       initialAssets={assets}
       initialMortgage={mortgage}

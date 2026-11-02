@@ -35,12 +35,12 @@ export function overlayDatasets(
       ...(chartType ? { type: chartType } : {}),
       // Its own stack: on a stacked bar chart a line would otherwise sit on top of the bars.
       stack: `scenario-${k}`,
-      label: o.label, data: fit(o.data, length, pad), compareTo,
+      label: o.label, endLabel: o.label, data: fit(o.data, length, pad), compareTo,
       borderColor: c[o.colour], backgroundColor: c[o.colour],
       borderDash: [7, 4], borderWidth: 2.2, pointRadius: 0, pointHoverRadius: 4, fill: false, tension: 0.4, order: -1,
     },
     ...(o.readouts ?? []).map(r => ({
-      type: 'line' as const, label: r.label, data: fit(r.data, length, pad), compareTo: fit(r.compareTo, length, pad), format: r.format,
+      type: 'line' as const, detail: true, label: r.label, data: fit(r.data, length, pad), compareTo: fit(r.compareTo, length, pad), format: r.format,
       borderColor: c[o.colour], borderWidth: 0, pointRadius: 0, pointHoverRadius: 0, showLine: false, fill: false, yAxisID: 'readout',
     })),
   ])

@@ -230,18 +230,6 @@ body {
 .nav-eofy:hover,
 .nav-eofy.active { background: color-mix(in srgb, var(--amber) 24%, transparent); color: var(--amber); }
 
-.nav-readonly {
-  flex-shrink: 0;
-  font-size: 0.66rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--amber);
-  background: color-mix(in srgb, var(--amber) 14%, transparent);
-  border: 1px solid color-mix(in srgb, var(--amber) 30%, transparent);
-  border-radius: 999px;
-  padding: 2px 8px;
-}
 
 /* Read-only fence: strip the native fieldset chrome, mute disabled controls */
 .ro-fence { border: 0; margin: 0; padding: 0; min-width: 0; }
@@ -575,13 +563,12 @@ input[type=range] { width: 100%; accent-color: var(--t3); }
 .wp-remove { background: none; border: none; color: var(--t3); font: inherit; font-size: 0.82rem; cursor: pointer; min-height: 36px; padding: 0 6px; border-radius: 6px; }
 .wp-remove:hover { color: var(--red); background: var(--red-lt); }
 .wp-field { display: flex; flex-direction: column; gap: 4px; font-size: 0.8rem; color: var(--t2); }
-.wp-field input, .wp-field select { font: inherit; font-size: 1rem; min-height: 42px; padding: 0 10px; border: 1px solid var(--border-md); border-radius: 8px; background: var(--surface); color: var(--t1); }
+.wp-field input, .wp-field select, .mix-glide select { font: inherit; font-size: 1rem; min-height: 42px; padding: 0 10px; border: 1px solid var(--border-md); border-radius: 8px; background: var(--surface); color: var(--t1); }
 .wp-pay { font-size: 0.82rem; color: var(--t2); }
 .wp-pay.warn { color: var(--amber); }
 .pk-add { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
 /* Future → What if?: investment mix, glide path, range switch (uncertainty.ts) */
 .mix-controls { display: flex; flex-direction: column; gap: 10px; margin: 4px 0 14px; }
-.mix-controls .seg { flex-wrap: wrap; }
 .mix-glide { display: flex; flex-direction: column; gap: 6px; }
 .mix-check { display: flex; align-items: center; gap: 8px; min-height: 32px; font-size: 0.8rem; color: var(--t2); cursor: pointer; }
 .ls-costs { list-style: none; margin: 0.5rem 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 0.85rem; }
@@ -1118,7 +1105,34 @@ input[type=range] { width: 100%; accent-color: var(--t3); }
   padding: 4px 10px; cursor: pointer;
 }
 .scrub-item strong { color: var(--t1); font-weight: 500; font-variant-numeric: tabular-nums; }
+.scrub-items.detail .scrub-item { font-size: 0.72rem; padding: 2px 8px; border-style: dashed; }
 .scrub-item.off { opacity: 0.45; }
+
+/* Years shown on the Future charts (YearRange) */
+.year-range { margin: 4px 0 12px; }
+.year-range-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.year-range-presets { max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+.year-range-presets button { font-size: 0.78rem; padding: 6px 10px; white-space: nowrap; flex-shrink: 0; }
+.year-range-label { font-size: 0.8rem; color: var(--t2); font-variant-numeric: tabular-nums; }
+.year-range-slider { position: relative; height: 30px; margin-top: 6px; }
+.year-range-track { position: absolute; left: 0; right: 0; top: 13px; height: 4px; border-radius: 2px; background: var(--border-md); }
+.year-range-fill { position: absolute; top: 9px; height: 12px; border-radius: 6px; background: color-mix(in srgb, var(--blue) 45%, transparent); cursor: grab; touch-action: none; }
+.year-range-fill:active { cursor: grabbing; }
+.year-range-slider input[type=range] {
+  position: absolute; inset: 0; width: 100%; margin: 0; background: none; pointer-events: none;
+  -webkit-appearance: none; appearance: none;
+}
+.year-range-slider input[type=range]::-webkit-slider-runnable-track { background: none; }
+.year-range-slider input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none; pointer-events: auto; cursor: ew-resize;
+  width: 22px; height: 22px; border-radius: 50%; background: var(--t1); border: 3px solid var(--surface);
+  box-shadow: 0 0 0 1px var(--border-md);
+}
+.year-range-slider input[type=range]::-moz-range-thumb {
+  pointer-events: auto; cursor: ew-resize;
+  width: 16px; height: 16px; border-radius: 50%; background: var(--t1); border: 3px solid var(--surface);
+}
+.year-range-slider input[type=range]:focus-visible::-webkit-slider-thumb { outline: 2px solid var(--blue); outline-offset: 2px; }
 .scrub-item.off .scrub-label { text-decoration: line-through; }
 .scrub-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
 .scrub-area { touch-action: pan-y; cursor: crosshair; -webkit-user-select: none; user-select: none; }
@@ -1482,7 +1496,6 @@ input[type=range] { width: 100%; accent-color: var(--t3); }
   .metrics { grid-template-columns: repeat(2, 1fr); }
   .income-grid { grid-template-columns: 1fr; }
   .lumpy-grid { grid-template-columns: 1fr; }
-  .nav-readonly { display: none; }
   .panel-head { flex-wrap: wrap; gap: 6px 1rem; }
   .da-label { min-width: 0; flex: 0 0 38%; }
   /* Own & owe rows: name on its own line, amount + controls beneath */

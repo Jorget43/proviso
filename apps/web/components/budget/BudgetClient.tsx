@@ -232,7 +232,7 @@ export default function BudgetClient({
   // server answers, so this never triggers a synchronous re-render.
   const childcareSyncing = useRef(false)
   useEffect(() => {
-    // Read-only viewers (Partner) can't write — syncing would just 403.
+    // Read-only viewers can't write — syncing would just 403.
     if (!canEdit || childcareSyncing.current) return
     const managed = expenses.find(isManagedChildcare)
     const json = { 'Content-Type': 'application/json' }

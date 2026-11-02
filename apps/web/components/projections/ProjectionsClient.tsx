@@ -1,5 +1,7 @@
 'use client'
 import { useState, useMemo, useCallback, useDeferredValue } from 'react'
+import { YearWindow } from '@/components/ui/ScrubChart'
+import YearRange, { type YearSpan } from '@/components/ui/YearRange'
 import { fmt, fmtK, possessive } from '@proviso/core/formatting'
 import { runProjections, type ProjectionResult } from '@proviso/core/projections'
 import { runOutlook, planInputs, mixFrom, rangeOn, chanceWords, MIX_CHOICES } from '@proviso/core/uncertainty'
@@ -534,6 +536,15 @@ export default function ProjectionsClient({
   const p1RetireYear = main.person1RetireYr ?? currentYear
   const p2RetireYear = main.person2RetireYr
   const lastRetireYr = Math.max(p1RetireYear, p2RetireYear ?? 0)
+
+  // Years shown on the charts (null: all of them).
+  const [yearWin, setYearWin] = useState<YearSpan | null>(null)
+  const firstYr = Number(output.labels[0]), lastYr = Number(output.labels[output.labels.length - 1])
+  const yearPresets = [
+    ...[10, 20].filter(n => firstYr + n - 1 < lastYr).map(n => ({ label: `${n} years`, span: { from: firstYr, to: firstYr + n - 1 } })),
+    ...(lastRetireYr > firstYr + 4 && lastRetireYr < lastYr ? [{ label: 'To retirement', span: { from: firstYr, to: lastRetireYr } }] : []),
+    { label: 'All', span: null },
+  ]
   const strategy     = asDrawdownStrategy(sup.drawdownStrategy)
   // The range's edges, on the same basis as what each chart shows.
   const endLow  = outlook.endNetWorth.low
@@ -679,6 +690,8 @@ export default function ProjectionsClient({
                   })}
                 </div>
               )}
+              <YearRange first={firstYr} last={lastYr} value={yearWin} presets={yearPresets} onChange={setYearWin} />
+              <YearWindow.Provider value={yearWin}>
               {current.key === 'networth' && (
                 <>
                   {hasSuper && (
@@ -749,6 +762,7 @@ export default function ProjectionsClient({
                   overlays={overlays(x => x.sfTotalArr)}
                 />
               )}
+              </YearWindow.Provider>
             </div>
           </section>
 
@@ -1367,6 +1381,8 @@ export default function ProjectionsClient({
   )
 }
 
+const mixLabel = (m: { growthPct: number; label: string }) => `${m.label} (${m.growthPct}% in shares)`
+
 /**
  * How investments and super are held, the glide path, and whether the range
  * of outcomes is shown (@proviso/core/uncertainty).
@@ -1379,16 +1395,15 @@ function MixControls({ growthPct, glidePath, glideTargetPct, showRange, onChange
   return (
     <div className="mix-controls">
       <div className="wp-field">
-        <span>How investments and super are held</span>
-        <div className="seg" role="radiogroup" aria-label="Investment mix">
-          {MIX_CHOICES.map(m => (
-            <button key={m.growthPct} type="button" role="radio" aria-checked={growthPct === m.growthPct} className={growthPct === m.growthPct ? 'on' : ''}
-              onClick={() => onChange({ growthPct: m.growthPct, ...(glideTargetPct >= m.growthPct ? { glideTargetPct: MIX_CHOICES.find(x => x.growthPct < m.growthPct)?.growthPct ?? 30 } : {}) })}>
-              {m.label}
-            </button>
-          ))}
-        </div>
-        <div className="slider-hint">More in shares and property grows faster on average but rises and falls more from year to year.</div>
+        <label htmlFor="mix-now">How investments and super are held</label>
+        <select id="mix-now" value={growthPct}
+          onChange={e => {
+            const g = Number(e.target.value)
+            onChange({ growthPct: g, ...(glideTargetPct >= g ? { glideTargetPct: MIX_CHOICES.find(x => x.growthPct < g)?.growthPct ?? 30 } : {}) })
+          }}>
+          {MIX_CHOICES.map(m => <option key={m.growthPct} value={m.growthPct}>{mixLabel(m)}</option>)}
+        </select>
+        <div className="slider-hint">The rest is in cash and bonds. More in shares and property grows faster on average, but rises and falls more from year to year.</div>
       </div>
       {safer.length > 0 && (
         <div className="mix-glide">
@@ -1397,12 +1412,10 @@ function MixControls({ growthPct, glidePath, glideTargetPct, showRange, onChange
             Move to safer investments by retirement
           </label>
           {glidePath && (
-            <div className="seg" role="radiogroup" aria-label="Mix by retirement">
-              {safer.map(m => (
-                <button key={m.growthPct} type="button" role="radio" aria-checked={glideTargetPct === m.growthPct} className={glideTargetPct === m.growthPct ? 'on' : ''}
-                  onClick={() => onChange({ glideTargetPct: m.growthPct })}>{m.label}</button>
-              ))}
-            </div>
+            <select aria-label="Mix by retirement" value={glideTargetPct}
+              onChange={e => onChange({ glideTargetPct: Number(e.target.value) })}>
+              {safer.map(m => <option key={m.growthPct} value={m.growthPct}>{mixLabel(m)}</option>)}
+            </select>
           )}
         </div>
       )}

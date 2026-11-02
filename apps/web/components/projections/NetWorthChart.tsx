@@ -1,7 +1,7 @@
 'use client'
 import { Chart as ChartJS, LineElement, PointElement, LinearScale, CategoryScale, Filler } from 'chart.js'
 import { Line } from 'react-chartjs-2'
-import { crosshair, SCRUB_BASE, kTicks } from '@/lib/chartPlugins'
+import { crosshair, endLabels, SCRUB_BASE, kTicks } from '@/lib/chartPlugins'
 import { useChartColors, axisTicks } from '@/lib/chartTheme'
 import ScrubChart, { type ScrubSeries } from '@/components/ui/ScrubChart'
 import { overlayDatasets, type Overlay } from '@/lib/scenarioOverlay'
@@ -38,30 +38,30 @@ export default function NetWorthChart({ labels, nwData, nwNoFees, investData, ca
   const withSuper = includeSuper && superData ? nwData.map((v, i) => v + (superData[i] ?? 0)) : nwData
   const nwLabel = includeSuper && superData ? 'Net worth with super' : 'Net worth'
   const datasets: (ScrubSeries & Record<string, unknown>)[] = [
-    { label: sfOn ? `${nwLabel} (with school fees)` : nwLabel, data: pad(withSuper), borderColor: c.green, backgroundColor: c.a(c.green, 0.07), fill: true, tension: 0.4, borderWidth: 2.5, pointRadius: 0, pointHoverRadius: 4 },
-    { label: 'Investments', data: pad(investData), borderColor: c.purple, backgroundColor: c.a(c.purple, 0.04), fill: true, tension: 0.4, borderWidth: 1.5, pointRadius: 0, pointHoverRadius: 3, borderDash: [5, 4] },
-    { label: 'Cash', data: pad(cashData), borderColor: c.blue, tension: 0.4, borderWidth: 1.5, pointRadius: 0, pointHoverRadius: 3, borderDash: [2, 4] },
+    { label: sfOn ? `${nwLabel} (with school fees)` : nwLabel, data: pad(withSuper), endLabel: overlays?.length ? 'Your plan' : 'Net worth', borderColor: c.green, backgroundColor: c.a(c.green, 0.07), fill: true, tension: 0.4, borderWidth: 3, pointRadius: 0, pointHoverRadius: 4 },
+    { label: 'Investments', startHidden: true, endLabel: 'Investments', data: pad(investData), borderColor: c.purple, backgroundColor: c.a(c.purple, 0.04), fill: true, tension: 0.4, borderWidth: 1.5, pointRadius: 0, pointHoverRadius: 3, borderDash: [5, 4] },
+    { label: 'Cash', startHidden: true, endLabel: 'Cash', data: pad(cashData), borderColor: c.blue, tension: 0.4, borderWidth: 1.5, pointRadius: 0, pointHoverRadius: 3, borderDash: [2, 4] },
     { label: 'Actual net worth', data: historyData.concat(Array(labels.length).fill(null)), borderColor: c.amber, backgroundColor: c.amber, fill: false, tension: 0, borderWidth: 2, pointRadius: 4, pointStyle: 'circle', spanGaps: true },
   ]
   if (superData) {
-    datasets.splice(1, 0, { label: includeSuper ? 'Of which super' : 'Super (not counted)', data: pad(superData), borderColor: c.teal, borderDash: [3, 3], borderWidth: 1.8, pointRadius: 0, fill: false, tension: 0.4 })
+    datasets.splice(1, 0, { label: includeSuper ? 'Of which super' : 'Super (not counted)', endLabel: 'Super', data: pad(superData), borderColor: c.teal, borderDash: [3, 3], borderWidth: 1.8, pointRadius: 0, fill: false, tension: 0.4 })
   }
   if (sfOn && nwNoFees) {
-    datasets.splice(1, 0, { label: `${nwLabel} (no school fees)`, data: pad(includeSuper && superData ? nwNoFees.map((v, i) => v + (superData[i] ?? 0)) : nwNoFees), borderColor: c.a(c.green, 0.4), borderDash: [6, 3], borderWidth: 1.8, pointRadius: 0, fill: false, tension: 0.4 })
+    datasets.splice(1, 0, { label: `${nwLabel} (no school fees)`, startHidden: true, endLabel: 'No school fees', data: pad(includeSuper && superData ? nwNoFees.map((v, i) => v + (superData[i] ?? 0)) : nwNoFees), borderColor: c.a(c.green, 0.4), borderDash: [6, 3], borderWidth: 1.8, pointRadius: 0, fill: false, tension: 0.4 })
   }
 
   datasets.splice(1, 0, ...overlayDatasets(overlays, c, labels.length, pad(withSuper), historyLabels.length))
   if (band) {
     // Two edges, the second filled down to the first: the shaded range.
     datasets.push(
-      { label: 'Worst 1 in 10', data: pad(band.low), borderColor: c.a(c.green, 0.35), borderWidth: 1, pointRadius: 0, fill: false, tension: 0.4 },
-      { label: 'Best 1 in 10', data: pad(band.high), borderColor: c.a(c.green, 0.35), backgroundColor: c.a(c.green, 0.1), borderWidth: 1, pointRadius: 0, fill: '-1', tension: 0.4 },
+      { label: 'Worst 1 in 10', detail: true, data: pad(band.low), borderColor: c.a(c.green, 0.35), borderWidth: 0, pointRadius: 0, fill: false, tension: 0.4 },
+      { label: 'Best 1 in 10', detail: true, data: pad(band.high), borderColor: c.a(c.green, 0.35), backgroundColor: c.a(c.green, 0.12), borderWidth: 0, pointRadius: 0, fill: '-1', tension: 0.4 },
     )
   }
 
   return (
     <ScrubChart labels={allLabels} datasets={datasets} height={240}>
-      <Line data={{ labels: allLabels, datasets: datasets as never[] }} plugins={[crosshair]} options={{
+      <Line data={{ labels: allLabels, datasets: datasets as never[] }} plugins={[crosshair, endLabels]} options={{
         ...SCRUB_BASE,
         scales: {
           x: { ticks: axisTicks(c), grid: { display: false } },

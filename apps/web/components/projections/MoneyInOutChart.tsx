@@ -6,7 +6,7 @@
 import { Chart as ChartJS, BarElement, LineElement, PointElement, LinearScale, CategoryScale } from 'chart.js'
 import { Chart } from 'react-chartjs-2'
 import { fmtK } from '@proviso/core/formatting'
-import { crosshair, SCRUB_BASE, kTicks } from '@/lib/chartPlugins'
+import { crosshair, endLabels, SCRUB_BASE, kTicks } from '@/lib/chartPlugins'
 import { useChartColors, axisTicks } from '@/lib/chartTheme'
 import ScrubChart from '@/components/ui/ScrubChart'
 import { overlayDatasets, type Overlay } from '@/lib/scenarioOverlay'
@@ -52,35 +52,38 @@ export default function MoneyInOutChart({
   const readOnly = { type: 'line' as const, borderWidth: 0, pointRadius: 0, pointHoverRadius: 0, showLine: false, fill: false, yAxisID: 'readout' }
 
   const datasets = [
-    { type: 'line' as const, label: 'Spending', data: spendData, borderColor: c.red, backgroundColor: c.red, borderWidth: 2.5, tension: 0.3, fill: false, order: 0,
+    // Its own stack, so it isn't added on top of the pay bars.
+    { type: 'line' as const, label: 'Spending', endLabel: 'Spending', data: spendData, stack: 'out', borderColor: c.red, backgroundColor: c.red, borderWidth: 2.5, tension: 0.3, fill: false, order: 0,
       pointRadius: gap.map(g => (g < 0 ? 3.5 : 0)), pointBackgroundColor: c.red, pointHoverRadius: 4 },
     { type: 'bar' as const, label: person1Name, data: person1Data, backgroundColor: c.a(c.blue, 0.7), stack: 'in', borderRadius: 3, order: 2 },
     ...(showPerson2 ? [{ type: 'bar' as const, label: person2Name, data: person2Data, stack: 'in', borderRadius: 3, order: 2,
       backgroundColor: labels.map(y => (leave.has(Number(y)) ? c.a(c.pink, 0.7) : c.a(c.green, 0.7))) }] : []),
     ...(fromBusiness ? [{ type: 'bar' as const, label: 'Business income, after tax', data: fromBusiness, backgroundColor: c.a(c.purple, 0.7), stack: 'in', borderRadius: 3, order: 2 }] : []),
     ...(fromSuper ? [{ type: 'bar' as const, label: 'From super', data: fromSuper, backgroundColor: c.a(c.teal, 0.7), stack: 'in', borderRadius: 3, order: 2 }] : []),
+    // Drawn only when it adds money; a year where tax on reinvested dividends
+    // outweighs the interest shows $0 here and is still counted in "left over".
+    ...(fromInvest ? [{ type: 'bar' as const, label: 'Interest and dividends, after tax', data: fromInvest.map(v => Math.max(0, v)), backgroundColor: c.a(c.t3, 0.55), stack: 'in', borderRadius: 3, order: 2 }] : []),
     { ...readOnly, label: 'Left over (or short)', data: gap, borderColor: c.t2, format: signed },
-    ...(fromInvest ? [{ ...readOnly, label: 'Of the money in: interest, less tax on investment income', data: fromInvest, borderColor: c.purple, format: signed }] : []),
-    { ...readOnly, label: 'Of the spending: school fees', data: sfTotalData, borderColor: c.amber },
-    { ...readOnly, label: 'Of the spending: life stages', data: phaseData, borderColor: c.teal },
-    { ...readOnly, label: 'Cash at the end of the year', data: cashData, borderColor: c.blue },
+    { ...readOnly, detail: true, label: 'Of the spending: school fees', data: sfTotalData, borderColor: c.amber },
+    { ...readOnly, detail: true, label: 'Of the spending: life stages', data: phaseData, borderColor: c.teal },
+    { ...readOnly, detail: true, label: 'Cash at the end of the year', data: cashData, borderColor: c.blue },
     ...overlayDatasets(overlays, c, labels.length, spendData, 0, 'line'),
   ]
 
   return (
     <>
       <ScrubChart labels={labels} datasets={datasets} height={260}>
-        <Chart type="bar" data={{ labels, datasets: datasets as never[] }} plugins={[crosshair]} options={{
+        <Chart type="bar" data={{ labels, datasets: datasets as never[] }} plugins={[crosshair, endLabels]} options={{
           ...SCRUB_BASE,
           scales: {
             x: { stacked: true, ticks: axisTicks(c), grid: { display: false } },
-            y: { stacked: false, beginAtZero: true, ticks: { ...axisTicks(c), callback: kTicks }, grid: { color: c.grid } },
+            y: { stacked: true, beginAtZero: true, ticks: { ...axisTicks(c), callback: kTicks }, grid: { color: c.grid } },
             readout: { display: false },
           },
         }} />
       </ScrubChart>
       <p className="proj-note mt1">
-        Bars: take-home pay{fromBusiness ? ', business income after tax' : ''}{fromSuper ? ', then money taken from super in retirement' : ''}{showPerson2 && leaveYrs.length ? ' (pink: parental leave)' : ''}. Line: everything that goes out, home loan repayments included; red dots mark years you&rsquo;d be short.
+        Bars: take-home pay{fromBusiness ? ', business income after tax' : ''}{fromInvest ? ', interest and dividends after tax' : ''}{fromSuper ? ', then money taken from super in retirement' : ''}{showPerson2 && leaveYrs.length ? ' (pink: parental leave)' : ''}. Line: everything that goes out, home loan repayments included; red dots mark years you&rsquo;d be short.
       </p>
     </>
   )

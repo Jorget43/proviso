@@ -13,6 +13,7 @@ import DevicesPanel from './DevicesPanel'
 import type { DeviceRow } from '@/lib/devices'
 import SituationPanel from './SituationPanel'
 import type { Situation } from '@/lib/situation'
+import { can } from '@/lib/roles'
 
 interface Props {
   person1Name:          string
@@ -44,6 +45,7 @@ export default function SettingsClient({
   currentRole, currentUserId, users, hasTOTP, passkeys, devices, watchdog, buildVersion, buildDate, theme,
 }: Props) {
   const isCfo = currentRole === 'CFO'
+  const canEdit = can(currentRole, 'budget:write')
   const router   = useRouter()
   const [busy, setBusy] = useState(false)
   const [done, setDone] = useState(false)
@@ -88,7 +90,7 @@ export default function SettingsClient({
 
       <Panel title="Household">
         <div className="da-grid" style={{ gap: '0.6rem' }}>
-          {isCfo ? (
+          {canEdit ? (
             <form onSubmit={saveNames} style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
               <div className="da-row">
                 <label className="da-label" htmlFor="person1Name">Person 1</label>
@@ -124,7 +126,7 @@ export default function SettingsClient({
       </Panel>
 
       <div style={{ marginTop: '1.5rem' }}>
-        <SituationPanel initial={situation} canEdit={isCfo} person2Name={person2Name} />
+        <SituationPanel initial={situation} canEdit={canEdit} person2Name={person2Name} />
       </div>
 
       <div style={{ marginTop: '1.5rem' }}>
@@ -170,7 +172,7 @@ export default function SettingsClient({
         </div>
       )}
 
-      {isCfo && (
+      {canEdit && (
       <div id="rerun" style={{ marginTop: '1.5rem', padding: '1.25rem', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r)' }}>
         <div style={{ fontSize: '0.875rem', fontWeight: 500, marginBottom: '0.4rem' }}>Re-run setup wizard</div>
         <p style={{ fontSize: '0.78rem', color: 'var(--t2)', marginBottom: '1rem', lineHeight: 1.5 }}>
@@ -207,9 +209,9 @@ export default function SettingsClient({
       )}
 
       <div style={{ marginTop: '1.25rem', fontSize: '0.72rem', color: 'var(--t3)' }}>
-        {isCfo
+        {canEdit
           ? 'To edit individual figures (incomes, expenses, super balances, debts) use Spending, Wealth or Future.'
-          : 'You have view + Actuals-import access. Editing is reserved for CFO members.'}
+          : 'You can view the household’s figures. Editing is for CFO and Partner members.'}
       </div>
 
       <div style={{ marginTop: '0.75rem', fontSize: '0.66rem', color: 'var(--t3)', opacity: 0.6 }}>

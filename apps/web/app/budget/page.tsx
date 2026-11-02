@@ -4,6 +4,7 @@ import { requireAdult } from '@/lib/auth'
 import BudgetClient from '@/components/budget/BudgetClient'
 import { workDaysForYear } from '@proviso/core/projections'
 import { computeCashOnHand } from '@proviso/core/netWorth'
+import { can } from '@/lib/roles'
 
 export default async function BudgetPage() {
   const me = await requireAdult()
@@ -25,7 +26,7 @@ export default async function BudgetPage() {
 
   return (
     <BudgetClient
-      canEdit={me.role === 'CFO'}
+      canEdit={can(me.role, 'budget:write')}
       initialExpenses={expenses}
       initialIncome={income}
       initialChildcare={childcare}

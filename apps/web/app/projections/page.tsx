@@ -6,6 +6,7 @@ import { currentAges } from '@proviso/core/people'
 import { workDaysForYear } from '@proviso/core/projections'
 import type { LifePhase } from '@proviso/core/lifephases'
 import ProjectionsClient from '@/components/projections/ProjectionsClient'
+import { can } from '@/lib/roles'
 
 export default async function ProjectionsPage() {
   const me = await requireAdult()
@@ -54,7 +55,7 @@ export default async function ProjectionsPage() {
 
   return (
     <ProjectionsClient
-      canEdit={me.role === 'CFO'}
+      canEdit={can(me.role, 'budget:write')}
       initialSettings={settings}
       initialPerson1Phases={person1Phases}
       initialPerson2Phases={person2Phases}

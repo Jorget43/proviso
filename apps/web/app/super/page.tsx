@@ -7,6 +7,7 @@ import { workDaysForYear } from '@proviso/core/projections'
 import { currentAges } from '@proviso/core/people'
 import SuperClient from '@/components/super/SuperClient'
 import type { HouseholdSuperInputs, ProjectionContext } from '@proviso/core/super'
+import { can } from '@/lib/roles'
 
 export default async function SuperPage() {
   const me = await requireAdult()
@@ -71,7 +72,7 @@ export default async function SuperPage() {
 
   return (
     <SuperClient
-      canEdit={me.role === 'CFO'}
+      canEdit={can(me.role, 'budget:write')}
       initial={initial}
       context={context}
       mortgage={mortgageContext}

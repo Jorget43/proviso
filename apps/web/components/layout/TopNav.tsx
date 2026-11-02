@@ -85,7 +85,6 @@ export default function TopNav({ user }: { user: TopNavUser | null }) {
               ◷ EOFY
             </Link>
           )}
-          {isPartner && <span className="nav-readonly" title="Partner access — viewing only, plus Actuals import">Read-only</span>}
           {!isChild && (
             <Link href="/settings" className={`nav-icon-btn${pathname.startsWith('/settings') ? ' active' : ''}`} aria-label="Setup & settings">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -108,7 +107,7 @@ export default function TopNav({ user }: { user: TopNavUser | null }) {
               <div className="nav-menu" role="menu">
                 <div className="nav-menu-name">{user.name}</div>
                 <div className="nav-menu-role">
-                  {isPartner ? 'Partner · view only' : isChild ? 'Child' : 'Owner'}
+                  {isPartner ? 'Partner' : isChild ? 'Child' : 'Owner'}
                 </div>
                 <button className="nav-menu-item" role="menuitem" onClick={logout}>Sign out</button>
               </div>

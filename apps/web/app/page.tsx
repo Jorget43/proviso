@@ -6,6 +6,7 @@ import { computeHomeOverview, type OverviewTarget } from '@proviso/core/overview
 import { fmt, fmtK } from '@proviso/core/formatting'
 import { situationLabels } from '@proviso/core/situation'
 import { loadSituation } from '@/lib/situation'
+import { can } from '@/lib/roles'
 
 export const dynamic = 'force-dynamic'
 
@@ -172,7 +173,7 @@ export default async function Home() {
             {situationLabels(situation, hs.person2Name).map(l => <li key={l}>{l}</li>)}
           </ul>
           <Link href="/settings#situation">
-            {me.role === 'CFO' ? 'Change what applies to you' : 'See what’s included'} →
+            {can(me.role, 'budget:write') ? 'Change what applies to you' : 'See what’s included'} →
           </Link>
         </div>
       </section>

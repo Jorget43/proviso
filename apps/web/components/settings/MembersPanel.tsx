@@ -104,7 +104,7 @@ export default function MembersPanel({ users, currentUserId }: { users: Member[]
   return (
     <Panel title="Household members" dotColor="var(--blue)">
       <p style={{ fontSize: '0.72rem', color: 'var(--t3)', margin: '0 0 12px', lineHeight: 1.5 }}>
-        CFOs have full access. Partners can view everything and import Actuals. Children see only their Pocket Money tab.
+        CFOs have full access. Partners can change the budget and plan too; only CFOs manage members, see the activity log and download the data. Children see only their Pocket Money tab.
       </p>
 
       {error && (

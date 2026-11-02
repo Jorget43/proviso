@@ -5,7 +5,7 @@
 // Housing costs charts.)
 import { Chart as ChartJS, LineElement, PointElement, LinearScale, CategoryScale, Filler } from 'chart.js'
 import { Line } from 'react-chartjs-2'
-import { crosshair, SCRUB_BASE, kTicks } from '@/lib/chartPlugins'
+import { crosshair, endLabels, SCRUB_BASE, kTicks } from '@/lib/chartPlugins'
 import { useChartColors, axisTicks } from '@/lib/chartTheme'
 import ScrubChart from '@/components/ui/ScrubChart'
 import { overlayDatasets, type Overlay } from '@/lib/scenarioOverlay'
@@ -28,7 +28,7 @@ export default function HomeChart({ labels, mortData, stressData, rentData, endD
   // On their own hidden scale, so they don't stretch the chart.
   const readOnly = { borderWidth: 0, pointRadius: 0, pointHoverRadius: 0, showLine: false, fill: false, yAxisID: 'readout' }
   const datasets = [
-    { label: 'Home loan left', data: mortData, borderColor: c.red, backgroundColor: c.a(c.red, 0.07), fill: true, tension: 0.4, borderWidth: 2,
+    { label: 'Home loan left', endLabel: 'Loan', data: mortData, borderColor: c.red, backgroundColor: c.a(c.red, 0.07), fill: true, tension: 0.4, borderWidth: 2,
       pointRadius: stressData.map(s => (s > MORTGAGE_STRESS_PCT ? 3.5 : 0)), pointBackgroundColor: c.amber, pointBorderColor: c.amber, pointHoverRadius: 4 },
     { ...readOnly, label: 'Repayments', data: stressData, borderColor: c.amber, format: pct },
     { ...readOnly, label: 'Rent paid', data: rentData, borderColor: c.blue },
@@ -37,7 +37,7 @@ export default function HomeChart({ labels, mortData, stressData, rentData, endD
   return (
     <>
       <ScrubChart labels={labels} datasets={datasets} height={240}>
-        <Line data={{ labels, datasets: datasets as never[] }} plugins={[crosshair]} options={{
+        <Line data={{ labels, datasets: datasets as never[] }} plugins={[crosshair, endLabels]} options={{
           ...SCRUB_BASE,
           scales: {
             x: { ticks: axisTicks(c), grid: { display: false } },

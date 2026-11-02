@@ -5,7 +5,7 @@
 import { Chart as ChartJS, BarElement, LinearScale, CategoryScale } from 'chart.js'
 import { Bar } from 'react-chartjs-2'
 import { fmtK } from '@proviso/core/formatting'
-import { crosshair, SCRUB_BASE, kTicks } from '@/lib/chartPlugins'
+import { crosshair, endLabels, SCRUB_BASE, kTicks } from '@/lib/chartPlugins'
 import { useChartColors, axisTicks } from '@/lib/chartTheme'
 import ScrubChart from '@/components/ui/ScrubChart'
 import { overlayDatasets, type Overlay } from '@/lib/scenarioOverlay'
@@ -45,7 +45,7 @@ export default function SchoolFeeChart({ labels, childArrs, childNames, familyAr
   return (
     <>
       <ScrubChart labels={labels} datasets={datasets as never[]} height={230} defaultIndex={peakIdx >= 0 ? peakIdx : undefined}>
-        <Bar plugins={[crosshair]} data={{ labels, datasets: datasets as never[] }} options={{
+        <Bar plugins={[crosshair, endLabels]} data={{ labels, datasets: datasets as never[] }} options={{
           ...SCRUB_BASE,
           scales: {
             x: { stacked: true, ticks: axisTicks(c), grid: { display: false } },

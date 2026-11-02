@@ -3,6 +3,7 @@ import { prisma } from '@/lib/db'
 import { requireAdult } from '@/lib/auth'
 import { marginalRate } from '@proviso/core/tax'
 import InvestmentsClient from '@/components/investments/InvestmentsClient'
+import { can } from '@/lib/roles'
 
 export default async function InvestmentsPage() {
   const me = await requireAdult()
@@ -25,7 +26,7 @@ export default async function InvestmentsPage() {
 
   return (
     <InvestmentsClient
-      canEdit={me.role === 'CFO'}
+      canEdit={can(me.role, 'budget:write')}
       initialParcels={parcels}
       members={members}
       marginalByMember={marginalByMember}
